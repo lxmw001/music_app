@@ -1,0 +1,157 @@
+import 'package:flutter/material.dart';
+import '../services/youtube_service.dart';
+import '../models/music_models.dart';
+import 'package:provider/provider.dart';
+import '../providers/music_player_provider.dart';
+
+class SearchScreen extends StatefulWidget {
+  @override
+  _SearchScreenState createState() => _SearchScreenState();
+}
+
+class _SearchScreenState extends State<SearchScreen> {
+  final TextEditingController _searchController = TextEditingController();
+  final YouTubeService _youtubeService = YouTubeService();
+  List<Song> searchResults = [];
+  bool isLoading = false;
+
+  Future<void> _performSearch(String query) async {
+    if (query.isEmpty) {
+      setState(() {
+        searchResults = [];
+      });
+      return;
+    }
+
+    setState(() {
+      isLoading = true;
+    });
+
+    final results = await _youtubeService.searchSongs(query);
+    setState(() {
+      searchResults = results;
+      isLoading = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: TextField(
+          controller: _searchController,
+          decoration: InputDecoration(
+            hintText: 'Search songs, artists, albums...',
+            border: InputBorder.none,
+            prefixIcon: Icon(Icons.search),
+          ),
+          onSubmitted: _performSearch,
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+      ),
+      body: isLoading
+          ? Center(child: CircularProgressIndicator())
+          : searchResults.isEmpty
+              ? Column(
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Text(
+                        'Browse all',
+                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    Expanded(
+                      child: GridView.builder(
+                        padding: EdgeInsets.all(16),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          childAspectRatio: 1.5,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                        ),
+                        itemCount: 8,
+                        itemBuilder: (context, index) {
+                          final genres = [
+                            'Pop', 'Rock', 'Hip-Hop', 'Jazz',
+                            'Classical', 'Electronic', 'Country', 'R&B'
+                          ];
+                          final colors = [
+                            Colors.red, Colors.blue, Colors.green, Colors.orange,
+                            Colors.purple, Colors.pink, Colors.teal, Colors.amber
+                          ];
+                          
+                          return GestureDetector(
+                            onTap: () => _performSearch(genres[index]),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: colors[index],
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  genres[index],
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                )
+              : ListView.builder(
+                  itemCount: searchResults.length,
+                  itemBuilder: (context, index) {
+                    final song = searchResults[index];
+                    return ListTile(
+                      leading: ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: Image.network(
+                          song.imageUrl,
+                          width: 50,
+                          height: 50,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              width: 50,
+                              height: 50,
+                              color: Colors.grey[800],
+                              child: Icon(Icons.music_note),
+                            );
+                          },
+                        ),
+                      ),
+                      title: Text(
+                        song.title,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      subtitle: Text(
+                        song.artist,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      trailing: Icon(Icons.more_vert),
+                      onTap: () {
+                        context.read<MusicPlayerProvider>().playSong(
+                          song,
+                          queue: searchResults,
+                        );
+                      },
+                    );
+                  },
+                ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _youtubeService.dispose();
+    super.dispose();
+  }
+}
