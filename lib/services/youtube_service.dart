@@ -33,7 +33,6 @@ class YouTubeService {
       }
       return songs;
     } catch (e) {
-      print('Error searching YouTube: $e');
       return [];
     }
   }
