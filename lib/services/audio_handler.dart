@@ -70,7 +70,16 @@ class AudioPlayerHandler extends BaseAudioHandler {
 
   Future<void> setAudioSource(String url, MediaItem mediaItem) async {
     this.mediaItem.add(mediaItem);
-    await _player.setAudioSource(AudioSource.uri(Uri.parse(url)));
+    await _player.setAudioSource(
+      AudioSource.uri(
+        Uri.parse(url),
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Referer': 'https://www.youtube.com/',
+        },
+      ),
+    );
   }
 
   Future<void> setQueue(List<Song> songs) async {
@@ -83,9 +92,14 @@ class AudioPlayerHandler extends BaseAudioHandler {
         artUri: Uri.parse(song.imageUrl),
         duration: song.duration,
       ),
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer': 'https://www.youtube.com/',
+      },
     )).toList();
 
-    await _player.setAudioSource(ConcatenatingAudioSource(children: audioSources));
+    await _player.setAudioSources(audioSources);
   }
 
   Stream<Duration> get positionStream => _player.positionStream;

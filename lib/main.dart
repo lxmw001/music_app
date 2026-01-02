@@ -7,28 +7,36 @@ import 'screens/library_screen.dart';
 import 'screens/player_screen.dart';
 
 void main() {
-  runApp(MyApp());
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => MusicPlayerProvider()),
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (context) => MusicPlayerProvider(),
-      child: MaterialApp(
-        title: 'Music App',
-        theme: ThemeData(
-          primarySwatch: Colors.green,
-          brightness: Brightness.dark,
-          scaffoldBackgroundColor: Colors.black,
-        ),
-        home: MainScreen(),
+    return MaterialApp(
+      title: 'Music App',
+      theme: ThemeData(
+        primarySwatch: Colors.green,
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: Colors.black,
       ),
+      home: const MainScreen(),
     );
   }
 }
 
 class MainScreen extends StatefulWidget {
+  const MainScreen({super.key});
+
   @override
   _MainScreenState createState() => _MainScreenState();
 }
@@ -59,7 +67,7 @@ class _MainScreenState extends State<MainScreen> {
                   child: Container(
                     height: 60,
                     color: Colors.grey[900],
-                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Row(
                       children: [
                         ClipRRect(
@@ -71,7 +79,7 @@ class _MainScreenState extends State<MainScreen> {
                             fit: BoxFit.cover,
                           ),
                         ),
-                        SizedBox(width: 12),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -79,12 +87,12 @@ class _MainScreenState extends State<MainScreen> {
                             children: [
                               Text(
                                 player.currentSong!.title,
-                                style: TextStyle(fontWeight: FontWeight.bold),
+                                style: const TextStyle(fontWeight: FontWeight.bold),
                                 overflow: TextOverflow.ellipsis,
                               ),
                               Text(
                                 player.currentSong!.artist,
-                                style: TextStyle(color: Colors.grey),
+                                style: const TextStyle(color: Colors.grey),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ],
@@ -105,7 +113,7 @@ class _MainScreenState extends State<MainScreen> {
                   ),
                 );
               }
-              return SizedBox.shrink();
+              return const SizedBox.shrink();
             },
           ),
         ],
@@ -117,7 +125,7 @@ class _MainScreenState extends State<MainScreen> {
         backgroundColor: Colors.black,
         selectedItemColor: Colors.green,
         unselectedItemColor: Colors.grey,
-        items: [
+        items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
           BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Search'),
           BottomNavigationBarItem(icon: Icon(Icons.library_music), label: 'Library'),

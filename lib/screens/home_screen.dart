@@ -32,9 +32,31 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Good evening'),
+        title: const Text('Good evening'),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.wifi_tethering),
+            tooltip: 'Test YouTube Connectivity',
+            onPressed: () async {
+              final result = await _youtubeService.testYouTubeConnectivity();
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: Text('YouTube Connectivity Test'),
+                  content: Text(result ? 'SUCCESS: Device can reach YouTube.' : 'FAILED: Device cannot reach YouTube.'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: Text('OK'),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: EdgeInsets.all(16),
