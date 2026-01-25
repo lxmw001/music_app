@@ -4,7 +4,7 @@ class Song {
   final String artist;
   final String album;
   final String imageUrl;
-  final String audioUrl;
+   String audioUrl;
   final Duration duration;
 
   Song({

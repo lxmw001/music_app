@@ -2,15 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:audio_service/audio_service.dart';
 import '../models/music_models.dart';
 import '../services/audio_handler.dart';
+import '../services/youtube_service.dart';
 
 class MusicPlayerProvider extends ChangeNotifier {
   late AudioPlayerHandler _audioHandler;
+  final YouTubeService _youtubeService = YouTubeService();
   Song? _currentSong;
   List<Song> _queue = [];
   int _currentIndex = 0;
   bool _isShuffled = false;
   bool _isRepeating = false;
   bool _isInitialized = false;
+  bool _autoAddSuggestions = true; // Enable/disable auto-add suggestions
+  bool _isFetchingSuggestions = false;
+  List<Song> _suggestedSongs = [];
 
   Song? _pendingSong;
   List<Song>? _pendingQueue;
@@ -20,6 +25,9 @@ class MusicPlayerProvider extends ChangeNotifier {
   bool get isShuffled => _isShuffled;
   bool get isRepeating => _isRepeating;
   bool get isInitialized => _isInitialized;
+  bool get autoAddSuggestions => _autoAddSuggestions;
+  bool get isFetchingSuggestions => _isFetchingSuggestions;
+  List<Song> get suggestedSongs => _suggestedSongs;
 
   bool get isPlaying => _isInitialized ? _audioHandler.playbackState.value.playing : false;
   Duration get currentPosition => _isInitialized ? _audioHandler.playbackState.value.updatePosition : Duration.zero;
@@ -47,6 +55,21 @@ class MusicPlayerProvider extends ChangeNotifier {
     _audioHandler.mediaItem.listen((_) {
       notifyListeners();
     });
+    
+    // Listen for when a song is about to end and fetch suggestions
+    _audioHandler.positionStream.listen((position) {
+      if (_currentSong != null && _autoAddSuggestions) {
+        final duration = totalDuration;
+        // When song is 10 seconds from ending, fetch suggestions in background
+        if (duration.inSeconds > 0 && 
+            (duration - position).inSeconds <= 10 && 
+            !_isFetchingSuggestions &&
+            _suggestedSongs.isEmpty) {
+          _fetchSuggestionsInBackground();
+        }
+      }
+    });
+    
     notifyListeners();
     
     // If there was a pending playSong call, process it now
@@ -65,12 +88,27 @@ class MusicPlayerProvider extends ChangeNotifier {
       _pendingQueue = queue;
       return;
     }
+    // Clear suggestions when starting a new song
+    _suggestedSongs = [];
+    // Fetch audio URL just before playing
+    String audioUrl = song.audioUrl;
+    if (audioUrl.isEmpty) {
+      audioUrl = await _youtubeService.getAudioUrl(song.id);
+      print('[MusicPlayerProvider] Audio URL fetched for ${song.title}: $audioUrl');
+      song.audioUrl = audioUrl;
+    }
     _currentSong = song;
     if (queue != null) {
       _queue = queue;
       _currentIndex = queue.indexOf(song);
       await _audioHandler.setQueue(queue);
     }
+    // // Fetch audio URL just before playing
+    // String audioUrl = song.audioUrl;
+    // if (audioUrl.isEmpty) {
+    //   audioUrl = await _youtubeService.getAudioUrl(song.id);
+    //   print('[MusicPlayerProvider] Audio URL fetched for ${song.title}: $audioUrl');
+    // }
     final mediaItem = MediaItem(
       id: song.id,
       title: song.title,
@@ -78,7 +116,7 @@ class MusicPlayerProvider extends ChangeNotifier {
       artUri: Uri.parse(song.imageUrl),
       duration: song.duration,
     );
-    await _audioHandler.setAudioSource(song.audioUrl, mediaItem);
+    await _audioHandler.setAudioSource(audioUrl, mediaItem);
     await _audioHandler.play();
     notifyListeners();
   }
@@ -130,6 +168,61 @@ class MusicPlayerProvider extends ChangeNotifier {
 
   void toggleRepeat() {
     _isRepeating = !_isRepeating;
+    notifyListeners();
+  }
+
+  void toggleAutoAddSuggestions() {
+    _autoAddSuggestions = !_autoAddSuggestions;
+    notifyListeners();
+  }
+
+  /// Fetch suggested songs in the background based on current song
+  Future<void> _fetchSuggestionsInBackground() async {
+    if (_currentSong == null || _isFetchingSuggestions) return;
+    
+    _isFetchingSuggestions = true;
+    notifyListeners();
+    
+    try {
+      print('Fetching suggestions for: ${_currentSong!.title}');
+      final suggestions = await _youtubeService.getSuggestedSongs(
+        _currentSong!.id,
+        maxResults: 5,
+      );
+      
+      _suggestedSongs = suggestions;
+      
+      // Automatically add suggestions to queue if enabled
+      if (_autoAddSuggestions && suggestions.isNotEmpty) {
+        _queue.addAll(suggestions);
+        print('Added ${suggestions.length} suggestions to queue');
+      }
+      
+    } catch (e) {
+      print('Error fetching suggestions: $e');
+    } finally {
+      _isFetchingSuggestions = false;
+      notifyListeners();
+    }
+  }
+  
+  /// Manually fetch suggestions for current song
+  Future<void> fetchSuggestions() async {
+    _suggestedSongs = []; // Clear previous suggestions
+    await _fetchSuggestionsInBackground();
+  }
+  
+  /// Add a suggested song to the queue
+  void addSuggestedToQueue(Song song) {
+    if (!_queue.contains(song)) {
+      _queue.add(song);
+      notifyListeners();
+    }
+  }
+  
+  /// Clear suggested songs list
+  void clearSuggestions() {
+    _suggestedSongs = [];
     notifyListeners();
   }
 

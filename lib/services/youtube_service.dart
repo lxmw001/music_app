@@ -1,12 +1,9 @@
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
-import 'package:dio/dio.dart';
 import 'package:http/http.dart' as http;
 import '../models/music_models.dart';
-import 'package:youtube_explode_dart/solvers.dart';
 
 class YouTubeService {
   final YoutubeExplode _yt = YoutubeExplode();
-  final Dio _dio = Dio();
 
   Future<List<Song>> searchSongs(String query) async {
     try {
@@ -14,22 +11,16 @@ class YouTubeService {
       final songs = <Song>[];
 
       for (var video in searchResults.take(5)) {
-        if (video is Video) {
-          final manifest = await _yt.videos.streamsClient.getManifest(video.id,
-            fullManifest: true,
-            ytClients: [YoutubeApiClient.ios, YoutubeApiClient.androidVr]);
-          final audioStream = manifest.audioOnly.withHighestBitrate();
-          
-          songs.add(Song(
-            id: video.id.value,
-            title: video.title,
-            artist: video.author,
-            album: '',
-            imageUrl: video.thumbnails.highResUrl,
-            audioUrl: audioStream.url.toString(),
-            duration: video.duration ?? Duration.zero,
-          ));
-        }
+        // Only basic info, do not fetch manifest here
+        songs.add(Song(
+          id: video.id.value,
+          title: video.title,
+          artist: video.author,
+          album: '',
+          imageUrl: video.thumbnails.highResUrl,
+          audioUrl: '', // Will be fetched before play
+          duration: video.duration ?? Duration.zero,
+        ));
       }
       return songs;
     } catch (e) {
@@ -39,9 +30,10 @@ class YouTubeService {
 
   Future<String> getAudioUrl(String videoId) async {
     try {
-      final manifest = await _yt.videos.streamsClient.getManifest(videoId,
-        fullManifest: true,
-        ytClients: [YoutubeApiClient.ios, YoutubeApiClient.androidVr]);
+      final manifest = await _yt.videos.streamsClient.getManifest(
+        videoId,
+        ytClients: [YoutubeApiClient.ios, YoutubeApiClient.androidVr],
+      );
       final audioStream = manifest.audioOnly.withHighestBitrate();
       return audioStream.url.toString();
     } catch (e) {
@@ -56,23 +48,16 @@ class YouTubeService {
       final songs = <Song>[];
 
       for (var video in searchResults.take(2)) {
-        if (video is Video) {
-          final manifest = await _yt.videos.streamsClient.getManifest(video.id,
-            fullManifest: true,
-            ytClients: [YoutubeApiClient.ios, YoutubeApiClient.androidVr]
-          );
-          final audioStream = manifest.audioOnly.withHighestBitrate();
-          
-          songs.add(Song(
-            id: video.id.value,
-            title: video.title,
-            artist: video.author,
-            album: '',
-            imageUrl: video.thumbnails.highResUrl,
-            audioUrl: audioStream.url.toString(),
-            duration: video.duration ?? Duration.zero,
-          ));
-        }
+        // Only basic info, do not fetch manifest here
+        songs.add(Song(
+          id: video.id.value,
+          title: video.title,
+          artist: video.author,
+          album: '',
+          imageUrl: video.thumbnails.highResUrl,
+          audioUrl: '', // Will be fetched before play
+          duration: video.duration ?? Duration.zero,
+        ));
       }
       return songs;
     } catch (e) {
@@ -88,18 +73,14 @@ class YouTubeService {
       final songs = <Song>[];
 
       for (var video in videos) {
-        final manifest = await _yt.videos.streamsClient.getManifest(video.id,
-          fullManifest: true,
-          ytClients: [YoutubeApiClient.ios, YoutubeApiClient.androidVr]);
-        final audioStream = manifest.audioOnly.withHighestBitrate();
-        
+        // Only basic info, do not fetch manifest here
         songs.add(Song(
           id: video.id.value,
           title: video.title,
           artist: video.author,
           album: playlist.title,
           imageUrl: video.thumbnails.highResUrl,
-          audioUrl: audioStream.url.toString(),
+          audioUrl: '', // Will be fetched before play
           duration: video.duration ?? Duration.zero,
         ));
       }
@@ -124,6 +105,39 @@ class YouTubeService {
     } catch (e) {
       print('YouTube connectivity test: ERROR - \\${e.toString()}');
       return false;
+    }
+  }
+
+  /// Get suggested songs based on a video ID
+  Future<List<Song>> getSuggestedSongs(String videoId, {int maxResults = 5}) async {
+    try {
+      // Get the video details first
+      final video = await _yt.videos.get(videoId);
+      
+      // Search for related content using the video title and artist
+      final searchQuery = '${video.title} ${video.author}';
+      final searchResults = await _yt.search.search(searchQuery);
+      final songs = <Song>[];
+
+      // Skip the first result as it's likely the same song
+      for (var result in searchResults.skip(1).take(maxResults)) {
+        // Only basic info, do not fetch manifest here
+        songs.add(Song(
+          id: result.id.value,
+          title: result.title,
+          artist: result.author,
+          album: '',
+          imageUrl: result.thumbnails.highResUrl,
+          audioUrl: '', // Will be fetched before play
+          duration: result.duration ?? Duration.zero,
+        ));
+      }
+      
+      print('Found \\${songs.length} suggested songs for: \\${video.title}');
+      return songs;
+    } catch (e) {
+      print('Error getting suggested songs: $e');
+      return [];
     }
   }
 
