@@ -118,6 +118,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
 
   Future<void> playSong(Song song, {List<Song>? queue}) async {
     if (!_isInitialized) {
+      print('[MusicPlayerProvider] not initialized yet, queuing: ${song.title}');
       _pendingSong = song;
       _pendingQueue = queue;
       _loadingAudioIds.add(song.id);
