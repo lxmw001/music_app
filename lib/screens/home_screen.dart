@@ -30,11 +30,6 @@ class _HomeScreenState extends State<HomeScreen> {
       trendingSongs = songs;
       isLoading = false;
     });
-
-    // Pre-fetch via provider so loading state is tracked and spinner shows
-    if (mounted) {
-      context.read<MusicPlayerProvider>().prefetchAudioUrls(songs);
-    }
   }
 
   @override

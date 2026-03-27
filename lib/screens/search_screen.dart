@@ -36,11 +36,6 @@ class _SearchScreenState extends State<SearchScreen> {
       searchResults = results;
       isLoading = false;
     });
-
-    // Pre-fetch via provider so loading state is tracked and spinner shows
-    if (mounted) {
-      context.read<MusicPlayerProvider>().prefetchAudioUrls(results);
-    }
   }
 
   @override
