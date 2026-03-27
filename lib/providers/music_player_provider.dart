@@ -116,6 +116,14 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       _pendingQueue = queue;
       return;
     }
+    // Show song immediately in UI while audio URL is being fetched
+    _currentSong = song;
+    if (queue != null) {
+      _queue = queue;
+      _currentIndex = queue.indexOf(song);
+    }
+    notifyListeners();
+
     // Clear suggestions when starting a new song
     _suggestedSongs = [];
     // Fetch audio URL just before playing
@@ -124,12 +132,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       audioUrl = await _youtubeService.getAudioUrl(song.id);
       print('[MusicPlayerProvider] Audio URL fetched for ${song.title}: $audioUrl');
       song.audioUrl = audioUrl;
-    }
-    _currentSong = song;
-    if (queue != null) {
-      _queue = queue;
-      _currentIndex = queue.indexOf(song);
-      // Don't call setQueue — audio URLs are fetched lazily per song
     }
     // // Fetch audio URL just before playing
     // String audioUrl = song.audioUrl;
