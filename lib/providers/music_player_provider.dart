@@ -4,7 +4,35 @@ import '../models/music_models.dart';
 import '../services/audio_handler.dart';
 import '../services/youtube_service.dart';
 
-class MusicPlayerProvider extends ChangeNotifier {
+abstract class MusicPlayerProvider extends ChangeNotifier {
+  Song? get currentSong;
+  List<Song> get queue;
+  bool get isShuffled;
+  bool get isRepeating;
+  bool get isInitialized;
+  bool get autoAddSuggestions;
+  bool get isFetchingSuggestions;
+  List<Song> get suggestedSongs;
+  bool get isPlaying;
+  Duration get currentPosition;
+  Duration get totalDuration;
+
+  Future<void> playSong(Song song, {List<Song>? queue});
+  Future<void> pause();
+  Future<void> resume();
+  Future<void> stop();
+  Future<void> seekTo(Duration position);
+  void nextSong();
+  void previousSong();
+  void toggleShuffle();
+  void toggleRepeat();
+  void toggleAutoAddSuggestions();
+  Future<void> fetchSuggestions();
+  void addSuggestedToQueue(Song song);
+  void clearSuggestions();
+}
+
+class MusicPlayerProviderImpl extends MusicPlayerProvider {
   late AudioPlayerHandler _audioHandler;
   final YouTubeService _youtubeService = YouTubeService();
   Song? _currentSong;

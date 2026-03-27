@@ -11,7 +11,7 @@ void main() {
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => MusicPlayerProvider()),
+        ChangeNotifierProvider(create: (_) => MusicPlayerProviderImpl()),
       ],
       child: const MyApp(),
     ),
@@ -68,6 +68,7 @@ class _MainScreenState extends State<MainScreen> {
             builder: (context, player, child) {
               if (player.currentSong != null) {
                 return GestureDetector(
+                  key: const Key('mini_player'),
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(builder: (context) => PlayerScreen()),
@@ -85,6 +86,10 @@ class _MainScreenState extends State<MainScreen> {
                             width: 40,
                             height: 40,
                             fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              width: 40, height: 40, color: Colors.grey[700],
+                              child: const Icon(Icons.music_note, size: 20),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 12),

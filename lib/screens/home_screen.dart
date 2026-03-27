@@ -107,6 +107,10 @@ class _HomeScreenState extends State<HomeScreen> {
                           width: 60,
                           height: 60,
                           fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            width: 60, height: 60, color: Colors.grey[700],
+                            child: const Icon(Icons.music_note, size: 20),
+                          ),
                         ),
                       ),
                       SizedBox(width: 12),
@@ -155,19 +159,19 @@ class _HomeScreenState extends State<HomeScreen> {
                                   child: Image.network(
                                     song.imageUrl,
                                     width: 160,
-                                    height: 160,
+                                    height: 150,
                                     fit: BoxFit.cover,
                                     errorBuilder: (context, error, stackTrace) {
                                       return Container(
                                         width: 160,
-                                        height: 160,
+                                        height: 150,
                                         color: Colors.grey[800],
                                         child: Icon(Icons.music_note),
                                       );
                                     },
                                   ),
                                 ),
-                                SizedBox(height: 8),
+                                SizedBox(height: 4),
                                 Text(
                                   song.title,
                                   style: TextStyle(fontWeight: FontWeight.bold),

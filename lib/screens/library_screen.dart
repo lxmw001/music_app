@@ -89,6 +89,10 @@ class LibraryScreen extends StatelessWidget {
                         width: 50,
                         height: 50,
                         fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          width: 50, height: 50, color: Colors.grey[700],
+                          child: const Icon(Icons.music_note, size: 20),
+                        ),
                       ),
                     ),
                     title: Text('My Playlist ${index + 1}'),
