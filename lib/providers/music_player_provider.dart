@@ -129,7 +129,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     if (queue != null) {
       _queue = queue;
       _currentIndex = queue.indexOf(song);
-      await _audioHandler.setQueue(queue);
+      // Don't call setQueue — audio URLs are fetched lazily per song
     }
     // // Fetch audio URL just before playing
     // String audioUrl = song.audioUrl;
