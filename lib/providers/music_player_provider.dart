@@ -118,6 +118,13 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     if (!_isInitialized) {
       _pendingSong = song;
       _pendingQueue = queue;
+      _loadingAudioIds.add(song.id);
+      _currentSong = song;
+      if (queue != null) {
+        _queue = queue;
+        _currentIndex = queue.indexOf(song);
+      }
+      notifyListeners();
       return;
     }
     // Show song immediately in UI while audio URL is being fetched
