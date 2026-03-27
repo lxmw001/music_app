@@ -111,6 +111,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       _pendingSong = null;
       _pendingQueue = null;
       _loadingAudioIds.remove(song!.id); // clear pending spinner before re-playing
+      print('[MusicPlayerProvider] _init complete, processing pending song: ${song.id}');
       await playSong(song, queue: queue);
     }
   }
@@ -139,11 +140,12 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     // Clear suggestions when starting a new song
     _suggestedSongs = [];
     String audioUrl = song.audioUrl;
+    print('[MusicPlayerProvider] playSong: ${song.title}, audioUrl empty=${audioUrl.isEmpty}, loadingIds=$_loadingAudioIds');
     if (audioUrl.isEmpty) {
       _loadingAudioIds.add(song.id);
       notifyListeners();
       audioUrl = await _youtubeService.getAudioUrl(song.id);
-      print('[MusicPlayerProvider] Audio URL fetched for ${song.title}: $audioUrl');
+      print('[MusicPlayerProvider] Audio URL fetched for ${song.title}: ${audioUrl.isEmpty ? "EMPTY" : "OK"}');
       song.audioUrl = audioUrl;
       _loadingAudioIds.remove(song.id);
     }

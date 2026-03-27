@@ -114,40 +114,27 @@ class _SearchScreenState extends State<SearchScreen> {
                   itemCount: searchResults.length,
                   itemBuilder: (context, index) {
                     final song = searchResults[index];
-                    return Consumer<MusicPlayerProvider>(
-                      builder: (context, player, _) {
-                        final isLoading = player.isLoadingAudio(song.id);
-                        return ListTile(
-                          leading: ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                Image.network(
-                                  song.imageUrl,
-                                  width: 50,
-                                  height: 50,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) => Container(
-                                    width: 50, height: 50,
-                                    color: Colors.grey[800],
-                                    child: Icon(Icons.music_note),
-                                  ),
-                                ),
-                                if (isLoading)
-                                  Container(
-                                    width: 50, height: 50,
-                                    color: Colors.black54,
-                                    child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                  ),
-                              ],
-                            ),
+                    return ListTile(
+                      leading: ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: Image.network(
+                          song.imageUrl,
+                          width: 50,
+                          height: 50,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            width: 50, height: 50,
+                            color: Colors.grey[800],
+                            child: Icon(Icons.music_note),
                           ),
-                          title: Text(song.title, overflow: TextOverflow.ellipsis),
-                          subtitle: Text(song.artist, overflow: TextOverflow.ellipsis),
-                          trailing: Icon(Icons.more_vert),
-                          onTap: () => player.playSong(song, queue: searchResults),
-                        );
+                        ),
+                      ),
+                      title: Text(song.title, overflow: TextOverflow.ellipsis),
+                      subtitle: Text(song.artist, overflow: TextOverflow.ellipsis),
+                      trailing: Icon(Icons.more_vert),
+                      onTap: () {
+                        print('[SearchScreen] tapped: ${song.title}');
+                        context.read<MusicPlayerProvider>().playSong(song, queue: searchResults);
                       },
                     );
                   },
