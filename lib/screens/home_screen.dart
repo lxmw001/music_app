@@ -31,11 +31,9 @@ class _HomeScreenState extends State<HomeScreen> {
       isLoading = false;
     });
 
-    // Pre-fetch audio URLs in background so next/prev are instant
-    for (final song in songs) {
-      if (song.audioUrl.isEmpty) {
-        _youtubeService.getAudioUrl(song.id).then((url) => song.audioUrl = url);
-      }
+    // Pre-fetch via provider so loading state is tracked and spinner shows
+    if (mounted) {
+      context.read<MusicPlayerProvider>().prefetchAudioUrls(songs);
     }
   }
 
@@ -141,51 +139,59 @@ class _HomeScreenState extends State<HomeScreen> {
                       itemCount: trendingSongs.length,
                       itemBuilder: (context, index) {
                         final song = trendingSongs[index];
-                        return GestureDetector(
-                          onTap: () {
-                            context.read<MusicPlayerProvider>().playSong(
-                              song,
-                              queue: trendingSongs,
+                        return Consumer<MusicPlayerProvider>(
+                          builder: (context, player, _) {
+                            final isLoading = player.isLoadingAudio(song.id);
+                            return GestureDetector(
+                              onTap: () => player.playSong(song, queue: trendingSongs),
+                              child: Container(
+                                width: 160,
+                                margin: EdgeInsets.only(right: 16),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Stack(
+                                        alignment: Alignment.center,
+                                        children: [
+                                          Image.network(
+                                            song.imageUrl,
+                                            width: 160,
+                                            height: 150,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (context, error, stackTrace) => Container(
+                                              width: 160, height: 150,
+                                              color: Colors.grey[800],
+                                              child: Icon(Icons.music_note),
+                                            ),
+                                          ),
+                                          if (isLoading)
+                                            Container(
+                                              width: 160, height: 150,
+                                              color: Colors.black54,
+                                              child: const CircularProgressIndicator(color: Colors.white),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                    SizedBox(height: 4),
+                                    Text(
+                                      song.title,
+                                      style: TextStyle(fontWeight: FontWeight.bold),
+                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 2,
+                                    ),
+                                    Text(
+                                      song.artist,
+                                      style: TextStyle(color: Colors.grey),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
                             );
                           },
-                          child: Container(
-                            width: 160,
-                            margin: EdgeInsets.only(right: 16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Image.network(
-                                    song.imageUrl,
-                                    width: 160,
-                                    height: 150,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return Container(
-                                        width: 160,
-                                        height: 150,
-                                        color: Colors.grey[800],
-                                        child: Icon(Icons.music_note),
-                                      );
-                                    },
-                                  ),
-                                ),
-                                SizedBox(height: 4),
-                                Text(
-                                  song.title,
-                                  style: TextStyle(fontWeight: FontWeight.bold),
-                                  overflow: TextOverflow.ellipsis,
-                                  maxLines: 2,
-                                ),
-                                Text(
-                                  song.artist,
-                                  style: TextStyle(color: Colors.grey),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
-                            ),
-                          ),
                         );
                       },
                     ),

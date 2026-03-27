@@ -13,6 +13,8 @@ abstract class MusicPlayerProvider extends ChangeNotifier {
   bool get autoAddSuggestions;
   bool get isFetchingSuggestions;
   List<Song> get suggestedSongs;
+  bool isLoadingAudio(String songId);
+  void prefetchAudioUrls(List<Song> songs);
   bool get isPlaying;
   Duration get currentPosition;
   Duration get totalDuration;
@@ -41,7 +43,9 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   bool _isShuffled = false;
   bool _isRepeating = false;
   bool _isInitialized = false;
-  bool _autoAddSuggestions = true; // Enable/disable auto-add suggestions
+  bool _autoAddSuggestions = true;
+  final Set<String> _loadingAudioIds = {};
+  bool isLoadingAudio(String songId) => _loadingAudioIds.contains(songId);
   bool _isFetchingSuggestions = false;
   List<Song> _suggestedSongs = [];
 
@@ -126,12 +130,14 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
 
     // Clear suggestions when starting a new song
     _suggestedSongs = [];
-    // Fetch audio URL just before playing
     String audioUrl = song.audioUrl;
     if (audioUrl.isEmpty) {
+      _loadingAudioIds.add(song.id);
+      notifyListeners();
       audioUrl = await _youtubeService.getAudioUrl(song.id);
       print('[MusicPlayerProvider] Audio URL fetched for ${song.title}: $audioUrl');
       song.audioUrl = audioUrl;
+      _loadingAudioIds.remove(song.id);
     }
     // // Fetch audio URL just before playing
     // String audioUrl = song.audioUrl;
@@ -232,7 +238,20 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     }
   }
   
-  /// Manually fetch suggestions for current song
+  /// Pre-fetch audio URLs for a list of songs in the background
+  void prefetchAudioUrls(List<Song> songs) {
+    for (final song in songs) {
+      if (song.audioUrl.isEmpty && !_loadingAudioIds.contains(song.id)) {
+        _loadingAudioIds.add(song.id);
+        notifyListeners();
+        _youtubeService.getAudioUrl(song.id).then((url) {
+          song.audioUrl = url;
+          _loadingAudioIds.remove(song.id);
+          notifyListeners();
+        });
+      }
+    }
+  }
   Future<void> fetchSuggestions() async {
     _suggestedSongs = []; // Clear previous suggestions
     await _fetchSuggestionsInBackground();

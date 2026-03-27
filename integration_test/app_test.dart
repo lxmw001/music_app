@@ -51,6 +51,8 @@ class FakeMusicPlayerProvider extends ChangeNotifier implements MusicPlayerProvi
   final List<Song> _queue = [];
 
   @override Song? get currentSong => _song;
+  @override bool isLoadingAudio(String songId) => false;
+  @override void prefetchAudioUrls(List<Song> songs) {}
   @override bool get isPlaying => _playing;
   @override bool get isShuffled => _shuffled;
   @override bool get isRepeating => _repeating;
