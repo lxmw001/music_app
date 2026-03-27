@@ -70,7 +70,9 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   }
 
   Future<void> _init() async {
-    _audioHandler = await AudioService.init(
+    try {
+      print('[MusicPlayerProvider] starting AudioService.init');
+      _audioHandler = await AudioService.init(
       builder: () => AudioPlayerHandler(),
       config: const AudioServiceConfig(
         androidNotificationChannelId: 'com.example.music_app.channel.audio',
@@ -79,6 +81,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         androidShowNotificationBadge: true,
       ),
     );
+    print('[MusicPlayerProvider] AudioService.init complete');
     _isInitialized = true;
     
     _audioHandler.playbackState.listen((_) {
@@ -114,7 +117,10 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       print('[MusicPlayerProvider] _init complete, processing pending song: ${song.id}');
       await playSong(song, queue: queue);
     }
+  } catch (e, st) {
+    print('[MusicPlayerProvider] _init ERROR: $e\n$st');
   }
+}
 
   Future<void> playSong(Song song, {List<Song>? queue}) async {
     if (!_isInitialized) {
