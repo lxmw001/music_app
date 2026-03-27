@@ -343,10 +343,9 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
 
   void _recordCurrentSongPlay() {
     if (_currentSong == null) return;
-    final total = totalDuration.inSeconds;
     final position = currentPosition.inSeconds;
-    if (total <= 0) return;
-    _historyService.recordPlay(_currentSong!, position / total);
+    if (position <= 0) return;
+    _historyService.recordPlay(_currentSong!, position);
   }
 
   Future<List<({Song song, int likedCount, int playCount})>> getMostLiked(List<Song> knownSongs) =>

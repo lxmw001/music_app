@@ -20,12 +20,16 @@ class PlayHistoryService {
     await prefs.setString(_key, jsonEncode(data));
   }
 
-  /// Call when a song finishes or is skipped. [listenedPercent] 0.0–1.0
-  Future<void> recordPlay(Song song, double listenedPercent) async {
+  /// Call when a song finishes or is skipped. [listenedSeconds] how many seconds played.
+  Future<void> recordPlay(Song song, int listenedSeconds) async {
     final data = await _load();
     final entry = data[song.id] ?? {'playCount': 0, 'likedCount': 0};
     entry['playCount'] = (entry['playCount'] ?? 0) + 1;
-    if (listenedPercent >= 0.5) {
+    final durationSeconds = song.duration.inSeconds;
+    final isLiked = durationSeconds >= 360
+        ? listenedSeconds >= 180          // long (≥6 min): 3 min threshold
+        : listenedSeconds >= durationSeconds * 0.5; // short: 50% threshold
+    if (isLiked) {
       entry['likedCount'] = (entry['likedCount'] ?? 0) + 1;
     }
     data[song.id] = entry;
