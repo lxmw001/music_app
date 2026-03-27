@@ -3,6 +3,7 @@ import 'package:audio_service/audio_service.dart';
 import '../models/music_models.dart';
 import '../services/audio_handler.dart';
 import '../services/youtube_service.dart';
+import '../services/play_history_service.dart';
 
 abstract class MusicPlayerProvider extends ChangeNotifier {
   Song? get currentSong;
@@ -32,11 +33,13 @@ abstract class MusicPlayerProvider extends ChangeNotifier {
   Future<void> fetchSuggestions();
   void addSuggestedToQueue(Song song);
   void clearSuggestions();
+  Future<List<({Song song, int likedCount, int playCount})>> getMostLiked(List<Song> knownSongs);
 }
 
 class MusicPlayerProviderImpl extends MusicPlayerProvider {
   late AudioPlayerHandler _audioHandler;
   final YouTubeService _youtubeService = YouTubeService();
+  final PlayHistoryService _historyService = PlayHistoryService();
   Song? _currentSong;
   List<Song> _queue = [];
   int _currentIndex = 0;
@@ -138,6 +141,9 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     }
     // Don't restart if same song is already playing
     if (_currentSong?.id == song.id && isPlaying) return;
+
+    // Record listen percentage for the song being replaced
+    _recordCurrentSongPlay();
     _currentSong = song;
     if (queue != null) {
       _queue = queue;
@@ -311,10 +317,20 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     }
   }
   Future<void> fetchSuggestions() async {
-    _suggestedSongs = []; // Clear previous suggestions
+    _suggestedSongs = [];
     await _fetchSuggestionsInBackground();
   }
-  
+
+  void _recordCurrentSongPlay() {
+    if (_currentSong == null) return;
+    final total = totalDuration.inSeconds;
+    final position = currentPosition.inSeconds;
+    if (total <= 0) return;
+    _historyService.recordPlay(_currentSong!, position / total);
+  }
+
+  Future<List<({Song song, int likedCount, int playCount})>> getMostLiked(List<Song> knownSongs) =>
+      _historyService.getMostLiked(knownSongs);
   /// Add a suggested song to the queue
   void addSuggestedToQueue(Song song) {
     if (!_queue.contains(song)) {
