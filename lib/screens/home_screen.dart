@@ -164,8 +164,13 @@ class _HomeScreenState extends State<HomeScreen> {
                                           if (isLoading)
                                             Container(
                                               width: 160, height: 150,
-                                              color: Colors.black54,
-                                              child: const CircularProgressIndicator(color: Colors.white),
+                                              color: Colors.black45,
+                                              child: const Center(
+                                                child: SizedBox(
+                                                  width: 32, height: 32,
+                                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                                ),
+                                              ),
                                             ),
                                         ],
                                       ),
