@@ -136,7 +136,8 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       notifyListeners();
       return;
     }
-    // Show song immediately in UI while audio URL is being fetched
+    // Don't restart if same song is already playing
+    if (_currentSong?.id == song.id && isPlaying) return;
     _currentSong = song;
     if (queue != null) {
       _queue = queue;
