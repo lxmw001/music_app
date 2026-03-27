@@ -5,18 +5,22 @@ import '../models/music_models.dart';
 import '../services/youtube_service.dart';
 
 class HomeScreen extends StatefulWidget {
+  final YouTubeService? youtubeService;
+  const HomeScreen({super.key, this.youtubeService});
+
   @override
   _HomeScreenState createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final YouTubeService _youtubeService = YouTubeService();
+  late final YouTubeService _youtubeService;
   List<Song> trendingSongs = [];
   bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
+    _youtubeService = widget.youtubeService ?? YouTubeService();
     _loadTrendingMusic();
   }
 

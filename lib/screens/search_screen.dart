@@ -5,15 +5,24 @@ import 'package:provider/provider.dart';
 import '../providers/music_player_provider.dart';
 
 class SearchScreen extends StatefulWidget {
+  final YouTubeService? youtubeService;
+  const SearchScreen({super.key, this.youtubeService});
+
   @override
   _SearchScreenState createState() => _SearchScreenState();
 }
 
 class _SearchScreenState extends State<SearchScreen> {
+  late final YouTubeService _youtubeService;
   final TextEditingController _searchController = TextEditingController();
-  final YouTubeService _youtubeService = YouTubeService();
   List<Song> searchResults = [];
   bool isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _youtubeService = widget.youtubeService ?? YouTubeService();
+  }
 
   Future<void> _performSearch(String query) async {
     if (query.isEmpty) {

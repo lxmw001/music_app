@@ -5,6 +5,7 @@ import 'screens/home_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/library_screen.dart';
 import 'screens/player_screen.dart';
+import 'services/youtube_service.dart';
 
 void main() {
   runApp(
@@ -35,7 +36,8 @@ class MyApp extends StatelessWidget {
 }
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({super.key});
+  final YouTubeService? youtubeService;
+  const MainScreen({super.key, this.youtubeService});
 
   @override
   _MainScreenState createState() => _MainScreenState();
@@ -43,12 +45,18 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
-  
-  final List<Widget> _screens = [
-    HomeScreen(),
-    SearchScreen(),
-    LibraryScreen(),
-  ];
+
+  late final List<Widget> _screens;
+
+  @override
+  void initState() {
+    super.initState();
+    _screens = [
+      HomeScreen(youtubeService: widget.youtubeService),
+      SearchScreen(youtubeService: widget.youtubeService),
+      LibraryScreen(),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
