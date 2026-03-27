@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] - 2026-03-27
+
+### Added
+- Unit tests for `YouTubeService` (14 tests) covering search, audio URL, trending, playlist, connectivity, and suggestions
+- Unit tests for `AudioPlayerHandler` (11 tests) covering all playback controls and streams
+
+### Changed
+- Refactored `YouTubeService` to use a `YoutubeGateway` abstraction for dependency injection
+- Refactored `AudioPlayerHandler` to accept an injected `AudioPlayer` instance
+
+### Technical
+- Added `mockito` and `build_runner` dev dependencies
+- Generated mock files for service tests
+
 ## [1.2.0] - 2025-12-31
 
 ### Added
