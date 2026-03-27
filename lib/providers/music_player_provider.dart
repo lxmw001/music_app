@@ -172,6 +172,14 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     await _audioHandler.setAudioSource(audioUrl, mediaItem);
     await _audioHandler.play();
     notifyListeners();
+
+    // Pre-fetch next song's URL in background to reduce lag on next tap
+    if (_queue.isNotEmpty && _currentIndex < _queue.length - 1) {
+      final nextSong = _queue[_currentIndex + 1];
+      if (nextSong.audioUrl.isEmpty) {
+        _youtubeService.getAudioUrl(nextSong.id).then((url) => nextSong.audioUrl = url);
+      }
+    }
   }
 
   Future<void> pause() async {
