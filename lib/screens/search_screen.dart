@@ -134,7 +134,13 @@ class _SearchScreenState extends State<SearchScreen> {
                       trailing: Icon(Icons.more_vert),
                       onTap: () {
                         print('[SearchScreen] tapped: ${song.title}');
-                        player.playSong(song, queue: searchResults);
+                        try {
+                          final p = context.read<MusicPlayerProvider>();
+                          print('[SearchScreen] provider found: $p');
+                          p.playSong(song, queue: searchResults);
+                        } catch (e) {
+                          print('[SearchScreen] ERROR: $e');
+                        }
                       },
                     );
                   },
