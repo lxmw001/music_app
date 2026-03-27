@@ -30,6 +30,13 @@ class _HomeScreenState extends State<HomeScreen> {
       trendingSongs = songs;
       isLoading = false;
     });
+
+    // Pre-fetch audio URLs in background so next/prev are instant
+    for (final song in songs) {
+      if (song.audioUrl.isEmpty) {
+        _youtubeService.getAudioUrl(song.id).then((url) => song.audioUrl = url);
+      }
+    }
   }
 
   @override

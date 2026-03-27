@@ -26,21 +26,23 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Future<void> _performSearch(String query) async {
     if (query.isEmpty) {
-      setState(() {
-        searchResults = [];
-      });
+      setState(() => searchResults = []);
       return;
     }
-
-    setState(() {
-      isLoading = true;
-    });
+    setState(() => isLoading = true);
 
     final results = await _youtubeService.searchSongs(query);
     setState(() {
       searchResults = results;
       isLoading = false;
     });
+
+    // Pre-fetch audio URLs in background so next/prev are instant
+    for (final song in results) {
+      if (song.audioUrl.isEmpty) {
+        _youtubeService.getAudioUrl(song.id).then((url) => song.audioUrl = url);
+      }
+    }
   }
 
   @override

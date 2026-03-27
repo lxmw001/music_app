@@ -145,9 +145,7 @@ class MusicPlayerProvider extends ChangeNotifier {
     if (!_isInitialized) return;
     if (_queue.isNotEmpty && _currentIndex < _queue.length - 1) {
       _currentIndex++;
-      _currentSong = _queue[_currentIndex];
-      _audioHandler.skipToNext();
-      notifyListeners();
+      playSong(_queue[_currentIndex]);
     }
   }
 
@@ -155,9 +153,7 @@ class MusicPlayerProvider extends ChangeNotifier {
     if (!_isInitialized) return;
     if (_queue.isNotEmpty && _currentIndex > 0) {
       _currentIndex--;
-      _currentSong = _queue[_currentIndex];
-      _audioHandler.skipToPrevious();
-      notifyListeners();
+      playSong(_queue[_currentIndex]);
     }
   }
 
