@@ -4,6 +4,7 @@ import '../models/music_models.dart';
 
 class PlayHistoryService {
   static const _key = 'play_history';
+  static const _lastSongKey = 'last_played_song';
 
   // songId -> {playCount, likedCount}
   Future<Map<String, Map<String, int>>> _load() async {
@@ -29,6 +30,27 @@ class PlayHistoryService {
     }
     data[song.id] = entry;
     await _save(data);
+    await saveLastSong(song);
+  }
+
+  Future<void> saveLastSong(Song song) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_lastSongKey, jsonEncode({
+      'id': song.id,
+      'title': song.title,
+      'artist': song.artist,
+      'album': song.album,
+      'imageUrl': song.imageUrl,
+      'audioUrl': song.audioUrl,
+      'duration': song.duration.inSeconds,
+    }));
+  }
+
+  Future<Song?> loadLastSong() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_lastSongKey);
+    if (raw == null) return null;
+    return Song.fromJson(jsonDecode(raw));
   }
 
   /// Returns songs sorted by likedCount descending

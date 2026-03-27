@@ -86,6 +86,13 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     );
     print('[MusicPlayerProvider] AudioService.init complete');
     _isInitialized = true;
+
+    // Restore last played song so mini player shows on startup
+    final lastSong = await _historyService.loadLastSong();
+    if (lastSong != null && _pendingSong == null) {
+      _currentSong = lastSong;
+      notifyListeners();
+    }
     
     _audioHandler.playbackState.listen((_) {
       notifyListeners();
@@ -178,6 +185,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     );
     await _audioHandler.setAudioSource(audioUrl, mediaItem);
     await _audioHandler.play();
+    _historyService.saveLastSong(song);
     notifyListeners();
 
     // Pre-fetch next song's URL in background to reduce lag on next tap
