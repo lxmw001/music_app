@@ -65,7 +65,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   Duration get currentPosition => _isInitialized ? _audioHandler.playbackState.value.updatePosition : Duration.zero;
   Duration get totalDuration => _isInitialized ? _audioHandler.mediaItem.value?.duration ?? Duration.zero : Duration.zero;
 
-  MusicPlayerProvider() {
+  MusicPlayerProviderImpl() {
     _init();
   }
 
