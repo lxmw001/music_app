@@ -54,10 +54,10 @@ class _SearchScreenState extends State<SearchScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
-      body: isLoading
-          ? Center(child: CircularProgressIndicator())
-          : searchResults.isEmpty
-              ? Column(
+      body: Builder(builder: (context) {
+        final player = context.read<MusicPlayerProvider>();
+        if (isLoading) return Center(child: CircularProgressIndicator());
+        if (searchResults.isEmpty) return Column(
                   children: [
                     Padding(
                       padding: EdgeInsets.all(16),
@@ -109,8 +109,8 @@ class _SearchScreenState extends State<SearchScreen> {
                       ),
                     ),
                   ],
-                )
-              : ListView.builder(
+                );
+        return ListView.builder(
                   itemCount: searchResults.length,
                   itemBuilder: (context, index) {
                     final song = searchResults[index];
@@ -134,11 +134,12 @@ class _SearchScreenState extends State<SearchScreen> {
                       trailing: Icon(Icons.more_vert),
                       onTap: () {
                         print('[SearchScreen] tapped: ${song.title}');
-                        context.read<MusicPlayerProvider>().playSong(song, queue: searchResults);
+                        player.playSong(song, queue: searchResults);
                       },
                     );
                   },
-                ),
+                );
+      }),
     );
   }
 
