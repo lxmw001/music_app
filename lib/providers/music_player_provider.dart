@@ -110,7 +110,8 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       final queue = _pendingQueue;
       _pendingSong = null;
       _pendingQueue = null;
-      await playSong(song!, queue: queue);
+      _loadingAudioIds.remove(song!.id); // clear pending spinner before re-playing
+      await playSong(song, queue: queue);
     }
   }
 
