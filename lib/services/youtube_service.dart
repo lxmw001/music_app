@@ -2,27 +2,67 @@ import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:http/http.dart' as http;
 import '../models/music_models.dart';
 
+/// Thin abstraction over YoutubeExplode to allow testing without real network calls.
+abstract class YoutubeGateway {
+  Future<List<Video>> search(String query, {int limit = 5});
+  Future<String> getAudioUrl(String videoId);
+  Future<Video> getVideo(String videoId);
+  Future<({String playlistTitle, List<Video> videos})> getPlaylistVideos(String playlistId);
+}
+
+class YoutubeExplodeGateway implements YoutubeGateway {
+  final YoutubeExplode _yt;
+  YoutubeExplodeGateway({YoutubeExplode? yt}) : _yt = yt ?? YoutubeExplode();
+
+  @override
+  Future<List<Video>> search(String query, {int limit = 5}) async {
+    final results = await _yt.search.search(query);
+    return results.take(limit).toList();
+  }
+
+  @override
+  Future<String> getAudioUrl(String videoId) async {
+    final manifest = await _yt.videos.streamsClient.getManifest(
+      videoId,
+      ytClients: [YoutubeApiClient.ios, YoutubeApiClient.androidVr],
+    );
+    return manifest.audioOnly.withHighestBitrate().url.toString();
+  }
+
+  @override
+  Future<Video> getVideo(String videoId) => _yt.videos.get(videoId);
+
+  @override
+  Future<({String playlistTitle, List<Video> videos})> getPlaylistVideos(
+      String playlistId) async {
+    final playlist = await _yt.playlists.get(playlistId);
+    final videos = await _yt.playlists.getVideos(playlistId).toList();
+    return (playlistTitle: playlist.title, videos: videos);
+  }
+}
+
+Song _videoToSong(Video video, {String album = ''}) => Song(
+      id: video.id.value,
+      title: video.title,
+      artist: video.author,
+      album: album,
+      imageUrl: video.thumbnails.highResUrl,
+      audioUrl: '',
+      duration: video.duration ?? Duration.zero,
+    );
+
 class YouTubeService {
-  final YoutubeExplode _yt = YoutubeExplode();
+  final YoutubeGateway _gateway;
+  final http.Client _httpClient;
+
+  YouTubeService({YoutubeGateway? gateway, http.Client? httpClient})
+      : _gateway = gateway ?? YoutubeExplodeGateway(),
+        _httpClient = httpClient ?? http.Client();
 
   Future<List<Song>> searchSongs(String query) async {
     try {
-      final searchResults = await _yt.search.search(query);
-      final songs = <Song>[];
-
-      for (var video in searchResults.take(5)) {
-        // Only basic info, do not fetch manifest here
-        songs.add(Song(
-          id: video.id.value,
-          title: video.title,
-          artist: video.author,
-          album: '',
-          imageUrl: video.thumbnails.highResUrl,
-          audioUrl: '', // Will be fetched before play
-          duration: video.duration ?? Duration.zero,
-        ));
-      }
-      return songs;
+      final videos = await _gateway.search(query, limit: 5);
+      return videos.map(_videoToSong).toList();
     } catch (e) {
       return [];
     }
@@ -30,12 +70,7 @@ class YouTubeService {
 
   Future<String> getAudioUrl(String videoId) async {
     try {
-      final manifest = await _yt.videos.streamsClient.getManifest(
-        videoId,
-        ytClients: [YoutubeApiClient.ios, YoutubeApiClient.androidVr],
-      );
-      final audioStream = manifest.audioOnly.withHighestBitrate();
-      return audioStream.url.toString();
+      return await _gateway.getAudioUrl(videoId);
     } catch (e) {
       print('Error getting audio URL: $e');
       return '';
@@ -44,22 +79,8 @@ class YouTubeService {
 
   Future<List<Song>> getTrendingMusic() async {
     try {
-      final searchResults = await _yt.search.search('regueton 2026');
-      final songs = <Song>[];
-
-      for (var video in searchResults.take(2)) {
-        // Only basic info, do not fetch manifest here
-        songs.add(Song(
-          id: video.id.value,
-          title: video.title,
-          artist: video.author,
-          album: '',
-          imageUrl: video.thumbnails.highResUrl,
-          audioUrl: '', // Will be fetched before play
-          duration: video.duration ?? Duration.zero,
-        ));
-      }
-      return songs;
+      final videos = await _gateway.search('regueton 2026', limit: 2);
+      return videos.map(_videoToSong).toList();
     } catch (e) {
       print('Error getting trending music: $e');
       return [];
@@ -68,80 +89,38 @@ class YouTubeService {
 
   Future<List<Song>> getPlaylistSongs(String playlistId) async {
     try {
-      final playlist = await _yt.playlists.get(playlistId);
-      final videos = await _yt.playlists.getVideos(playlistId).toList();
-      final songs = <Song>[];
-
-      for (var video in videos) {
-        // Only basic info, do not fetch manifest here
-        songs.add(Song(
-          id: video.id.value,
-          title: video.title,
-          artist: video.author,
-          album: playlist.title,
-          imageUrl: video.thumbnails.highResUrl,
-          audioUrl: '', // Will be fetched before play
-          duration: video.duration ?? Duration.zero,
-        ));
-      }
-      return songs;
+      final result = await _gateway.getPlaylistVideos(playlistId);
+      return result.videos
+          .map((v) => _videoToSong(v, album: result.playlistTitle))
+          .toList();
     } catch (e) {
       print('Error getting playlist songs: $e');
       return [];
     }
   }
 
-  /// Step 7: Minimal network test to check connectivity to YouTube
   Future<bool> testYouTubeConnectivity() async {
     try {
-      final response = await http.get(Uri.parse('https://www.youtube.com'));
-      if (response.statusCode == 200) {
-        print('YouTube connectivity test: SUCCESS');
-        return true;
-      } else {
-        print('YouTube connectivity test: FAILED with status \\${response.statusCode}');
-        return false;
-      }
+      final response = await _httpClient.get(Uri.parse('https://www.youtube.com'));
+      return response.statusCode == 200;
     } catch (e) {
-      print('YouTube connectivity test: ERROR - \\${e.toString()}');
       return false;
     }
   }
 
-  /// Get suggested songs based on a video ID
   Future<List<Song>> getSuggestedSongs(String videoId, {int maxResults = 5}) async {
     try {
-      // Get the video details first
-      final video = await _yt.videos.get(videoId);
-      
-      // Search for related content using the video title and artist
-      final searchQuery = '${video.title} ${video.author}';
-      final searchResults = await _yt.search.search(searchQuery);
-      final songs = <Song>[];
-
-      // Skip the first result as it's likely the same song
-      for (var result in searchResults.skip(1).take(maxResults)) {
-        // Only basic info, do not fetch manifest here
-        songs.add(Song(
-          id: result.id.value,
-          title: result.title,
-          artist: result.author,
-          album: '',
-          imageUrl: result.thumbnails.highResUrl,
-          audioUrl: '', // Will be fetched before play
-          duration: result.duration ?? Duration.zero,
-        ));
-      }
-      
-      print('Found \\${songs.length} suggested songs for: \\${video.title}');
-      return songs;
+      final video = await _gateway.getVideo(videoId);
+      final videos = await _gateway.search(
+        '${video.title} ${video.author}',
+        limit: maxResults + 1,
+      );
+      return videos.skip(1).map(_videoToSong).toList();
     } catch (e) {
       print('Error getting suggested songs: $e');
       return [];
     }
   }
 
-  void dispose() {
-    // _yt.close();
-  }
+  void dispose() {}
 }

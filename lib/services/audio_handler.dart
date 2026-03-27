@@ -3,9 +3,9 @@ import 'package:just_audio/just_audio.dart';
 import '../models/music_models.dart';
 
 class AudioPlayerHandler extends BaseAudioHandler {
-  final AudioPlayer _player = AudioPlayer();
-  
-  AudioPlayerHandler() {
+  final AudioPlayer _player;
+
+  AudioPlayerHandler({AudioPlayer? player}) : _player = player ?? AudioPlayer() {
     _init();
   }
 
