@@ -114,19 +114,32 @@ class _SearchScreenState extends State<SearchScreen> {
                   itemCount: searchResults.length,
                   itemBuilder: (context, index) {
                     final song = searchResults[index];
+                    final isLoading = context.select<MusicPlayerProvider, bool>(
+                      (p) => p.isLoadingAudio(song.id),
+                    );
                     return ListTile(
                       leading: ClipRRect(
                         borderRadius: BorderRadius.circular(4),
-                        child: Image.network(
-                          song.imageUrl,
-                          width: 50,
-                          height: 50,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
-                            width: 50, height: 50,
-                            color: Colors.grey[800],
-                            child: Icon(Icons.music_note),
-                          ),
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Image.network(
+                              song.imageUrl,
+                              width: 50, height: 50,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                width: 50, height: 50,
+                                color: Colors.grey[800],
+                                child: Icon(Icons.music_note),
+                              ),
+                            ),
+                            if (isLoading)
+                              Container(
+                                width: 50, height: 50,
+                                color: Colors.black54,
+                                child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              ),
+                          ],
                         ),
                       ),
                       title: Text(song.title, overflow: TextOverflow.ellipsis),
