@@ -61,7 +61,7 @@ class YouTubeService {
 
   Future<List<Song>> searchSongs(String query) async {
     try {
-      final videos = await _gateway.search(query, limit: 5);
+      final videos = await _gateway.search(query, limit: 20);
       return videos.map(_videoToSong).toList();
     } catch (e) {
       return [];
