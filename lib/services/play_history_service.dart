@@ -33,7 +33,7 @@ class PlayHistoryService {
     await saveLastSong(song);
   }
 
-  Future<void> saveLastSong(Song song) async {
+  Future<void> saveLastSong(Song song, {int lastPositionSeconds = 0}) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_lastSongKey, jsonEncode({
       'id': song.id,
@@ -43,14 +43,19 @@ class PlayHistoryService {
       'imageUrl': song.imageUrl,
       'audioUrl': song.audioUrl,
       'duration': song.duration.inSeconds,
+      'lastPosition': lastPositionSeconds,
     }));
   }
 
-  Future<Song?> loadLastSong() async {
+  Future<({Song song, int lastPositionSeconds})?> loadLastSong() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_lastSongKey);
     if (raw == null) return null;
-    return Song.fromJson(jsonDecode(raw));
+    final map = jsonDecode(raw);
+    return (
+      song: Song.fromJson(map),
+      lastPositionSeconds: (map['lastPosition'] as int?) ?? 0,
+    );
   }
 
   /// Returns songs sorted by likedCount descending

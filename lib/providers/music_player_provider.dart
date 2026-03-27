@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:audio_service/audio_service.dart';
 import '../models/music_models.dart';
@@ -40,6 +41,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   late AudioPlayerHandler _audioHandler;
   final YouTubeService _youtubeService = YouTubeService();
   final PlayHistoryService _historyService = PlayHistoryService();
+  Timer? _positionSaveTimer;
   Song? _currentSong;
   List<Song> _queue = [];
   int _currentIndex = 0;
@@ -88,9 +90,9 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     _isInitialized = true;
 
     // Restore last played song so mini player shows on startup
-    final lastSong = await _historyService.loadLastSong();
-    if (lastSong != null && _pendingSong == null) {
-      _currentSong = lastSong;
+    final lastSongData = await _historyService.loadLastSong();
+    if (lastSongData != null && _pendingSong == null) {
+      _currentSong = lastSongData.song;
       notifyListeners();
     }
     
@@ -186,6 +188,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     await _audioHandler.setAudioSource(audioUrl, mediaItem);
     await _audioHandler.play();
     _historyService.saveLastSong(song);
+    _startPositionSaveTimer(song);
     notifyListeners();
 
     // Pre-fetch next song's URL in background to reduce lag on next tap
@@ -329,6 +332,15 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     await _fetchSuggestionsInBackground();
   }
 
+  void _startPositionSaveTimer(Song song) {
+    _positionSaveTimer?.cancel();
+    _positionSaveTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (_currentSong?.id == song.id) {
+        _historyService.saveLastSong(song, lastPositionSeconds: currentPosition.inSeconds);
+      }
+    });
+  }
+
   void _recordCurrentSongPlay() {
     if (_currentSong == null) return;
     final total = totalDuration.inSeconds;
@@ -355,6 +367,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
 
   @override
   void dispose() {
+    _positionSaveTimer?.cancel();
     if (_isInitialized) {
       _audioHandler.stop();
     }
