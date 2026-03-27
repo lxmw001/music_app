@@ -37,3 +37,15 @@ A Flutter mobile application with YouTube as the music source, featuring:
 - Enhance search with filters
 - Add lyrics display
 - Create custom playlists
+
+### Testing:
+- **Unit tests**: `flutter test test/services/`
+- **Integration tests (fake)**: `flutter test integration_test/app_test.dart -d <device>`
+- **Integration tests (real network)**: `flutter test integration_test/youtube_service_real_test.dart -d <device>`
+
+### Dev Session:
+A saved Kiro CLI chat session is available at `music_app_session.json`. To resume:
+```bash
+# From inside the project directory, start a chat and run:
+/chat load music_app_session.json
+```
