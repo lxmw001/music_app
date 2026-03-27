@@ -180,6 +180,15 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       if (nextSong.audioUrl.isEmpty) {
         _youtubeService.getAudioUrl(nextSong.id).then((url) => nextSong.audioUrl = url);
       }
+    } else {
+      // At end of queue — pre-fetch a suggestion + its audio URL
+      _youtubeService.getSuggestedSongs(song.id, maxResults: 1).then((suggestions) {
+        if (suggestions.isNotEmpty) {
+          _suggestedSongs = suggestions;
+          final suggested = suggestions.first;
+          _youtubeService.getAudioUrl(suggested.id).then((url) => suggested.audioUrl = url);
+        }
+      });
     }
   }
 
@@ -208,6 +217,29 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     if (_queue.isNotEmpty && _currentIndex < _queue.length - 1) {
       _currentIndex++;
       playSong(_queue[_currentIndex]);
+    } else if (_currentSong != null && _suggestedSongs.isNotEmpty) {
+      // Use already pre-fetched suggestion
+      final next = _suggestedSongs.first;
+      _suggestedSongs = [];
+      _queue.add(next);
+      _currentIndex = _queue.length - 1;
+      playSong(next);
+    } else if (_currentSong != null) {
+      _fetchAndPlaySuggestion();
+    }
+  }
+
+  Future<void> _fetchAndPlaySuggestion() async {
+    if (_currentSong == null) return;
+    try {
+      final suggestions = await _youtubeService.getSuggestedSongs(_currentSong!.id, maxResults: 1);
+      if (suggestions.isNotEmpty) {
+        _queue.add(suggestions.first);
+        _currentIndex = _queue.length - 1;
+        playSong(suggestions.first);
+      }
+    } catch (e) {
+      print('Error fetching suggestion: $e');
     }
   }
 
