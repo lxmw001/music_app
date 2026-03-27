@@ -79,7 +79,7 @@ class YouTubeService {
 
   Future<List<Song>> getTrendingMusic() async {
     try {
-      final videos = await _gateway.search('regueton 2026', limit: 2);
+      final videos = await _gateway.search('regueton 2026', limit: 20);
       return videos.map(_videoToSong).toList();
     } catch (e) {
       print('Error getting trending music: $e');

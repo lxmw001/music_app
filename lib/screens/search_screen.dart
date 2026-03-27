@@ -110,13 +110,13 @@ class _SearchScreenState extends State<SearchScreen> {
                     ),
                   ],
                 );
-        return ListView.builder(
+        return Selector<MusicPlayerProvider, Set<String>>(
+          selector: (_, p) => Set.from(p.queue.map((s) => s.id).where((id) => p.isLoadingAudio(id))),
+          builder: (context, loadingIds, _) => ListView.builder(
                   itemCount: searchResults.length,
                   itemBuilder: (context, index) {
                     final song = searchResults[index];
-                    final isLoading = context.select<MusicPlayerProvider, bool>(
-                      (p) => p.isLoadingAudio(song.id),
-                    );
+                    final isLoading = loadingIds.contains(song.id);
                     return ListTile(
                       leading: ClipRRect(
                         borderRadius: BorderRadius.circular(4),
@@ -145,19 +145,11 @@ class _SearchScreenState extends State<SearchScreen> {
                       title: Text(song.title, overflow: TextOverflow.ellipsis),
                       subtitle: Text(song.artist, overflow: TextOverflow.ellipsis),
                       trailing: Icon(Icons.more_vert),
-                      onTap: () {
-                        print('[SearchScreen] tapped: ${song.title}');
-                        try {
-                          final p = context.read<MusicPlayerProvider>();
-                          print('[SearchScreen] provider found: $p');
-                          p.playSong(song, queue: searchResults);
-                        } catch (e) {
-                          print('[SearchScreen] ERROR: $e');
-                        }
-                      },
+                      onTap: () => player.playSong(song, queue: searchResults),
                     );
                   },
-                );
+                ),
+        );
       }),
     );
   }
