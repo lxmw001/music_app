@@ -42,6 +42,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   final YouTubeService _youtubeService = YouTubeService();
   final PlayHistoryService _historyService = PlayHistoryService();
   Timer? _positionSaveTimer;
+  Duration _lastRestoredPosition = Duration.zero;
   Song? _currentSong;
   List<Song> _queue = [];
   int _currentIndex = 0;
@@ -98,6 +99,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       final song = lastSongData.song;
       song.audioUrl = ''; // force fresh URL fetch on play
       _currentSong = song;
+      _lastRestoredPosition = Duration(seconds: lastSongData.lastPositionSeconds);
       notifyListeners();
     }
     
@@ -228,6 +230,11 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     if (_currentSong != null && !_audioHandler.playbackState.value.playing &&
         _audioHandler.playbackState.value.processingState == AudioProcessingState.idle) {
       await playSong(_currentSong!);
+      // Seek to last saved position after loading
+      if (_lastRestoredPosition > Duration.zero) {
+        await _audioHandler.seek(_lastRestoredPosition);
+        _lastRestoredPosition = Duration.zero;
+      }
       return;
     }
     await _audioHandler.play();
