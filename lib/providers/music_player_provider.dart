@@ -78,7 +78,10 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     try {
       print('[MusicPlayerProvider] starting AudioService.init');
       _audioHandler = await AudioService.init(
-      builder: () => AudioPlayerHandler(),
+      builder: () => AudioPlayerHandler(
+        onSkipToNext: () => nextSong(),
+        onSkipToPrevious: () => previousSong(),
+      ),
       config: const AudioServiceConfig(
         androidNotificationChannelId: 'com.example.music_app.channel.audio',
         androidNotificationChannelName: 'Music Player',

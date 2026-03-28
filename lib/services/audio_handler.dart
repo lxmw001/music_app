@@ -1,11 +1,15 @@
 import 'package:audio_service/audio_service.dart';
+import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import '../models/music_models.dart';
 
 class AudioPlayerHandler extends BaseAudioHandler {
   final AudioPlayer _player;
+  final VoidCallback? onSkipToNext;
+  final VoidCallback? onSkipToPrevious;
 
-  AudioPlayerHandler({AudioPlayer? player}) : _player = player ?? AudioPlayer() {
+  AudioPlayerHandler({AudioPlayer? player, this.onSkipToNext, this.onSkipToPrevious})
+      : _player = player ?? AudioPlayer() {
     _init();
   }
 
@@ -57,10 +61,14 @@ class AudioPlayerHandler extends BaseAudioHandler {
   Future<void> seek(Duration position) => _player.seek(position);
 
   @override
-  Future<void> skipToNext() => _player.seekToNext();
+  Future<void> skipToNext() async {
+    onSkipToNext?.call();
+  }
 
   @override
-  Future<void> skipToPrevious() => _player.seekToPrevious();
+  Future<void> skipToPrevious() async {
+    onSkipToPrevious?.call();
+  }
 
   @override
   Future<void> stop() async {
