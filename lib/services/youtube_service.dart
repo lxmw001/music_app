@@ -26,7 +26,9 @@ class YoutubeExplodeGateway implements YoutubeGateway {
       videoId,
       ytClients: [YoutubeApiClient.ios, YoutubeApiClient.androidVr],
     );
-    return manifest.audioOnly.withLowestBitrate().url.toString();
+    final streams = manifest.audioOnly.toList()
+      ..sort((a, b) => a.bitrate.compareTo(b.bitrate));
+    return streams.first.url.toString();
   }
 
   @override

@@ -23,13 +23,24 @@ class AudioPlayerHandler extends BaseAudioHandler {
     });
   }
 
+  bool _nextEnabled = true;
+
+  void setNextEnabled(bool enabled) {
+    _nextEnabled = enabled;
+    // Force a playback state update so notification refreshes
+    final current = playbackState.value;
+    playbackState.add(current.copyWith(controls: _buildControls()));
+  }
+
+  List<MediaControl> _buildControls() => [
+    MediaControl.skipToPrevious,
+    if (_player.playing) MediaControl.pause else MediaControl.play,
+    if (_nextEnabled) MediaControl.skipToNext,
+  ];
+
   PlaybackState _transformEvent(PlaybackEvent event) {
     return PlaybackState(
-      controls: [
-        MediaControl.skipToPrevious,
-        if (_player.playing) MediaControl.pause else MediaControl.play,
-        MediaControl.skipToNext,
-      ],
+      controls: _buildControls(),
       systemActions: const {
         MediaAction.seek,
         MediaAction.seekForward,

@@ -179,11 +179,13 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     print('[MusicPlayerProvider] playSong: ${song.title}, audioUrl empty=${audioUrl.isEmpty}, loadingIds=$_loadingAudioIds');
     if (audioUrl.isEmpty) {
       _loadingAudioIds.add(song.id);
+      _audioHandler.setNextEnabled(false);
       notifyListeners();
       audioUrl = await _youtubeService.getAudioUrl(song.id);
       print('[MusicPlayerProvider] Audio URL fetched for ${song.title}: ${audioUrl.isEmpty ? "EMPTY" : "OK"}');
       song.audioUrl = audioUrl;
       _loadingAudioIds.remove(song.id);
+      _audioHandler.setNextEnabled(true);
     }
     // // Fetch audio URL just before playing
     // String audioUrl = song.audioUrl;
