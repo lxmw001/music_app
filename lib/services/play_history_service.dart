@@ -5,6 +5,7 @@ import '../models/music_models.dart';
 class PlayHistoryService {
   static const _key = 'play_history';
   static const _lastSongKey = 'last_played_song';
+  static const _songsKey = 'known_songs';
 
   // songId -> {playCount, likedCount}
   Future<Map<String, Map<String, int>>> _load() async {
@@ -27,14 +28,41 @@ class PlayHistoryService {
     entry['playCount'] = (entry['playCount'] ?? 0) + 1;
     final durationSeconds = song.duration.inSeconds;
     final isLiked = durationSeconds >= 360
-        ? listenedSeconds >= 180          // long (≥6 min): 3 min threshold
-        : listenedSeconds >= durationSeconds * 0.5; // short: 50% threshold
+        ? listenedSeconds >= 180
+        : listenedSeconds >= durationSeconds * 0.5;
     if (isLiked) {
       entry['likedCount'] = (entry['likedCount'] ?? 0) + 1;
     }
     data[song.id] = entry;
     await _save(data);
+    await _saveSongMetadata(song);
     await saveLastSong(song);
+  }
+
+  Future<void> _saveSongMetadata(Song song) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_songsKey);
+    final songs = raw != null ? Map<String, dynamic>.from(jsonDecode(raw)) : <String, dynamic>{};
+    songs[song.id] = {
+      'id': song.id, 'title': song.title, 'artist': song.artist,
+      'album': song.album, 'imageUrl': song.imageUrl,
+      'audioUrl': '', 'duration': song.duration.inSeconds,
+    };
+    await prefs.setString(_songsKey, jsonEncode(songs));
+  }
+
+  Future<List<Song>> getMostLikedSongs() async {
+    final prefs = await SharedPreferences.getInstance();
+    final songsRaw = prefs.getString(_songsKey);
+    if (songsRaw == null) return [];
+    final songsMap = Map<String, dynamic>.from(jsonDecode(songsRaw));
+    final data = await _load();
+    final results = songsMap.entries
+        .where((e) => (data[e.key]?['likedCount'] ?? 0) > 0)
+        .map((e) => (song: Song.fromJson(e.value), likedCount: data[e.key]!['likedCount'] as int))
+        .toList()
+      ..sort((a, b) => b.likedCount.compareTo(a.likedCount));
+    return results.map((e) => e.song).toList();
   }
 
   Future<void> saveLastSong(Song song, {int lastPositionSeconds = 0}) async {

@@ -34,6 +34,7 @@ abstract class MusicPlayerProvider extends ChangeNotifier {
   Future<void> fetchSuggestions();
   void addSuggestedToQueue(Song song);
   void clearSuggestions();
+  Future<List<Song>> getMostLikedFromHistory();
   Future<List<({Song song, int likedCount, int playCount})>> getMostLiked(List<Song> knownSongs);
 }
 
@@ -383,6 +384,8 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     if (position <= 0) return;
     _historyService.recordPlay(_currentSong!, position);
   }
+
+  Future<List<Song>> getMostLikedFromHistory() => _historyService.getMostLikedSongs();
 
   Future<List<({Song song, int likedCount, int playCount})>> getMostLiked(List<Song> knownSongs) =>
       _historyService.getMostLiked(knownSongs);
