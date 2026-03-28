@@ -124,5 +124,25 @@ class YouTubeService {
     }
   }
 
+  Future<List<Song>> getSuggestionsFromHistory(List<Song> likedSongs, {int maxResults = 10}) async {
+    if (likedSongs.isEmpty) return [];
+    try {
+      // Use top 3 liked songs to build a search query
+      final topSongs = likedSongs.take(3).toList();
+      final query = topSongs.map((s) => s.artist).toSet().take(2).join(' ');
+      final videos = await _gateway.search(query, limit: maxResults + topSongs.length);
+      // Exclude songs already in liked list
+      final likedIds = likedSongs.map((s) => s.id).toSet();
+      return videos
+          .where((v) => !likedIds.contains(v.id.value))
+          .take(maxResults)
+          .map(_videoToSong)
+          .toList();
+    } catch (e) {
+      print('Error getting suggestions from history: $e');
+      return [];
+    }
+  }
+
   void dispose() {}
 }

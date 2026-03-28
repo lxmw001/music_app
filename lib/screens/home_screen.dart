@@ -15,6 +15,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late final YouTubeService _youtubeService;
   List<Song> trendingSongs = [];
+  List<Song> suggestedSongs = [];
   bool isLoading = true;
 
   @override
@@ -30,6 +31,17 @@ class _HomeScreenState extends State<HomeScreen> {
       trendingSongs = songs;
       isLoading = false;
     });
+    _loadSuggestions();
+  }
+
+  Future<void> _loadSuggestions() async {
+    final provider = context.read<MusicPlayerProvider>();
+    final liked = await provider.getMostLiked(trendingSongs);
+    if (liked.isEmpty) return;
+    final suggestions = await _youtubeService.getSuggestionsFromHistory(
+      liked.map((e) => e.song).toList(),
+    );
+    if (mounted) setState(() => suggestedSongs = suggestions);
   }
 
   @override
@@ -201,6 +213,49 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                   ),
+          if (suggestedSongs.isNotEmpty) ...[
+            SizedBox(height: 32),
+            Text('Suggested for You', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            SizedBox(height: 16),
+            SizedBox(
+              height: 200,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: suggestedSongs.length,
+                itemBuilder: (context, index) {
+                  final song = suggestedSongs[index];
+                  return GestureDetector(
+                    onTap: () => context.read<MusicPlayerProvider>().playSong(song, queue: suggestedSongs),
+                    child: Container(
+                      width: 160,
+                      margin: EdgeInsets.only(right: 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              song.imageUrl,
+                              width: 160, height: 150,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                width: 160, height: 150,
+                                color: Colors.grey[800],
+                                child: Icon(Icons.music_note),
+                              ),
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(song.title, style: TextStyle(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis, maxLines: 2),
+                          Text(song.artist, style: TextStyle(color: Colors.grey), overflow: TextOverflow.ellipsis),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
           ],
         ),
       ),
