@@ -219,6 +219,12 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
 
   Future<void> resume() async {
     if (!_isInitialized) return;
+    // If restored from history but never loaded into player, play it now
+    if (_currentSong != null && !_audioHandler.playbackState.value.playing &&
+        _audioHandler.playbackState.value.processingState == AudioProcessingState.idle) {
+      await playSong(_currentSong!);
+      return;
+    }
     await _audioHandler.play();
   }
 
