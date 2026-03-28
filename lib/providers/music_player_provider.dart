@@ -21,7 +21,7 @@ abstract class MusicPlayerProvider extends ChangeNotifier {
   Duration get currentPosition;
   Duration get totalDuration;
 
-  Future<void> playSong(Song song, {List<Song>? queue});
+  Future<void> playSong(Song song, {List<Song>? queue, Duration? seekTo});
   Future<void> pause();
   Future<void> resume();
   Future<void> stop();
@@ -147,7 +147,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   }
 }
 
-  Future<void> playSong(Song song, {List<Song>? queue}) async {
+  Future<void> playSong(Song song, {List<Song>? queue, Duration? seekTo}) async {
     if (!_isInitialized) {
       print('[MusicPlayerProvider] not initialized yet, queuing: ${song.title}');
       _pendingSong = song;
@@ -199,6 +199,9 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       duration: song.duration,
     );
     await _audioHandler.setAudioSource(audioUrl, mediaItem);
+    if (seekTo != null && seekTo > Duration.zero) {
+      await _audioHandler.seek(seekTo);
+    }
     await _audioHandler.play();
     _historyService.saveLastSong(song);
     _startPositionSaveTimer(song);
@@ -232,20 +235,11 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     // If restored from history but never loaded into player, play it now
     if (_currentSong != null && !_audioHandler.playbackState.value.playing &&
         _audioHandler.playbackState.value.processingState == AudioProcessingState.idle) {
-      await playSong(_currentSong!);
-      // Seek to last saved position after player is ready
-      if (_lastRestoredPosition > Duration.zero) {
-        final seekTo = _lastRestoredPosition;
-        _lastRestoredPosition = Duration.zero;
-        print('[MusicPlayerProvider] waiting for ready to seek to ${seekTo.inSeconds}s');
-        await _audioHandler.playbackState
-            .firstWhere((s) => s.processingState == AudioProcessingState.ready);
-        print('[MusicPlayerProvider] seeking to ${seekTo.inSeconds}s');
-        await _audioHandler.seek(seekTo);
-        print('[MusicPlayerProvider] seek done, position=${currentPosition.inSeconds}s');
-      } else {
-        print('[MusicPlayerProvider] no restored position to seek to');
-      }
+      final seekTo = _lastRestoredPosition > Duration.zero ? _lastRestoredPosition : null;
+      _lastRestoredPosition = Duration.zero;
+      await playSong(_currentSong!, seekTo: seekTo);
+      // Remove the old wait-and-seek block
+      return;
       return;
     }
     await _audioHandler.play();
