@@ -95,7 +95,9 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     // Restore last played song so mini player shows on startup
     final lastSongData = await _historyService.loadLastSong();
     if (lastSongData != null && _pendingSong == null) {
-      _currentSong = lastSongData.song;
+      final song = lastSongData.song;
+      song.audioUrl = ''; // force fresh URL fetch on play
+      _currentSong = song;
       notifyListeners();
     }
     
