@@ -37,10 +37,12 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadSuggestions() async {
     final provider = context.read<MusicPlayerProvider>();
     final liked = await provider.getMostLiked(trendingSongs);
-    if (liked.isEmpty) return;
-    final suggestions = await _youtubeService.getSuggestionsFromHistory(
-      liked.map((e) => e.song).toList(),
-    );
+    // Fall back to trending songs as seed if no history yet
+    final seedSongs = liked.isNotEmpty
+        ? liked.map((e) => e.song).toList()
+        : trendingSongs.take(2).toList();
+    if (seedSongs.isEmpty) return;
+    final suggestions = await _youtubeService.getSuggestionsFromHistory(seedSongs);
     if (mounted) setState(() => suggestedSongs = suggestions);
   }
 
