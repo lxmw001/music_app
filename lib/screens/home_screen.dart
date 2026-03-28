@@ -129,71 +129,71 @@ class _HomeScreenState extends State<HomeScreen> {
                 ? Center(child: CircularProgressIndicator())
                 : SizedBox(
                     height: 200,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: trendingSongs.length,
-                      itemBuilder: (context, index) {
-                        final song = trendingSongs[index];
-                        return Consumer<MusicPlayerProvider>(
-                          builder: (context, player, _) {
-                            final isLoading = player.isLoadingAudio(song.id);
-                            return GestureDetector(
-                              onTap: () => player.playSong(song, queue: trendingSongs),
-                              child: Container(
-                                width: 160,
-                                margin: EdgeInsets.only(right: 16),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: Stack(
-                                        alignment: Alignment.center,
-                                        children: [
-                                          Image.network(
-                                            song.imageUrl,
-                                            width: 160,
-                                            height: 150,
-                                            fit: BoxFit.cover,
-                                            errorBuilder: (context, error, stackTrace) => Container(
-                                              width: 160, height: 150,
-                                              color: Colors.grey[800],
-                                              child: Icon(Icons.music_note),
-                                            ),
+                    child: Selector<MusicPlayerProvider, String?>(
+                      selector: (_, p) => trendingSongs.firstWhere(
+                        (s) => p.isLoadingAudio(s.id), orElse: () => trendingSongs.isNotEmpty ? trendingSongs.first : null as dynamic).id,
+                      builder: (context, loadingId, _) => ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: trendingSongs.length,
+                        itemBuilder: (context, index) {
+                          final song = trendingSongs[index];
+                          final isLoading = song.id == loadingId;
+                          return GestureDetector(
+                            onTap: () => context.read<MusicPlayerProvider>().playSong(song, queue: trendingSongs),
+                            child: Container(
+                              width: 160,
+                              margin: EdgeInsets.only(right: 16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Stack(
+                                      alignment: Alignment.center,
+                                      children: [
+                                        Image.network(
+                                          song.imageUrl,
+                                          width: 160,
+                                          height: 150,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (context, error, stackTrace) => Container(
+                                            width: 160, height: 150,
+                                            color: Colors.grey[800],
+                                            child: Icon(Icons.music_note),
                                           ),
-                                          if (isLoading)
-                                            Container(
-                                              width: 160, height: 150,
-                                              color: Colors.black45,
-                                              child: const Center(
-                                                child: SizedBox(
-                                                  width: 32, height: 32,
-                                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                                ),
+                                        ),
+                                        if (isLoading)
+                                          Container(
+                                            width: 160, height: 150,
+                                            color: Colors.black45,
+                                            child: const Center(
+                                              child: SizedBox(
+                                                width: 32, height: 32,
+                                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                                               ),
                                             ),
-                                        ],
-                                      ),
+                                          ),
+                                      ],
                                     ),
-                                    SizedBox(height: 4),
-                                    Text(
-                                      song.title,
-                                      style: TextStyle(fontWeight: FontWeight.bold),
-                                      overflow: TextOverflow.ellipsis,
-                                      maxLines: 2,
-                                    ),
-                                    Text(
-                                      song.artist,
-                                      style: TextStyle(color: Colors.grey),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
-                                ),
+                                  ),
+                                  SizedBox(height: 4),
+                                  Text(
+                                    song.title,
+                                    style: TextStyle(fontWeight: FontWeight.bold),
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 2,
+                                  ),
+                                  Text(
+                                    song.artist,
+                                    style: TextStyle(color: Colors.grey),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
                               ),
-                            );
-                          },
-                        );
-                      },
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ),
           ],
