@@ -27,6 +27,7 @@ class PlayerScreen extends StatelessWidget {
           if (player.currentSong == null) {
             return Center(child: Text('No song playing'));
           }
+          final isLoading = player.isLoadingAudio(player.currentSong!.id);
 
           return Padding(
             padding: EdgeInsets.all(24),
@@ -47,9 +48,20 @@ class PlayerScreen extends StatelessWidget {
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(12),
-                      child: Image.network(
-                        player.currentSong!.imageUrl,
-                        fit: BoxFit.cover,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Image.network(
+                            player.currentSong!.imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(color: Colors.grey[800], child: Icon(Icons.music_note, size: 80)),
+                          ),
+                          if (isLoading)
+                            Container(
+                              color: Colors.black54,
+                              child: const CircularProgressIndicator(color: Colors.white),
+                            ),
+                        ],
                       ),
                     ),
                   ),
@@ -150,8 +162,9 @@ class PlayerScreen extends StatelessWidget {
                             ),
                           ),
                           IconButton(
-                            icon: Icon(Icons.skip_next, size: 32),
-                            onPressed: player.nextSong,
+                            icon: Icon(Icons.skip_next, size: 32,
+                              color: isLoading ? Colors.grey : Colors.white),
+                            onPressed: isLoading ? null : player.nextSong,
                           ),
                           IconButton(
                             icon: Icon(
