@@ -130,8 +130,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 : SizedBox(
                     height: 200,
                     child: Selector<MusicPlayerProvider, String?>(
-                      selector: (_, p) => trendingSongs.firstWhere(
-                        (s) => p.isLoadingAudio(s.id), orElse: () => trendingSongs.isNotEmpty ? trendingSongs.first : null as dynamic).id,
+                      selector: (_, p) {
+                        try {
+                          return trendingSongs.firstWhere((s) => p.isLoadingAudio(s.id)).id;
+                        } catch (_) {
+                          return null;
+                        }
+                      },
                       builder: (context, loadingId, _) => ListView.builder(
                         scrollDirection: Axis.horizontal,
                         itemCount: trendingSongs.length,
