@@ -2,6 +2,41 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.0] - 2026-03-28
+
+### Added
+- Play history with smart like threshold (≥50% for short songs, ≥3min for mixes ≥6min)
+- Last played song restored in mini player on app restart
+- Playback position saved every 15 seconds, restored on next launch
+- Audio URL pre-fetched on app start for instant resume
+- Auto-play next song when current song completes
+- Auto-suggest next song when queue ends (pre-fetched in background)
+- Next song pre-fetched while current song plays to reduce lag
+- Notification next/prev buttons wired to provider via callbacks
+- Per-song loading spinner on search and trending cards
+- Loading spinner on player screen album art while fetching audio
+- Next button disabled in player and notification while loading
+- "Suggested for You" section on home screen based on play history
+- `IndexedStack` to preserve screen state when switching tabs
+
+### Fixed
+- `MusicPlayerProvider` abstract class — `MusicPlayerProviderImpl` missing constructor (AudioService never initialized)
+- Provider type registration causing "could not find provider" error
+- `setQueue` crash with empty audio URLs
+- Mini player not showing immediately on song tap
+- YouTube rate limiting from bulk pre-fetch — now fetches on demand
+- Tap not reaching provider due to `Consumer` inside `ListView.builder`
+- Notification next button causing `addStream` conflict
+- Trending spinner always shown on first song
+- 403 expired stream URL on restored song — always fetches fresh URL
+- Seek to restored position before `play()` so resume starts at correct time
+
+### Changed
+- Audio quality set to lowest bitrate for faster loading
+- Search results increased from 5 to 20
+- Trending results increased from 2 to 20
+- `MusicPlayerProvider` refactored as abstract class for testability
+
 ## [1.3.0] - 2026-03-27
 
 ### Added
