@@ -102,6 +102,8 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       _lastRestoredPosition = Duration(seconds: lastSongData.lastPositionSeconds);
       print('[MusicPlayerProvider] restored song: ${song.title}, position=${lastSongData.lastPositionSeconds}s');
       notifyListeners();
+      // Pre-fetch audio URL in background so play is instant
+      _youtubeService.getAudioUrl(song.id).then((url) => song.audioUrl = url);
     }
     
     _audioHandler.playbackState.listen((state) {
