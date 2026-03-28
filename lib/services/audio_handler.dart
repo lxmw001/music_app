@@ -24,13 +24,7 @@ class AudioPlayerHandler extends BaseAudioHandler {
   }
 
   bool _nextEnabled = true;
-
-  void setNextEnabled(bool enabled) {
-    _nextEnabled = enabled;
-    // Force a playback state update so notification refreshes
-    final current = playbackState.value;
-    playbackState.add(current.copyWith(controls: _buildControls()));
-  }
+  set nextEnabled(bool value) => _nextEnabled = value;
 
   List<MediaControl> _buildControls() => [
     MediaControl.skipToPrevious,
