@@ -101,7 +101,10 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       notifyListeners();
     }
     
-    _audioHandler.playbackState.listen((_) {
+    _audioHandler.playbackState.listen((state) {
+      if (state.processingState == AudioProcessingState.completed) {
+        nextSong();
+      }
       notifyListeners();
     });
     _audioHandler.mediaItem.listen((_) {
