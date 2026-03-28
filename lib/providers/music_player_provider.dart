@@ -100,6 +100,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       song.audioUrl = ''; // force fresh URL fetch on play
       _currentSong = song;
       _lastRestoredPosition = Duration(seconds: lastSongData.lastPositionSeconds);
+      print('[MusicPlayerProvider] restored song: ${song.title}, position=${lastSongData.lastPositionSeconds}s');
       notifyListeners();
     }
     
@@ -234,10 +235,14 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       if (_lastRestoredPosition > Duration.zero) {
         final seekTo = _lastRestoredPosition;
         _lastRestoredPosition = Duration.zero;
-        // Wait for player to be ready before seeking
+        print('[MusicPlayerProvider] waiting for ready to seek to ${seekTo.inSeconds}s');
         await _audioHandler.playbackState
             .firstWhere((s) => s.processingState == AudioProcessingState.ready);
+        print('[MusicPlayerProvider] seeking to ${seekTo.inSeconds}s');
         await _audioHandler.seek(seekTo);
+        print('[MusicPlayerProvider] seek done, position=${currentPosition.inSeconds}s');
+      } else {
+        print('[MusicPlayerProvider] no restored position to seek to');
       }
       return;
     }
