@@ -230,10 +230,14 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     if (_currentSong != null && !_audioHandler.playbackState.value.playing &&
         _audioHandler.playbackState.value.processingState == AudioProcessingState.idle) {
       await playSong(_currentSong!);
-      // Seek to last saved position after loading
+      // Seek to last saved position after player is ready
       if (_lastRestoredPosition > Duration.zero) {
-        await _audioHandler.seek(_lastRestoredPosition);
+        final seekTo = _lastRestoredPosition;
         _lastRestoredPosition = Duration.zero;
+        // Wait for player to be ready before seeking
+        await _audioHandler.playbackState
+            .firstWhere((s) => s.processingState == AudioProcessingState.ready);
+        await _audioHandler.seek(seekTo);
       }
       return;
     }
