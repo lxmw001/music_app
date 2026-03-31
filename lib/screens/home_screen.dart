@@ -4,6 +4,7 @@ import '../providers/music_player_provider.dart';
 import '../models/music_models.dart';
 import '../services/youtube_service.dart';
 import '../widgets/song_card_list.dart';
+import '../widgets/recent_songs_grid.dart';
 
 class HomeScreen extends StatefulWidget {
   final YouTubeService? youtubeService;
@@ -88,7 +89,7 @@ class _HomeScreenState extends State<HomeScreen> {
             if (recentSongs.isEmpty)
               const Text('No recently played songs yet.', style: TextStyle(color: Colors.grey))
             else
-              SongCardList(songs: recentSongs),
+              RecentSongsGrid(songs: recentSongs),
             const SizedBox(height: 32),
             const Text('Trending Music', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
