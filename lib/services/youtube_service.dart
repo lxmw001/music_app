@@ -83,8 +83,13 @@ class YouTubeService {
   Future<List<Song>> getSuggestedSongs(String videoId, {int maxResults = 5}) =>
       safeCall(() async {
         final video = await _gateway.getVideo(videoId);
-        final videos = await _gateway.search('${video.title} ${video.author}', limit: maxResults + 1);
-        return videos.skip(1).map(_videoToSong).toList();
+        // Search by artist only — omit title to avoid getting the same song
+        final videos = await _gateway.search(video.author, limit: maxResults + 3);
+        return videos
+            .where((v) => v.id.value != videoId)
+            .take(maxResults)
+            .map(_videoToSong)
+            .toList();
       }, [], tag: 'YouTubeService.getSuggestedSongs');
 
   Future<List<Song>> getSuggestionsFromHistory(List<Song> likedSongs, {int maxResults = 10}) {
