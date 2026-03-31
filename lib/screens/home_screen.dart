@@ -30,7 +30,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadTrendingMusic() async {
     final songs = await _youtubeService.getTrendingMusic();
-    final recent = await context.read<MusicPlayerProvider>().getRecentSongs();
+    final provider = context.read<MusicPlayerProvider>();
+    final allRecent = await provider.getRecentSongs();
+    final currentId = provider.currentSong?.id;
+    final recent = allRecent.where((s) => s.id != currentId).toList();
     setState(() {
       trendingSongs = songs;
       recentSongs = recent;
