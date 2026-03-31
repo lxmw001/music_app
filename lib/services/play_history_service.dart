@@ -6,6 +6,7 @@ class PlayHistoryService {
   static const _key = 'play_history';
   static const _lastSongKey = 'last_played_song';
   static const _songsKey = 'known_songs';
+  static const _recentKey = 'recent_songs';
 
   Future<SharedPreferences> get _prefs => SharedPreferences.getInstance();
 
@@ -41,7 +42,24 @@ class PlayHistoryService {
     data[song.id] = entry;
     await _save(data);
     await _saveSongMetadata(song);
+    await _saveRecentSong(song);
     await saveLastSong(song);
+  }
+
+  Future<void> _saveRecentSong(Song song) async {
+    final p = await _prefs;
+    final raw = p.getString(_recentKey);
+    final list = raw != null ? List<dynamic>.from(jsonDecode(raw)) : [];
+    list.removeWhere((e) => e['id'] == song.id); // avoid duplicates
+    list.insert(0, _songToMap(song));
+    if (list.length > 10) list.removeLast();
+    await p.setString(_recentKey, jsonEncode(list));
+  }
+
+  Future<List<Song>> getRecentSongs() async {
+    final raw = (await _prefs).getString(_recentKey);
+    if (raw == null) return [];
+    return (jsonDecode(raw) as List).map((e) => Song.fromJson(e)).toList();
   }
 
   Future<void> _saveSongMetadata(Song song) async {

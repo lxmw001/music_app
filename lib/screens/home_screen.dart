@@ -17,6 +17,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late final YouTubeService _youtubeService;
   List<Song> trendingSongs = [];
   List<Song> suggestedSongs = [];
+  List<Song> recentSongs = [];
   bool isLoading = true;
 
   @override
@@ -28,8 +29,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadTrendingMusic() async {
     final songs = await _youtubeService.getTrendingMusic();
+    final recent = await context.read<MusicPlayerProvider>().getRecentSongs();
     setState(() {
       trendingSongs = songs;
+      recentSongs = recent;
       isLoading = false;
     });
     _loadSuggestions();
@@ -82,31 +85,10 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             const Text('Recently Played', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2, childAspectRatio: 3, crossAxisSpacing: 8, mainAxisSpacing: 8,
-              ),
-              itemCount: 6,
-              itemBuilder: (context, index) => Container(
-                decoration: BoxDecoration(color: Colors.grey[800], borderRadius: BorderRadius.circular(4)),
-                child: Row(
-                  children: [
-                    ClipRRect(
-                      borderRadius: const BorderRadius.only(topLeft: Radius.circular(4), bottomLeft: Radius.circular(4)),
-                      child: Image.network(
-                        'https://via.placeholder.com/60',
-                        width: 60, height: 60, fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(width: 60, height: 60, color: Colors.grey[700], child: const Icon(Icons.music_note, size: 20)),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(child: Text('Playlist ${index + 1}', style: const TextStyle(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
-                  ],
-                ),
-              ),
-            ),
+            if (recentSongs.isEmpty)
+              const Text('No recently played songs yet.', style: TextStyle(color: Colors.grey))
+            else
+              SongCardList(songs: recentSongs),
             const SizedBox(height: 32),
             const Text('Trending Music', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
