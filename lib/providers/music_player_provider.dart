@@ -99,7 +99,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     final lastSongData = await _historyService.loadLastSong();
     if (lastSongData != null && _pendingSong == null) {
       final song = lastSongData.song;
-      song.audioUrl = ''; // force fresh URL fetch on play
       _currentSong = song;
       _lastRestoredPosition = Duration(seconds: lastSongData.lastPositionSeconds);
       print('[MusicPlayerProvider] restored song: ${song.title}, position=${lastSongData.lastPositionSeconds}s');
@@ -220,7 +219,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       await _audioHandler.seek(seekTo);
     }
     await _audioHandler.play();
-    _historyService.saveLastSong(song);
+    _historyService.savePosition(song, 0);
     _startPositionSaveTimer(song);
     notifyListeners();
 
@@ -247,7 +246,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     if (_currentSong != null) {
       final pos = currentPosition.inSeconds;
       _historyService.recordPlay(_currentSong!, pos);
-      _historyService.saveLastSong(_currentSong!, lastPositionSeconds: pos);
+      _historyService.savePosition(_currentSong!, pos);
     }
     await _audioHandler.pause();
   }
@@ -269,7 +268,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     if (_currentSong != null) {
       final pos = currentPosition.inSeconds;
       _historyService.recordPlay(_currentSong!, pos);
-      _historyService.saveLastSong(_currentSong!, lastPositionSeconds: pos);
+      _historyService.savePosition(_currentSong!, pos);
     }
     await _audioHandler.stop();
   }
@@ -366,7 +365,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     _positionSaveTimer?.cancel();
     _positionSaveTimer = Timer.periodic(const Duration(seconds: 15), (_) {
       if (_currentSong?.id == song.id) {
-        _historyService.saveLastSong(song, lastPositionSeconds: currentPosition.inSeconds);
+        _historyService.savePosition(song, currentPosition.inSeconds);
       }
     });
   }
@@ -395,7 +394,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     _positionSaveTimer?.cancel();
     if (_isInitialized) {
       if (_currentSong != null) {
-        _historyService.saveLastSong(_currentSong!, lastPositionSeconds: currentPosition.inSeconds);
+        _historyService.savePosition(_currentSong!, currentPosition.inSeconds);
       }
       _audioHandler.stop();
     }

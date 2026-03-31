@@ -2,11 +2,13 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/music_models.dart';
 
+/// Single source of truth for play history.
+/// Stores everything under two keys:
+///   - `play_history`: songId → {playCount, likedCount, lastPlayedAt (ms), lastPosition}
+///   - `known_songs`:  songId → song metadata
 class PlayHistoryService {
-  static const _key = 'play_history';
-  static const _lastSongKey = 'last_played_song';
+  static const _historyKey = 'play_history';
   static const _songsKey = 'known_songs';
-  static const _recentKey = 'recent_songs';
 
   Future<SharedPreferences> get _prefs => SharedPreferences.getInstance();
 
@@ -16,50 +18,15 @@ class PlayHistoryService {
     'audioUrl': '', 'duration': song.duration.inSeconds,
   };
 
-  // songId -> {playCount, likedCount}
-  Future<Map<String, Map<String, int>>> _load() async {
-    final raw = (await _prefs).getString(_key);
+  Future<Map<String, Map<String, dynamic>>> _loadHistory() async {
+    final raw = (await _prefs).getString(_historyKey);
     if (raw == null) return {};
-    return (jsonDecode(raw) as Map<String, dynamic>).map((k, v) => MapEntry(k, Map<String, int>.from(v)));
+    return (jsonDecode(raw) as Map<String, dynamic>)
+        .map((k, v) => MapEntry(k, Map<String, dynamic>.from(v)));
   }
 
-  Future<void> _save(Map<String, Map<String, int>> data) async {
-    await (await _prefs).setString(_key, jsonEncode(data));
-  }
-
-  /// Call when a song finishes or is skipped. [listenedSeconds] how many seconds played.
-  Future<void> recordPlay(Song song, int listenedSeconds) async {
-    final data = await _load();
-    final entry = data[song.id] ?? {'playCount': 0, 'likedCount': 0};
-    entry['playCount'] = (entry['playCount'] ?? 0) + 1;
-    final durationSeconds = song.duration.inSeconds;
-    final isLiked = durationSeconds >= 360
-        ? listenedSeconds >= 180
-        : listenedSeconds >= durationSeconds * 0.5;
-    if (isLiked) {
-      entry['likedCount'] = (entry['likedCount'] ?? 0) + 1;
-    }
-    data[song.id] = entry;
-    await _save(data);
-    await _saveSongMetadata(song);
-    await _saveRecentSong(song);
-    await saveLastSong(song);
-  }
-
-  Future<void> _saveRecentSong(Song song) async {
-    final p = await _prefs;
-    final raw = p.getString(_recentKey);
-    final list = raw != null ? List<dynamic>.from(jsonDecode(raw)) : [];
-    list.removeWhere((e) => e['id'] == song.id); // avoid duplicates
-    list.insert(0, _songToMap(song));
-    if (list.length > 10) list.removeLast();
-    await p.setString(_recentKey, jsonEncode(list));
-  }
-
-  Future<List<Song>> getRecentSongs() async {
-    final raw = (await _prefs).getString(_recentKey);
-    if (raw == null) return [];
-    return (jsonDecode(raw) as List).map((e) => Song.fromJson(e)).toList();
+  Future<void> _saveHistory(Map<String, Map<String, dynamic>> data) async {
+    await (await _prefs).setString(_historyKey, jsonEncode(data));
   }
 
   Future<void> _saveSongMetadata(Song song) async {
@@ -70,18 +37,71 @@ class PlayHistoryService {
     await p.setString(_songsKey, jsonEncode(songs));
   }
 
+  Future<void> recordPlay(Song song, int listenedSeconds) async {
+    final data = await _loadHistory();
+    final entry = data[song.id] ?? {'playCount': 0, 'likedCount': 0};
+    entry['playCount'] = (entry['playCount'] as int? ?? 0) + 1;
+    entry['lastPlayedAt'] = DateTime.now().millisecondsSinceEpoch;
+    entry['lastPosition'] = listenedSeconds;
+
+    final durationSeconds = song.duration.inSeconds;
+    final isLiked = durationSeconds >= 360
+        ? listenedSeconds >= 180
+        : listenedSeconds >= durationSeconds * 0.5;
+    if (isLiked) entry['likedCount'] = (entry['likedCount'] as int? ?? 0) + 1;
+
+    data[song.id] = entry;
+    await _saveHistory(data);
+    await _saveSongMetadata(song);
+  }
+
+  /// Save current position without recording a full play event
+  Future<void> savePosition(Song song, int positionSeconds) async {
+    final data = await _loadHistory();
+    final entry = data[song.id] ?? {'playCount': 0, 'likedCount': 0};
+    entry['lastPlayedAt'] = DateTime.now().millisecondsSinceEpoch;
+    entry['lastPosition'] = positionSeconds;
+    data[song.id] = entry;
+    await _saveHistory(data);
+    await _saveSongMetadata(song);
+  }
+
+  Future<List<Song>> getRecentSongs({int limit = 10}) async {
+    final p = await _prefs;
+    final songsRaw = p.getString(_songsKey);
+    if (songsRaw == null) return [];
+    final songsMap = Map<String, dynamic>.from(jsonDecode(songsRaw));
+    final data = await _loadHistory();
+
+    return (songsMap.entries
+        .where((e) => data.containsKey(e.key))
+        .map((e) => (song: Song.fromJson(e.value), lastPlayedAt: data[e.key]!['lastPlayedAt'] as int? ?? 0))
+        .toList()
+          ..sort((a, b) => b.lastPlayedAt.compareTo(a.lastPlayedAt)))
+        .take(limit)
+        .map((e) => e.song)
+        .toList();
+  }
+
+  Future<({Song song, int lastPositionSeconds})?> loadLastSong() async {
+    final recent = await getRecentSongs(limit: 1);
+    if (recent.isEmpty) return null;
+    final song = recent.first;
+    final data = await _loadHistory();
+    final pos = data[song.id]?['lastPosition'] as int? ?? 0;
+    song.audioUrl = ''; // always fetch fresh URL
+    return (song: song, lastPositionSeconds: pos);
+  }
+
   Future<List<Song>> getMostLikedSongs() async {
     final p = await _prefs;
     final songsRaw = p.getString(_songsKey);
-    if (songsRaw == null) {
-      print('[PlayHistoryService] no songs metadata saved yet');
-      return [];
-    }
+    if (songsRaw == null) return [];
     final songsMap = Map<String, dynamic>.from(jsonDecode(songsRaw));
-    final data = await _load();
+    final data = await _loadHistory();
     print('[PlayHistoryService] history data: $data');
     final results = songsMap.entries
-        .where((e) => (data[e.key]?['likedCount'] ?? 0) > 0)
+        .where((e) => (data[e.key]?['likedCount'] as int? ?? 0) > 0)
         .map((e) => (song: Song.fromJson(e.value), likedCount: data[e.key]!['likedCount'] as int))
         .toList()
       ..sort((a, b) => b.likedCount.compareTo(a.likedCount));
@@ -89,35 +109,17 @@ class PlayHistoryService {
     return results.map((e) => e.song).toList();
   }
 
-  Future<void> saveLastSong(Song song, {int lastPositionSeconds = 0}) async {
-    await (await _prefs).setString(_lastSongKey, jsonEncode({
-      ..._songToMap(song),
-      'audioUrl': song.audioUrl,
-      'lastPosition': lastPositionSeconds,
-    }));
-  }
-
-  Future<({Song song, int lastPositionSeconds})?> loadLastSong() async {
-    final raw = (await _prefs).getString(_lastSongKey);
-    if (raw == null) return null;
-    final map = jsonDecode(raw);
-    return (song: Song.fromJson(map), lastPositionSeconds: (map['lastPosition'] as int?) ?? 0);
-  }
-
-  /// Returns songs sorted by likedCount descending
-  Future<List<({Song song, int likedCount, int playCount})>> getMostLiked(
-      List<Song> knownSongs) async {
-    final data = await _load();
-    final results = knownSongs
-        .where((s) => data.containsKey(s.id))
+  /// Legacy — kept for backward compat with provider
+  Future<List<({Song song, int likedCount, int playCount})>> getMostLiked(List<Song> knownSongs) async {
+    final data = await _loadHistory();
+    return knownSongs
+        .where((s) => (data[s.id]?['likedCount'] as int? ?? 0) > 0)
         .map((s) => (
               song: s,
-              likedCount: data[s.id]!['likedCount'] ?? 0,
-              playCount: data[s.id]!['playCount'] ?? 0,
+              likedCount: data[s.id]!['likedCount'] as int,
+              playCount: data[s.id]!['playCount'] as int? ?? 0,
             ))
-        .where((e) => e.likedCount > 0)
         .toList()
       ..sort((a, b) => b.likedCount.compareTo(a.likedCount));
-    return results;
   }
 }
