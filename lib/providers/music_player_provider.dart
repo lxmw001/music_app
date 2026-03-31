@@ -202,12 +202,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       print('[MusicPlayerProvider] Could not get audio URL for ${song.title}, skipping');
       return;
     }
-    // // Fetch audio URL just before playing
-    // String audioUrl = song.audioUrl;
-    // if (audioUrl.isEmpty) {
-    //   audioUrl = await _youtubeService.getAudioUrl(song.id);
-    //   print('[MusicPlayerProvider] Audio URL fetched for ${song.title}: $audioUrl');
-    // }
     final mediaItem = MediaItem(
       id: song.id,
       title: song.title,
@@ -253,14 +247,11 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
 
   Future<void> resume() async {
     if (!_isInitialized) return;
-    // If restored from history but never loaded into player, play it now
     if (_currentSong != null && !_audioHandler.playbackState.value.playing &&
         _audioHandler.playbackState.value.processingState == AudioProcessingState.idle) {
       final seekTo = _lastRestoredPosition > Duration.zero ? _lastRestoredPosition : null;
       _lastRestoredPosition = Duration.zero;
       await playSong(_currentSong!, seekTo: seekTo);
-      // Remove the old wait-and-seek block
-      return;
       return;
     }
     await _audioHandler.play();
@@ -329,28 +320,12 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     notifyListeners();
   }
 
-  /// Fetch suggested songs in the background based on current song
   Future<void> _fetchSuggestionsInBackground() async {
     if (_currentSong == null || _isFetchingSuggestions) return;
-    
     _isFetchingSuggestions = true;
     notifyListeners();
-    
     try {
-      print('Fetching suggestions for: ${_currentSong!.title}');
-      final suggestions = await _youtubeService.getSuggestedSongs(
-        _currentSong!.id,
-        maxResults: 5,
-      );
-      
-      _suggestedSongs = suggestions;
-      
-      // Automatically add suggestions to queue if enabled
-      if (_autoAddSuggestions && suggestions.isNotEmpty) {
-        _queue.addAll(suggestions);
-        print('Added ${suggestions.length} suggestions to queue');
-      }
-      
+      _suggestedSongs = await _youtubeService.getSuggestedSongs(_currentSong!.id, maxResults: 5);
     } catch (e) {
       print('Error fetching suggestions: $e');
     } finally {
@@ -385,13 +360,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         _historyService.saveLastSong(song, lastPositionSeconds: currentPosition.inSeconds);
       }
     });
-  }
-  void _recordCurrentSongPlay() {
-    if (_currentSong == null) return;
-    final position = currentPosition.inSeconds;
-    print('[MusicPlayerProvider] recording play: ${_currentSong!.title}, position=${position}s, duration=${_currentSong!.duration.inSeconds}s');
-    if (position <= 0) return;
-    _historyService.recordPlay(_currentSong!, position);
   }
 
   Future<List<Song>> getMostLikedFromHistory() => _historyService.getMostLikedSongs();

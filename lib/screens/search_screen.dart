@@ -3,6 +3,7 @@ import '../services/youtube_service.dart';
 import '../models/music_models.dart';
 import 'package:provider/provider.dart';
 import '../providers/music_player_provider.dart';
+import '../widgets/song_list_tile.dart';
 
 class SearchScreen extends StatefulWidget {
   final YouTubeService? youtubeService;
@@ -111,44 +112,14 @@ class _SearchScreenState extends State<SearchScreen> {
                   ],
                 );
         return Selector<MusicPlayerProvider, Set<String>>(
-          selector: (_, p) => Set.from(p.queue.map((s) => s.id).where((id) => p.isLoadingAudio(id))),
+          selector: (_, p) => Set.from(searchResults.map((s) => s.id).where((id) => p.isLoadingAudio(id))),
           builder: (context, loadingIds, _) => ListView.builder(
-                  itemCount: searchResults.length,
-                  itemBuilder: (context, index) {
-                    final song = searchResults[index];
-                    final isLoading = loadingIds.contains(song.id);
-                    return ListTile(
-                      leading: ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            Image.network(
-                              song.imageUrl,
-                              width: 50, height: 50,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
-                                width: 50, height: 50,
-                                color: Colors.grey[800],
-                                child: Icon(Icons.music_note),
-                              ),
-                            ),
-                            if (isLoading)
-                              Container(
-                                width: 50, height: 50,
-                                color: Colors.black54,
-                                child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                              ),
-                          ],
-                        ),
-                      ),
-                      title: Text(song.title, overflow: TextOverflow.ellipsis),
-                      subtitle: Text(song.artist, overflow: TextOverflow.ellipsis),
-                      trailing: Icon(Icons.more_vert),
-                      onTap: () => player.playSong(song, queue: searchResults),
-                    );
-                  },
-                ),
+            itemCount: searchResults.length,
+            itemBuilder: (context, index) {
+              final song = searchResults[index];
+              return SongListTile(song: song, queue: searchResults, isLoading: loadingIds.contains(song.id));
+            },
+          ),
         );
       }),
     );
