@@ -165,8 +165,14 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     // Don't restart if same song is already playing
     if (_currentSong?.id == song.id && isPlaying) return;
 
-    // Record listen percentage for the song being replaced
-    _recordCurrentSongPlay();
+    // Snapshot position before it resets, then record play for previous song
+    final previousSong = _currentSong;
+    final previousPosition = currentPosition.inSeconds;
+    if (previousSong != null && previousPosition > 0) {
+      print('[MusicPlayerProvider] recording play: ${previousSong.title}, position=${previousPosition}s, duration=${previousSong.duration.inSeconds}s');
+      _historyService.recordPlay(previousSong, previousPosition);
+    }
+    // Show song immediately in UI while audio URL is being fetched
     _currentSong = song;
     if (queue != null) {
       _queue = queue;
@@ -383,6 +389,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   void _recordCurrentSongPlay() {
     if (_currentSong == null) return;
     final position = currentPosition.inSeconds;
+    print('[MusicPlayerProvider] recording play: ${_currentSong!.title}, position=${position}s, duration=${_currentSong!.duration.inSeconds}s');
     if (position <= 0) return;
     _historyService.recordPlay(_currentSong!, position);
   }
