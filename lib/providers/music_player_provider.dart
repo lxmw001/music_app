@@ -110,6 +110,10 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     _audioHandler.playbackState.listen((state) {
       if (state.processingState == AudioProcessingState.completed && !_isFetchingSuggestions) {
         print('[MusicPlayerProvider] song completed, calling nextSong');
+        // Record full duration as listened since song completed naturally
+        if (_currentSong != null) {
+          _historyService.recordPlay(_currentSong!, _currentSong!.duration.inSeconds);
+        }
         nextSong();
       }
       notifyListeners();
