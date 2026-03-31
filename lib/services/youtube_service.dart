@@ -90,10 +90,31 @@ class YouTubeService {
   Future<List<Song>> getSuggestionsFromHistory(List<Song> likedSongs, {int maxResults = 10}) {
     if (likedSongs.isEmpty) return Future.value([]);
     return safeCall(() async {
-      final query = likedSongs.take(3).map((s) => s.artist).toSet().take(2).join(' ');
+      // Count plays per artist
+      final artistCount = <String, int>{};
+      for (final s in likedSongs) {
+        artistCount[s.artist] = (artistCount[s.artist] ?? 0) + 1;
+      }
+      // Sort artists by play count, take top ones
+      final topArtists = (artistCount.entries.toList()
+            ..sort((a, b) => b.value.compareTo(a.value)))
+          .map((e) => e.key)
+          .take(3)
+          .toList();
+
       final likedIds = likedSongs.map((s) => s.id).toSet();
-      final videos = await _gateway.search(query, limit: maxResults + likedSongs.length);
-      return videos.where((v) => !likedIds.contains(v.id.value)).take(maxResults).map(_videoToSong).toList();
+      final results = <Song>[];
+
+      // Fetch suggestions for each artist proportionally
+      for (final artist in topArtists) {
+        final limit = (maxResults / topArtists.length).ceil();
+        final videos = await _gateway.search(artist, limit: limit + 2);
+        results.addAll(
+          videos.where((v) => !likedIds.contains(v.id.value)).take(limit).map(_videoToSong),
+        );
+      }
+
+      return results.take(maxResults).toList();
     }, [], tag: 'YouTubeService.getSuggestionsFromHistory');
   }
 
