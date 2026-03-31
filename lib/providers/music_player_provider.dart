@@ -239,6 +239,10 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   Future<void> pause() async {
     if (!_isInitialized) return;
     await _audioHandler.pause();
+    // Save position immediately on pause
+    if (_currentSong != null) {
+      _historyService.saveLastSong(_currentSong!, lastPositionSeconds: currentPosition.inSeconds);
+    }
   }
 
   Future<void> resume() async {
@@ -258,6 +262,9 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
 
   Future<void> stop() async {
     if (!_isInitialized) return;
+    if (_currentSong != null) {
+      _historyService.saveLastSong(_currentSong!, lastPositionSeconds: currentPosition.inSeconds);
+    }
     await _audioHandler.stop();
   }
 
@@ -373,7 +380,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       }
     });
   }
-
   void _recordCurrentSongPlay() {
     if (_currentSong == null) return;
     final position = currentPosition.inSeconds;
@@ -403,6 +409,9 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   void dispose() {
     _positionSaveTimer?.cancel();
     if (_isInitialized) {
+      if (_currentSong != null) {
+        _historyService.saveLastSong(_currentSong!, lastPositionSeconds: currentPosition.inSeconds);
+      }
       _audioHandler.stop();
     }
     super.dispose();
