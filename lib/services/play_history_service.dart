@@ -7,18 +7,23 @@ class PlayHistoryService {
   static const _lastSongKey = 'last_played_song';
   static const _songsKey = 'known_songs';
 
+  Future<SharedPreferences> get _prefs => SharedPreferences.getInstance();
+
+  Map<String, dynamic> _songToMap(Song song) => {
+    'id': song.id, 'title': song.title, 'artist': song.artist,
+    'album': song.album, 'imageUrl': song.imageUrl,
+    'audioUrl': '', 'duration': song.duration.inSeconds,
+  };
+
   // songId -> {playCount, likedCount}
   Future<Map<String, Map<String, int>>> _load() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_key);
+    final raw = (await _prefs).getString(_key);
     if (raw == null) return {};
-    final decoded = jsonDecode(raw) as Map<String, dynamic>;
-    return decoded.map((k, v) => MapEntry(k, Map<String, int>.from(v)));
+    return (jsonDecode(raw) as Map<String, dynamic>).map((k, v) => MapEntry(k, Map<String, int>.from(v)));
   }
 
   Future<void> _save(Map<String, Map<String, int>> data) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_key, jsonEncode(data));
+    await (await _prefs).setString(_key, jsonEncode(data));
   }
 
   /// Call when a song finishes or is skipped. [listenedSeconds] how many seconds played.
@@ -40,27 +45,23 @@ class PlayHistoryService {
   }
 
   Future<void> _saveSongMetadata(Song song) async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_songsKey);
+    final p = await _prefs;
+    final raw = p.getString(_songsKey);
     final songs = raw != null ? Map<String, dynamic>.from(jsonDecode(raw)) : <String, dynamic>{};
-    songs[song.id] = {
-      'id': song.id, 'title': song.title, 'artist': song.artist,
-      'album': song.album, 'imageUrl': song.imageUrl,
-      'audioUrl': '', 'duration': song.duration.inSeconds,
-    };
-    await prefs.setString(_songsKey, jsonEncode(songs));
+    songs[song.id] = _songToMap(song);
+    await p.setString(_songsKey, jsonEncode(songs));
   }
 
   Future<List<Song>> getMostLikedSongs() async {
-    final prefs = await SharedPreferences.getInstance();
-    final songsRaw = prefs.getString(_songsKey);
+    final p = await _prefs;
+    final songsRaw = p.getString(_songsKey);
     if (songsRaw == null) {
       print('[PlayHistoryService] no songs metadata saved yet');
       return [];
     }
     final songsMap = Map<String, dynamic>.from(jsonDecode(songsRaw));
     final data = await _load();
-    print('[PlayHistoryService] history data: ${data.map((k, v) => MapEntry(k, v))}');
+    print('[PlayHistoryService] history data: $data');
     final results = songsMap.entries
         .where((e) => (data[e.key]?['likedCount'] ?? 0) > 0)
         .map((e) => (song: Song.fromJson(e.value), likedCount: data[e.key]!['likedCount'] as int))
@@ -71,28 +72,18 @@ class PlayHistoryService {
   }
 
   Future<void> saveLastSong(Song song, {int lastPositionSeconds = 0}) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_lastSongKey, jsonEncode({
-      'id': song.id,
-      'title': song.title,
-      'artist': song.artist,
-      'album': song.album,
-      'imageUrl': song.imageUrl,
+    await (await _prefs).setString(_lastSongKey, jsonEncode({
+      ..._songToMap(song),
       'audioUrl': song.audioUrl,
-      'duration': song.duration.inSeconds,
       'lastPosition': lastPositionSeconds,
     }));
   }
 
   Future<({Song song, int lastPositionSeconds})?> loadLastSong() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_lastSongKey);
+    final raw = (await _prefs).getString(_lastSongKey);
     if (raw == null) return null;
     final map = jsonDecode(raw);
-    return (
-      song: Song.fromJson(map),
-      lastPositionSeconds: (map['lastPosition'] as int?) ?? 0,
-    );
+    return (song: Song.fromJson(map), lastPositionSeconds: (map['lastPosition'] as int?) ?? 0);
   }
 
   /// Returns songs sorted by likedCount descending

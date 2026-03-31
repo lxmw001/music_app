@@ -1,6 +1,7 @@
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:http/http.dart' as http;
 import '../models/music_models.dart';
+import '../utils/safe_call.dart';
 
 /// Thin abstraction over YoutubeExplode to allow testing without real network calls.
 abstract class YoutubeGateway {
@@ -61,87 +62,39 @@ class YouTubeService {
       : _gateway = gateway ?? YoutubeExplodeGateway(),
         _httpClient = httpClient ?? http.Client();
 
-  Future<List<Song>> searchSongs(String query) async {
-    try {
-      final videos = await _gateway.search(query, limit: 20);
-      return videos.map(_videoToSong).toList();
-    } catch (e) {
-      return [];
-    }
-  }
+  Future<List<Song>> searchSongs(String query) =>
+      safeCall(() async => (await _gateway.search(query, limit: 20)).map(_videoToSong).toList(), [], tag: 'YouTubeService.searchSongs');
 
-  Future<String> getAudioUrl(String videoId) async {
-    try {
-      return await _gateway.getAudioUrl(videoId);
-    } catch (e) {
-      print('Error getting audio URL: $e');
-      return '';
-    }
-  }
+  Future<String> getAudioUrl(String videoId) =>
+      safeCall(() => _gateway.getAudioUrl(videoId), '', tag: 'YouTubeService.getAudioUrl');
 
-  Future<List<Song>> getTrendingMusic() async {
-    try {
-      final videos = await _gateway.search('regueton 2026', limit: 20);
-      return videos.map(_videoToSong).toList();
-    } catch (e) {
-      print('Error getting trending music: $e');
-      return [];
-    }
-  }
+  Future<List<Song>> getTrendingMusic() =>
+      safeCall(() async => (await _gateway.search('regueton 2026', limit: 20)).map(_videoToSong).toList(), [], tag: 'YouTubeService.getTrendingMusic');
 
-  Future<List<Song>> getPlaylistSongs(String playlistId) async {
-    try {
-      final result = await _gateway.getPlaylistVideos(playlistId);
-      return result.videos
-          .map((v) => _videoToSong(v, album: result.playlistTitle))
-          .toList();
-    } catch (e) {
-      print('Error getting playlist songs: $e');
-      return [];
-    }
-  }
+  Future<List<Song>> getPlaylistSongs(String playlistId) =>
+      safeCall(() async {
+        final result = await _gateway.getPlaylistVideos(playlistId);
+        return result.videos.map((v) => _videoToSong(v, album: result.playlistTitle)).toList();
+      }, [], tag: 'YouTubeService.getPlaylistSongs');
 
-  Future<bool> testYouTubeConnectivity() async {
-    try {
-      final response = await _httpClient.get(Uri.parse('https://www.youtube.com'));
-      return response.statusCode == 200;
-    } catch (e) {
-      return false;
-    }
-  }
+  Future<bool> testYouTubeConnectivity() =>
+      safeCall(() async => (await _httpClient.get(Uri.parse('https://www.youtube.com'))).statusCode == 200, false);
 
-  Future<List<Song>> getSuggestedSongs(String videoId, {int maxResults = 5}) async {
-    try {
-      final video = await _gateway.getVideo(videoId);
-      final videos = await _gateway.search(
-        '${video.title} ${video.author}',
-        limit: maxResults + 1,
-      );
-      return videos.skip(1).map(_videoToSong).toList();
-    } catch (e) {
-      print('Error getting suggested songs: $e');
-      return [];
-    }
-  }
+  Future<List<Song>> getSuggestedSongs(String videoId, {int maxResults = 5}) =>
+      safeCall(() async {
+        final video = await _gateway.getVideo(videoId);
+        final videos = await _gateway.search('${video.title} ${video.author}', limit: maxResults + 1);
+        return videos.skip(1).map(_videoToSong).toList();
+      }, [], tag: 'YouTubeService.getSuggestedSongs');
 
-  Future<List<Song>> getSuggestionsFromHistory(List<Song> likedSongs, {int maxResults = 10}) async {
-    if (likedSongs.isEmpty) return [];
-    try {
-      // Use top 3 liked songs to build a search query
-      final topSongs = likedSongs.take(3).toList();
-      final query = topSongs.map((s) => s.artist).toSet().take(2).join(' ');
-      final videos = await _gateway.search(query, limit: maxResults + topSongs.length);
-      // Exclude songs already in liked list
+  Future<List<Song>> getSuggestionsFromHistory(List<Song> likedSongs, {int maxResults = 10}) {
+    if (likedSongs.isEmpty) return Future.value([]);
+    return safeCall(() async {
+      final query = likedSongs.take(3).map((s) => s.artist).toSet().take(2).join(' ');
       final likedIds = likedSongs.map((s) => s.id).toSet();
-      return videos
-          .where((v) => !likedIds.contains(v.id.value))
-          .take(maxResults)
-          .map(_videoToSong)
-          .toList();
-    } catch (e) {
-      print('Error getting suggestions from history: $e');
-      return [];
-    }
+      final videos = await _gateway.search(query, limit: maxResults + likedSongs.length);
+      return videos.where((v) => !likedIds.contains(v.id.value)).take(maxResults).map(_videoToSong).toList();
+    }, [], tag: 'YouTubeService.getSuggestionsFromHistory');
   }
 
   void dispose() {}
