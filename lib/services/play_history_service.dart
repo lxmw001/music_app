@@ -54,14 +54,19 @@ class PlayHistoryService {
   Future<List<Song>> getMostLikedSongs() async {
     final prefs = await SharedPreferences.getInstance();
     final songsRaw = prefs.getString(_songsKey);
-    if (songsRaw == null) return [];
+    if (songsRaw == null) {
+      print('[PlayHistoryService] no songs metadata saved yet');
+      return [];
+    }
     final songsMap = Map<String, dynamic>.from(jsonDecode(songsRaw));
     final data = await _load();
+    print('[PlayHistoryService] history data: ${data.map((k, v) => MapEntry(k, v))}');
     final results = songsMap.entries
         .where((e) => (data[e.key]?['likedCount'] ?? 0) > 0)
         .map((e) => (song: Song.fromJson(e.value), likedCount: data[e.key]!['likedCount'] as int))
         .toList()
       ..sort((a, b) => b.likedCount.compareTo(a.likedCount));
+    print('[PlayHistoryService] liked songs: ${results.map((e) => "${e.song.title}(${e.likedCount})").toList()}');
     return results.map((e) => e.song).toList();
   }
 

@@ -37,11 +37,14 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadSuggestions() async {
     final provider = context.read<MusicPlayerProvider>();
     final likedSongs = await provider.getMostLikedFromHistory();
+    print('[HomeScreen] liked songs from history: ${likedSongs.map((s) => s.title).toList()}');
     final seedSongs = likedSongs.isNotEmpty
         ? likedSongs.take(3).toList()
         : trendingSongs.take(2).toList();
+    print('[HomeScreen] seed songs for suggestions: ${seedSongs.map((s) => s.title).toList()}');
     if (seedSongs.isEmpty) return;
     final suggestions = await _youtubeService.getSuggestionsFromHistory(seedSongs);
+    print('[HomeScreen] suggestions loaded: ${suggestions.length}');
     if (mounted) setState(() => suggestedSongs = suggestions);
   }
 
@@ -220,40 +223,58 @@ class _HomeScreenState extends State<HomeScreen> {
             SizedBox(height: 16),
             SizedBox(
               height: 200,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: suggestedSongs.length,
-                itemBuilder: (context, index) {
-                  final song = suggestedSongs[index];
-                  return GestureDetector(
-                    onTap: () => context.read<MusicPlayerProvider>().playSong(song, queue: suggestedSongs),
-                    child: Container(
-                      width: 160,
-                      margin: EdgeInsets.only(right: 16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.network(
-                              song.imageUrl,
-                              width: 160, height: 150,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
-                                width: 160, height: 150,
-                                color: Colors.grey[800],
-                                child: Icon(Icons.music_note),
+              child: Selector<MusicPlayerProvider, String?>(
+                selector: (_, p) {
+                  try { return suggestedSongs.firstWhere((s) => p.isLoadingAudio(s.id)).id; }
+                  catch (_) { return null; }
+                },
+                builder: (context, loadingId, _) => ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: suggestedSongs.length,
+                  itemBuilder: (context, index) {
+                    final song = suggestedSongs[index];
+                    final isLoading = song.id == loadingId;
+                    return GestureDetector(
+                      onTap: () => context.read<MusicPlayerProvider>().playSong(song, queue: suggestedSongs),
+                      child: Container(
+                        width: 160,
+                        margin: EdgeInsets.only(right: 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  Image.network(
+                                    song.imageUrl,
+                                    width: 160, height: 150,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => Container(
+                                      width: 160, height: 150,
+                                      color: Colors.grey[800],
+                                      child: Icon(Icons.music_note),
+                                    ),
+                                  ),
+                                  if (isLoading)
+                                    Container(
+                                      width: 160, height: 150,
+                                      color: Colors.black45,
+                                      child: const Center(child: SizedBox(width: 32, height: 32, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))),
+                                    ),
+                                ],
                               ),
                             ),
-                          ),
-                          SizedBox(height: 4),
-                          Text(song.title, style: TextStyle(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis, maxLines: 2),
-                          Text(song.artist, style: TextStyle(color: Colors.grey), overflow: TextOverflow.ellipsis),
-                        ],
+                            SizedBox(height: 4),
+                            Text(song.title, style: TextStyle(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis, maxLines: 2),
+                            Text(song.artist, style: TextStyle(color: Colors.grey), overflow: TextOverflow.ellipsis),
+                          ],
+                        ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
             ),
           ],
