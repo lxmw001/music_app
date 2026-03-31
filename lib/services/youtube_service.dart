@@ -114,7 +114,7 @@ class YouTubeService {
         );
       }
 
-      return results.take(maxResults).toList();
+      return (results..shuffle()).take(maxResults).toList();
     }, [], tag: 'YouTubeService.getSuggestionsFromHistory');
   }
 
