@@ -97,9 +97,15 @@ class PlayerScreen extends StatelessWidget {
                               ],
                             ),
                           ),
-                          IconButton(
-                            icon: Icon(Icons.favorite_border),
-                            onPressed: () {},
+                          FutureBuilder<bool>(
+                            future: player.isLiked(player.currentSong!.id),
+                            builder: (context, snap) {
+                              final liked = snap.data ?? false;
+                              return IconButton(
+                                icon: Icon(liked ? Icons.favorite : Icons.favorite_border, color: liked ? Colors.green : null),
+                                onPressed: () => player.toggleLike(player.currentSong!),
+                              );
+                            },
                           ),
                         ],
                       ),

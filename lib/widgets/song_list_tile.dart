@@ -39,7 +39,16 @@ class SongListTile extends StatelessWidget {
       ),
       title: Text(song.title, overflow: TextOverflow.ellipsis),
       subtitle: Text(song.artist, overflow: TextOverflow.ellipsis),
-      trailing: const Icon(Icons.more_vert),
+      trailing: FutureBuilder<bool>(
+        future: context.read<MusicPlayerProvider>().isLiked(song.id),
+        builder: (context, snap) {
+          final liked = snap.data ?? false;
+          return IconButton(
+            icon: Icon(liked ? Icons.favorite : Icons.favorite_border, size: 20, color: liked ? Colors.green : Colors.grey),
+            onPressed: () => context.read<MusicPlayerProvider>().toggleLike(song),
+          );
+        },
+      ),
       onTap: () => context.read<MusicPlayerProvider>().playSong(song, queue: queue),
     );
   }

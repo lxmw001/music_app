@@ -36,6 +36,8 @@ abstract class MusicPlayerProvider extends ChangeNotifier {
   void clearSuggestions();
   Future<List<Song>> getMostLikedFromHistory();
   Future<List<Song>> getRecentSongs();
+  Future<bool> isLiked(String songId);
+  Future<void> toggleLike(Song song);
   Future<List<({Song song, int likedCount, int playCount})>> getMostLiked(List<Song> knownSongs);
 }
 
@@ -372,6 +374,11 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
 
   Future<List<Song>> getMostLikedFromHistory() => _historyService.getMostLikedSongs();
   Future<List<Song>> getRecentSongs() => _historyService.getRecentSongs();
+  Future<bool> isLiked(String songId) => _historyService.isLiked(songId);
+  Future<void> toggleLike(Song song) async {
+    await _historyService.toggleLike(song);
+    notifyListeners();
+  }
 
   Future<List<({Song song, int likedCount, int playCount})>> getMostLiked(List<Song> knownSongs) =>
       _historyService.getMostLiked(knownSongs);

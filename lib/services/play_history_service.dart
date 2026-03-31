@@ -66,7 +66,24 @@ class PlayHistoryService {
     await _saveSongMetadata(song);
   }
 
-  Future<List<Song>> getRecentSongs({int limit = 10}) async {
+  Future<bool> isLiked(String songId) async {
+    final data = await _loadHistory();
+    return (data[songId]?['manualLike'] as bool?) ?? false;
+  }
+
+  Future<void> toggleLike(Song song) async {
+    final data = await _loadHistory();
+    final entry = data[song.id] ?? {'playCount': 0, 'likedCount': 0};
+    final current = (entry['manualLike'] as bool?) ?? false;
+    entry['manualLike'] = !current;
+    if (!current) {
+      // Liking manually also counts as a like
+      entry['likedCount'] = (entry['likedCount'] as int? ?? 0) + 1;
+    }
+    data[song.id] = entry;
+    await _saveHistory(data);
+    await _saveSongMetadata(song);
+  }
     final p = await _prefs;
     final songsRaw = p.getString(_songsKey);
     if (songsRaw == null) return [];
