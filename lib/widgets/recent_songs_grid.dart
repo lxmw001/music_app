@@ -9,8 +9,8 @@ class RecentSongsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Show max 8 (2 rows × 4 cols)
-    final items = songs.take(8).toList();
+    // Show max 6 (3 rows × 2 cols)
+    final items = songs.take(6).toList();
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
