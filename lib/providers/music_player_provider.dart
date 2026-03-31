@@ -108,7 +108,8 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     }
     
     _audioHandler.playbackState.listen((state) {
-      if (state.processingState == AudioProcessingState.completed) {
+      if (state.processingState == AudioProcessingState.completed && !_isFetchingSuggestions) {
+        print('[MusicPlayerProvider] song completed, calling nextSong');
         nextSong();
       }
       notifyListeners();
