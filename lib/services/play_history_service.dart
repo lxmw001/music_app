@@ -84,6 +84,8 @@ class PlayHistoryService {
     await _saveHistory(data);
     await _saveSongMetadata(song);
   }
+
+  Future<List<Song>> getRecentSongs({int limit = 10}) async {
     final p = await _prefs;
     final songsRaw = p.getString(_songsKey);
     if (songsRaw == null) return [];
