@@ -1,19 +1,50 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
 
 class GeminiService {
   static const _endpoint =
       'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+  static const _cacheKey = 'gemini_known_artists';
 
   final http.Client _client;
   GeminiService({http.Client? client}) : _client = client ?? http.Client();
 
-  /// Returns the artist name extracted from a YouTube video title.
-  /// Returns null if extraction fails or API key not set.
-  Future<String?> extractArtist(String videoTitle) async {
-    if (ApiConfig.geminiApiKey == 'YOUR_GEMINI_API_KEY_HERE') return null;
+  bool get _hasApiKey => ApiConfig.geminiApiKey.isNotEmpty;
 
+  Future<Set<String>> _loadKnownArtists() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_cacheKey);
+    if (raw == null) return {};
+    return Set<String>.from(jsonDecode(raw));
+  }
+
+  Future<void> _addKnownArtist(String artist) async {
+    final prefs = await SharedPreferences.getInstance();
+    final artists = await _loadKnownArtists()..add(artist.toLowerCase());
+    await prefs.setString(_cacheKey, jsonEncode(artists.toList()));
+  }
+
+  /// Returns the artist name from the title.
+  /// Checks known artists cache first, then regex, then Gemini API.
+  Future<String?> extractArtist(String videoTitle) async {
+    // 1. Check if any known artist appears in the title
+    final knownArtists = await _loadKnownArtists();
+    final titleLower = videoTitle.toLowerCase();
+    for (final artist in knownArtists) {
+      if (titleLower.contains(artist)) return artist;
+    }
+
+    // 2. Try regex for "Artist - Title" pattern
+    final regexArtist = _extractFromTitle(videoTitle);
+    if (regexArtist != null) {
+      await _addKnownArtist(regexArtist);
+      return regexArtist;
+    }
+
+    // 3. Call Gemini API if key is available
+    if (!_hasApiKey) return null;
     try {
       final response = await _client.post(
         Uri.parse('$_endpoint?key=${ApiConfig.geminiApiKey}'),
@@ -23,8 +54,7 @@ class GeminiService {
             {
               'parts': [
                 {
-                  'text':
-                      'Extract only the artist/singer name from this YouTube music video title. '
+                  'text': 'Extract only the artist/singer name from this YouTube music video title. '
                       'Return just the artist name, nothing else. '
                       'If you cannot determine the artist, return "unknown".\n\nTitle: "$videoTitle"'
                 }
@@ -34,14 +64,27 @@ class GeminiService {
           'generationConfig': {'maxOutputTokens': 50, 'temperature': 0.1},
         }),
       );
-
       if (response.statusCode != 200) return null;
       final data = jsonDecode(response.body);
       final text = data['candidates']?[0]?['content']?['parts']?[0]?['text'] as String?;
       if (text == null || text.trim().toLowerCase() == 'unknown') return null;
-      return text.trim();
+      final artist = text.trim();
+      await _addKnownArtist(artist);
+      return artist;
     } catch (e) {
       return null;
     }
+  }
+
+  String? _extractFromTitle(String title) {
+    final cleaned = title
+        .replaceAll(RegExp(r'\(.*?\)|\[.*?\]'), '')
+        .replaceAll(RegExp(r'official|video|audio|lyrics|hd|4k', caseSensitive: false), '')
+        .trim();
+    if (cleaned.contains(' - ')) {
+      final artist = cleaned.split(' - ').first.trim();
+      if (artist.isNotEmpty && artist.split(' ').length <= 4) return artist;
+    }
+    return null;
   }
 }

@@ -86,7 +86,6 @@ class YouTubeService {
   Future<List<Song>> getSuggestedSongs(String videoId, {int maxResults = 5}) =>
       safeCall(() async {
         final video = await _gateway.getVideo(videoId);
-        // Try Gemini first, fall back to regex extraction
         final artist = await _gemini.extractArtist(video.title);
         final query = artist != null
             ? '$artist music'
