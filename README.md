@@ -30,6 +30,21 @@ A Flutter mobile application with YouTube as the music source, featuring:
 3. Add proper network permissions for Android/iOS
 4. Test on device for audio playback
 
+### API Keys:
+Keys are injected at build/run time via `--dart-define` (never hardcoded):
+
+```bash
+# Run with keys
+flutter run \
+  --dart-define=GEMINI_API_KEY=your_gemini_key
+
+# Build with keys
+flutter build apk \
+  --dart-define=GEMINI_API_KEY=your_gemini_key
+```
+
+- **Gemini API key**: Get free key at [aistudio.google.com](https://aistudio.google.com) — used for AI-powered artist extraction to improve song suggestions. App works without it (falls back to regex).
+
 ### Next Steps:
 - Add user authentication
 - Implement offline downloads
