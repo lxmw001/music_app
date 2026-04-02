@@ -9,6 +9,7 @@ import '../services/play_history_service.dart';
 abstract class MusicPlayerProvider extends ChangeNotifier {
   Song? get currentSong;
   List<Song> get queue;
+  int get currentIndex;
   bool get isShuffled;
   bool get isRepeating;
   bool get isInitialized;
@@ -64,6 +65,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
 
   Song? get currentSong => _currentSong;
   List<Song> get queue => _queue;
+  int get currentIndex => _currentIndex;
   bool get isShuffled => _isShuffled;
   bool get isRepeating => _isRepeating;
   bool get isInitialized => _isInitialized;
@@ -251,7 +253,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       _seedQueueWithSuggestions(song);
     }
   }
-
   /// Fetch suggestions for the seed song and append to queue in background
   void _seedQueueWithSuggestions(Song seedSong) {
     _youtubeService.getSuggestedSongs(seedSong.id, maxResults: 20).then((suggestions) {

@@ -61,6 +61,7 @@ class FakeMusicPlayerProvider extends ChangeNotifier implements MusicPlayerProvi
   @override bool get isFetchingSuggestions => false;
   @override List<Song> get suggestedSongs => [];
   @override List<Song> get queue => _queue;
+  @override int get currentIndex => 0;
   @override Duration get currentPosition => Duration.zero;
   @override Duration get totalDuration => const Duration(seconds: 200);
 

@@ -184,6 +184,52 @@ class PlayerScreen extends StatelessWidget {
                     ],
                   ),
                 ),
+                // Up Next queue
+                if (player.queue.length > 1) ...[
+                  const Divider(color: Colors.grey),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    child: Row(
+                      children: [
+                        const Text('Up Next', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        const Spacer(),
+                        Text('${player.queue.length - player.currentIndex - 1} songs',
+                            style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: player.queue.length,
+                      itemBuilder: (context, i) {
+                        final song = player.queue[i];
+                        final isCurrent = i == player.currentIndex;
+                        if (i <= player.currentIndex) return const SizedBox.shrink();
+                        return ListTile(
+                          dense: true,
+                          leading: ClipRRect(
+                            borderRadius: BorderRadius.circular(4),
+                            child: Image.network(
+                              song.imageUrl,
+                              width: 40, height: 40, fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                width: 40, height: 40, color: Colors.grey[800],
+                                child: const Icon(Icons.music_note, size: 16),
+                              ),
+                            ),
+                          ),
+                          title: Text(song.title,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(color: isCurrent ? Colors.green : Colors.white, fontSize: 13)),
+                          subtitle: Text(song.artist,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 11)),
+                          onTap: () => player.playSong(song),
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ],
             ),
           );
