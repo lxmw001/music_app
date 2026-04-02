@@ -250,7 +250,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
 
   /// Fetch suggestions for the seed song and append to queue in background
   void _seedQueueWithSuggestions(Song seedSong) {
-    _youtubeService.getSuggestedSongs(seedSong.id, maxResults: 5).then((suggestions) {
+    _youtubeService.getSuggestedSongs(seedSong.id, maxResults: 20).then((suggestions) {
       // Filter out songs already in queue
       final existing = _queue.map((s) => s.id).toSet();
       final toAdd = suggestions.where((s) => !existing.contains(s.id)).toList();
