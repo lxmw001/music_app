@@ -5,7 +5,7 @@ import '../config/api_config.dart';
 
 class GeminiService {
   static const _endpoint =
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
   static const _cacheKey = 'gemini_known_artists';
 
   final http.Client _client;
