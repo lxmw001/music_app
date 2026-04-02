@@ -102,11 +102,15 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     if (lastSongData != null && _pendingSong == null) {
       final song = lastSongData.song;
       _currentSong = song;
+      _queue = [song];
+      _currentIndex = 0;
       _lastRestoredPosition = Duration(seconds: lastSongData.lastPositionSeconds);
       print('[MusicPlayerProvider] restored song: ${song.title}, position=${lastSongData.lastPositionSeconds}s');
       notifyListeners();
       // Pre-fetch audio URL in background so play is instant
       _youtubeService.getAudioUrl(song.id).then((url) => song.audioUrl = url);
+      // Seed queue with suggestions in background
+      _seedQueueWithSuggestions(song);
     }
     
     _audioHandler.playbackState.listen((state) {
