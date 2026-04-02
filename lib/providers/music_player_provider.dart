@@ -309,13 +309,19 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
 
   void nextSong() {
     if (!_isInitialized) return;
-    if (_suggestedSongs.isNotEmpty) {
+    if (_queue.isNotEmpty && _currentIndex < _queue.length - 1) {
+      // Play next song already in queue
+      _currentIndex++;
+      playSong(_queue[_currentIndex]);
+    } else if (_suggestedSongs.isNotEmpty) {
+      // Use pre-fetched suggestion
       final next = _suggestedSongs.first;
       _suggestedSongs = [];
       _queue.add(next);
       _currentIndex = _queue.length - 1;
       playSong(next);
     } else if (_currentSong != null) {
+      // Fetch a new suggestion on demand
       _fetchAndPlaySuggestion();
     }
   }
