@@ -241,6 +241,28 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         }
       });
     }
+
+    // If this is the first song of a new queue, seed suggestions in background
+    if (queue != null) {
+      _seedQueueWithSuggestions(song);
+    }
+  }
+
+  /// Fetch suggestions for the seed song and append to queue in background
+  void _seedQueueWithSuggestions(Song seedSong) {
+    _youtubeService.getSuggestedSongs(seedSong.id, maxResults: 5).then((suggestions) {
+      // Filter out songs already in queue
+      final existing = _queue.map((s) => s.id).toSet();
+      final toAdd = suggestions.where((s) => !existing.contains(s.id)).toList();
+      if (toAdd.isNotEmpty) {
+        _queue.addAll(toAdd);
+        // Pre-fetch audio URL for the first new suggestion
+        if (toAdd.first.audioUrl.isEmpty) {
+          _youtubeService.getAudioUrl(toAdd.first.id).then((url) => toAdd.first.audioUrl = url);
+        }
+        notifyListeners();
+      }
+    });
   }
 
   Future<void> pause() async {
