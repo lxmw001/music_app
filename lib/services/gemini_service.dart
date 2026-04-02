@@ -26,28 +26,25 @@ class GeminiService {
     await prefs.setString(_cacheKey, jsonEncode(artists.toList()));
   }
 
-  /// Returns the artist name from the title.
-  /// Checks known artists cache first, then regex, then Gemini API.
-  Future<String?> extractArtist(String videoTitle) async {
-    // 1. Check if any known artist appears in the title
+  /// Returns a YouTube search query for finding similar songs.
+  /// - Individual song → "<artist> music"
+  /// - Mix/compilation (any language) → similar mix query
+  Future<String?> getSuggestionQuery(String videoTitle) async {
+    // 1. Check known artists cache
     final knownArtists = await _loadKnownArtists();
     final titleLower = videoTitle.toLowerCase();
     for (final artist in knownArtists) {
-      if (titleLower.contains(artist)) {
-        print('[Gemini] cache hit: "$artist" in "$videoTitle"');
-        return artist;
-      }
+      if (titleLower.contains(artist)) return '$artist music';
     }
 
-    // 2. Try regex for "Artist - Title" pattern
+    // 2. Regex for obvious "Artist - Song" pattern
     final regexArtist = _extractFromTitle(videoTitle);
     if (regexArtist != null) {
-      print('[Gemini] regex extracted: "$regexArtist" from "$videoTitle"');
       await _addKnownArtist(regexArtist);
-      return regexArtist;
+      return '$regexArtist music';
     }
 
-    // 3. Call Gemini API if key is available
+    // 3. Gemini API
     if (!_hasApiKey) {
       print('[Gemini] no API key, skipping: "$videoTitle"');
       return null;
@@ -62,12 +59,17 @@ class GeminiService {
             {
               'parts': [
                 {
-                  'text': 'What is the artist name in this YouTube music video title? Reply with only the artist name, nothing else. If unknown, reply "unknown".\n\n"$videoTitle"'
+                  'text': 'Analyze this YouTube music video title and return a YouTube search query to find similar music.\n\n'
+                      'Rules:\n'
+                      '- If it is a mix, compilation, or greatest hits style (in any language): return a query for similar mixes of the same genre/style\n'
+                      '- If it is an individual song: return "<artist name> music"\n'
+                      '- Return ONLY the search query, nothing else.\n\n'
+                      'Title: "$videoTitle"'
                 }
               ]
             }
           ],
-          'generationConfig': {'maxOutputTokens': 50, 'temperature': 0.1},
+          'generationConfig': {'maxOutputTokens': 30, 'temperature': 0.1},
         }),
       );
       if (response.statusCode != 200) {
@@ -76,14 +78,13 @@ class GeminiService {
       }
       final data = jsonDecode(response.body);
       final text = data['candidates']?[0]?['content']?['parts']?[0]?['text'] as String?;
-      if (text == null || text.trim().toLowerCase() == 'unknown') {
-        print('[Gemini] could not extract artist from: "$videoTitle"');
-        return null;
+      if (text == null) return null;
+      final query = text.trim();
+      print('[Gemini] suggestion query: "$query"');
+      if (query.endsWith(' music')) {
+        await _addKnownArtist(query.replaceAll(' music', '').trim());
       }
-      final artist = text.trim();
-      print('[Gemini] API extracted: "$artist" from "$videoTitle"');
-      await _addKnownArtist(artist);
-      return artist;
+      return query;
     } catch (e) {
       print('[Gemini] exception: $e');
       return null;
@@ -96,20 +97,17 @@ class GeminiService {
         .replaceAll(RegExp(r'official|video|audio|lyrics|hd|4k|letra', caseSensitive: false), '')
         .trim();
 
-    // "Song - Artist" or "Artist - Song"
     if (cleaned.contains(' - ')) {
       final parts = cleaned.split(' - ');
-      // Heuristic: shorter part is more likely the artist
       final artist = parts.first.trim().split(' ').length <= parts.last.trim().split(' ').length
           ? parts.first.trim()
           : parts.last.trim();
       if (artist.isNotEmpty && artist.split(' ').length <= 5) return artist;
     }
 
-    // "Song, Artist"
     if (cleaned.contains(', ')) {
       final artist = cleaned.split(', ').last.trim()
-          .replaceAll(RegExp(r'\s*-\s*$'), '').trim(); // strip trailing " -"
+          .replaceAll(RegExp(r'\s*-\s*$'), '').trim();
       if (artist.isNotEmpty && artist.split(' ').length <= 5) return artist;
     }
 
