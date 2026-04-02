@@ -62,10 +62,7 @@ class GeminiService {
             {
               'parts': [
                 {
-                  'text': 'Extract only the artist/singer name from this YouTube music video title. '
-                      'The artist may appear before or after the song name, separated by " - " or ", ". '
-                      'Return just the artist name, nothing else. '
-                      'If you cannot determine the artist, return "unknown".\n\nTitle: "$videoTitle"'
+                  'text': 'What is the artist name in this YouTube music video title? Reply with only the artist name, nothing else. If unknown, reply "unknown".\n\n"$videoTitle"'
                 }
               ]
             }
@@ -111,7 +108,8 @@ class GeminiService {
 
     // "Song, Artist"
     if (cleaned.contains(', ')) {
-      final artist = cleaned.split(', ').last.trim();
+      final artist = cleaned.split(', ').last.trim()
+          .replaceAll(RegExp(r'\s*-\s*$'), '').trim(); // strip trailing " -"
       if (artist.isNotEmpty && artist.split(' ').length <= 5) return artist;
     }
 
