@@ -206,7 +206,18 @@ class PlayerScreen extends StatelessWidget {
         minChildSize: 0.4,
         maxChildSize: 0.95,
         expand: false,
-        builder: (_, controller) => Column(
+        builder: (_, controller) {
+          // Auto-scroll to current song
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (player.currentIndex > 0) {
+              controller.animateTo(
+                player.currentIndex * 72.0,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOut,
+              );
+            }
+          });
+          return Column(
           children: [
             Container(
               margin: const EdgeInsets.symmetric(vertical: 8),
@@ -252,7 +263,7 @@ class PlayerScreen extends StatelessWidget {
                               fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal)),
                       subtitle: Text(song.artist,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Colors.grey)),
+                          style: TextStyle(color: i < player.currentIndex ? Colors.grey[700] : Colors.grey)),
                       trailing: isCurrent
                           ? const Icon(Icons.equalizer, color: Colors.green)
                           : null,
@@ -266,7 +277,8 @@ class PlayerScreen extends StatelessWidget {
               ),
             ),
           ],
-        ),
+        );
+        },
       ),
     );
   }
