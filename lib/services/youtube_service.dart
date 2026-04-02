@@ -83,14 +83,36 @@ class YouTubeService {
   Future<List<Song>> getSuggestedSongs(String videoId, {int maxResults = 5}) =>
       safeCall(() async {
         final video = await _gateway.getVideo(videoId);
-        // Search by artist only — omit title to avoid getting the same song
-        final videos = await _gateway.search(video.author, limit: maxResults + 3);
+        final query = _extractSearchQuery(video.title, video.author);
+        final videos = await _gateway.search(query, limit: maxResults + 3);
         return videos
             .where((v) => v.id.value != videoId)
             .take(maxResults)
             .map(_videoToSong)
             .toList();
       }, [], tag: 'YouTubeService.getSuggestedSongs');
+
+  /// Extract a meaningful search query from the video title.
+  /// Most music titles follow "Artist - Song" or "Song - Artist" patterns.
+  String _extractSearchQuery(String title, String channelAuthor) {
+    // Remove common noise: (Official Video), [HD], etc.
+    final cleaned = title
+        .replaceAll(RegExp(r'\(.*?\)|\[.*?\]'), '')
+        .replaceAll(RegExp(r'official|video|audio|lyrics|hd|4k|ft\.?|feat\.?', caseSensitive: false), '')
+        .trim();
+
+    // If title contains " - ", the part before is likely the artist
+    if (cleaned.contains(' - ')) {
+      final parts = cleaned.split(' - ');
+      final artist = parts.first.trim();
+      // Use artist name for broader suggestions
+      return artist.isNotEmpty ? '$artist music' : cleaned;
+    }
+
+    // Fall back to first few words of the title (avoid full title = same song)
+    final words = cleaned.split(' ').where((w) => w.isNotEmpty).take(4).join(' ');
+    return words.isNotEmpty ? words : channelAuthor;
+  }
 
   Future<List<Song>> getSuggestionsFromHistory(List<Song> likedSongs, {int maxResults = 10}) {
     if (likedSongs.isEmpty) return Future.value([]);
