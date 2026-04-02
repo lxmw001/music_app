@@ -253,20 +253,24 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       _seedQueueWithSuggestions(song);
     }
   }
+  bool _isSeeding = false;
+
   /// Fetch suggestions for the seed song and append to queue in background
   void _seedQueueWithSuggestions(Song seedSong) {
+    if (_isSeeding) return;
+    _isSeeding = true;
     _youtubeService.getSuggestedSongs(seedSong.id, maxResults: 20).then((suggestions) {
       // Filter out songs already in queue
       final existing = _queue.map((s) => s.id).toSet();
       final toAdd = suggestions.where((s) => !existing.contains(s.id)).toList();
       if (toAdd.isNotEmpty) {
         _queue.addAll(toAdd);
-        // Pre-fetch audio URL for the first new suggestion
         if (toAdd.first.audioUrl.isEmpty) {
           _youtubeService.getAudioUrl(toAdd.first.id).then((url) => toAdd.first.audioUrl = url);
         }
         notifyListeners();
       }
+      _isSeeding = false;
     });
   }
 
@@ -327,7 +331,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   }
 
   Future<void> _fetchAndPlaySuggestion() async {
-    if (_currentSong == null) return;
+    if (_currentSong == null || _isSeeding) return;
     try {
       final suggestions = await _youtubeService.getSuggestedSongs(_currentSong!.id, maxResults: 1);
       if (suggestions.isNotEmpty) {
