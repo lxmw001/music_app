@@ -33,18 +33,26 @@ class GeminiService {
     final knownArtists = await _loadKnownArtists();
     final titleLower = videoTitle.toLowerCase();
     for (final artist in knownArtists) {
-      if (titleLower.contains(artist)) return artist;
+      if (titleLower.contains(artist)) {
+        print('[Gemini] cache hit: "$artist" in "$videoTitle"');
+        return artist;
+      }
     }
 
     // 2. Try regex for "Artist - Title" pattern
     final regexArtist = _extractFromTitle(videoTitle);
     if (regexArtist != null) {
+      print('[Gemini] regex extracted: "$regexArtist" from "$videoTitle"');
       await _addKnownArtist(regexArtist);
       return regexArtist;
     }
 
     // 3. Call Gemini API if key is available
-    if (!_hasApiKey) return null;
+    if (!_hasApiKey) {
+      print('[Gemini] no API key, skipping: "$videoTitle"');
+      return null;
+    }
+    print('[Gemini] calling API for: "$videoTitle"');
     try {
       final response = await _client.post(
         Uri.parse('$_endpoint?key=${ApiConfig.geminiApiKey}'),
@@ -64,14 +72,22 @@ class GeminiService {
           'generationConfig': {'maxOutputTokens': 50, 'temperature': 0.1},
         }),
       );
-      if (response.statusCode != 200) return null;
+      if (response.statusCode != 200) {
+        print('[Gemini] API error ${response.statusCode}: ${response.body}');
+        return null;
+      }
       final data = jsonDecode(response.body);
       final text = data['candidates']?[0]?['content']?['parts']?[0]?['text'] as String?;
-      if (text == null || text.trim().toLowerCase() == 'unknown') return null;
+      if (text == null || text.trim().toLowerCase() == 'unknown') {
+        print('[Gemini] could not extract artist from: "$videoTitle"');
+        return null;
+      }
       final artist = text.trim();
+      print('[Gemini] API extracted: "$artist" from "$videoTitle"');
       await _addKnownArtist(artist);
       return artist;
     } catch (e) {
+      print('[Gemini] exception: $e');
       return null;
     }
   }

@@ -90,6 +90,7 @@ class YouTubeService {
         final query = artist != null
             ? '$artist music'
             : _extractSearchQuery(video.title, video.author);
+        print('[YouTubeService] suggestions query: "$query" (artist=$artist)');
         final videos = await _gateway.search(query, limit: maxResults + 3);
         return videos
             .where((v) => v.id.value != videoId)
