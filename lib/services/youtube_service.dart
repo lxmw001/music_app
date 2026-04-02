@@ -1,6 +1,7 @@
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:http/http.dart' as http;
 import '../models/music_models.dart';
+import 'gemini_service.dart';
 import '../utils/safe_call.dart';
 
 /// Thin abstraction over YoutubeExplode to allow testing without real network calls.
@@ -57,10 +58,12 @@ Song _videoToSong(Video video, {String album = ''}) => Song(
 class YouTubeService {
   final YoutubeGateway _gateway;
   final http.Client _httpClient;
+  final GeminiService _gemini;
 
-  YouTubeService({YoutubeGateway? gateway, http.Client? httpClient})
+  YouTubeService({YoutubeGateway? gateway, http.Client? httpClient, GeminiService? gemini})
       : _gateway = gateway ?? YoutubeExplodeGateway(),
-        _httpClient = httpClient ?? http.Client();
+        _httpClient = httpClient ?? http.Client(),
+        _gemini = gemini ?? GeminiService();
 
   Future<List<Song>> searchSongs(String query) =>
       safeCall(() async => (await _gateway.search(query, limit: 20)).map(_videoToSong).toList(), [], tag: 'YouTubeService.searchSongs');
@@ -83,7 +86,11 @@ class YouTubeService {
   Future<List<Song>> getSuggestedSongs(String videoId, {int maxResults = 5}) =>
       safeCall(() async {
         final video = await _gateway.getVideo(videoId);
-        final query = _extractSearchQuery(video.title, video.author);
+        // Try Gemini first, fall back to regex extraction
+        final artist = await _gemini.extractArtist(video.title);
+        final query = artist != null
+            ? '$artist music'
+            : _extractSearchQuery(video.title, video.author);
         final videos = await _gateway.search(query, limit: maxResults + 3);
         return videos
             .where((v) => v.id.value != videoId)
