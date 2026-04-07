@@ -120,6 +120,8 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         notifyListeners();
         final song = _currentSong!;
         _youtubeService.getAudioUrl(song.id).then((url) => song.audioUrl = url);
+        // If queue has only 1 song (no suggestions yet), seed in background
+        if (_queue.length <= 1) _seedQueueWithSuggestions(song);
       }
     }
     
