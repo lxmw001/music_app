@@ -95,6 +95,8 @@ List<Song> _deduplicateSongs(List<Song> songs) {
   }
   return best.values.toList();
 }
+
+Song _videoToSong(Video video, {String album = ''}) {
   final cleanedTitle = _cleanTitle(video.title);
   final artist = _extractArtistFromTitle(cleanedTitle, video.author);
   return Song(
