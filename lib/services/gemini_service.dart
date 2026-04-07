@@ -107,7 +107,7 @@ Title: "$videoTitle"'''
               ]
             }
           ],
-          'generationConfig': {'maxOutputTokens': 200, 'temperature': 0.2},
+          'generationConfig': {'maxOutputTokens': 500, 'temperature': 0.2},
         }),
       );
 
@@ -121,11 +121,16 @@ Title: "$videoTitle"'''
       if (text == null) return null;
 
       final cleaned = text.replaceAll(RegExp(r'```json|```'), '').trim();
-      final metadata = SongMetadata.fromJson(jsonDecode(cleaned));
-      print('[Gemini] artist=${metadata.artist}, genre=${metadata.genre}, isMix=${metadata.isMix}');
-      print('[Gemini] queries=${metadata.suggestedQueries}');
-      await _saveToCache(key, metadata);
-      return metadata;
+      try {
+        final metadata = SongMetadata.fromJson(jsonDecode(cleaned));
+        print('[Gemini] artist=${metadata.artist}, genre=${metadata.genre}, isMix=${metadata.isMix}');
+        print('[Gemini] queries=${metadata.suggestedQueries}');
+        await _saveToCache(key, metadata);
+        return metadata;
+      } catch (e) {
+        print('[Gemini] JSON parse error: $e\nRaw: $cleaned');
+        return null;
+      }
     } catch (e) {
       print('[Gemini] exception: $e');
       return null;
