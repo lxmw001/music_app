@@ -86,8 +86,8 @@ class YouTubeService {
   Future<List<Song>> getSuggestedSongs(String videoId, {int maxResults = 5}) =>
       safeCall(() async {
         final video = await _gateway.getVideo(videoId);
-        final geminiQuery = await _gemini.getSuggestionQuery(video.title);
-        final query = geminiQuery ?? _extractSearchQuery(video.title, video.author);
+        final metadata = await _gemini.getSongMetadata(video.title);
+        final query = metadata?.randomQuery() ?? _extractSearchQuery(video.title, video.author);
         print('[YouTubeService] suggestions query: "$query"');
         final videos = await _gateway.search(query, limit: maxResults + 3);
         return videos

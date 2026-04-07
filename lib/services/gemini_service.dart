@@ -1,54 +1,83 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
 
+class SongMetadata {
+  final String artist;
+  final String genre;
+  final bool isMix;
+  final List<String> suggestedQueries;
+
+  SongMetadata({
+    required this.artist,
+    required this.genre,
+    required this.isMix,
+    required this.suggestedQueries,
+  });
+
+  factory SongMetadata.fromJson(Map<String, dynamic> json) => SongMetadata(
+        artist: json['artist'] ?? '',
+        genre: json['genre'] ?? '',
+        isMix: json['isMix'] ?? false,
+        suggestedQueries: List<String>.from(json['suggestedQueries'] ?? []),
+      );
+
+  Map<String, dynamic> toJson() => {
+        'artist': artist,
+        'genre': genre,
+        'isMix': isMix,
+        'suggestedQueries': suggestedQueries,
+      };
+
+  String? randomQuery() {
+    if (suggestedQueries.isEmpty) return null;
+    return suggestedQueries[Random().nextInt(suggestedQueries.length)];
+  }
+}
+
 class GeminiService {
   static const _endpoint =
       'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
-  static const _cacheKey = 'gemini_known_artists';
+  static const _cacheKey = 'gemini_song_metadata';
 
   final http.Client _client;
   GeminiService({http.Client? client}) : _client = client ?? http.Client();
 
   bool get _hasApiKey => ApiConfig.geminiApiKey.isNotEmpty;
 
-  Future<Set<String>> _loadKnownArtists() async {
+  Future<Map<String, dynamic>> _loadCache() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_cacheKey);
     if (raw == null) return {};
-    return Set<String>.from(jsonDecode(raw));
+    return Map<String, dynamic>.from(jsonDecode(raw));
   }
 
-  Future<void> _addKnownArtist(String artist) async {
+  Future<void> _saveToCache(String key, SongMetadata metadata) async {
     final prefs = await SharedPreferences.getInstance();
-    final artists = await _loadKnownArtists()..add(artist.toLowerCase());
-    await prefs.setString(_cacheKey, jsonEncode(artists.toList()));
+    final cache = await _loadCache();
+    cache[key] = metadata.toJson();
+    await prefs.setString(_cacheKey, jsonEncode(cache));
   }
 
-  /// Returns a YouTube search query for finding similar songs.
-  /// - Individual song → "<artist> music"
-  /// - Mix/compilation (any language) → similar mix query
-  Future<String?> getSuggestionQuery(String videoTitle) async {
-    // 1. Check known artists cache
-    final knownArtists = await _loadKnownArtists();
-    final titleLower = videoTitle.toLowerCase();
-    for (final artist in knownArtists) {
-      if (titleLower.contains(artist)) return '$artist music';
+  /// Returns metadata for a song title, using local cache when available.
+  Future<SongMetadata?> getSongMetadata(String videoTitle) async {
+    final key = videoTitle.toLowerCase();
+
+    // 1. Check cache
+    final cache = await _loadCache();
+    if (cache.containsKey(key)) {
+      return SongMetadata.fromJson(cache[key]);
     }
 
-    // 2. Regex for obvious "Artist - Song" pattern
-    final regexArtist = _extractFromTitle(videoTitle);
-    if (regexArtist != null) {
-      await _addKnownArtist(regexArtist);
-      return '$regexArtist music';
-    }
-
-    // 3. Gemini API
+    // 2. No API key — use regex as last resort
     if (!_hasApiKey) {
-      print('[Gemini] no API key, skipping: "$videoTitle"');
-      return null;
+      print('[Gemini] no API key, using regex for: "$videoTitle"');
+      return _regexFallback(videoTitle);
     }
+
+    // 3. Call Gemini
     print('[Gemini] calling API for: "$videoTitle"');
     try {
       final response = await _client.post(
@@ -59,58 +88,71 @@ class GeminiService {
             {
               'parts': [
                 {
-                  'text': 'Analyze this YouTube music video title and return a YouTube search query to find similar music.\n\n'
-                      'Rules:\n'
-                      '- If it is a mix, compilation, or greatest hits style (in any language): return a query for similar mixes of the same genre/style\n'
-                      '- If it is an individual song: return "<artist name> music"\n'
-                      '- Return ONLY the search query, nothing else.\n\n'
-                      'Title: "$videoTitle"'
+                  'text': '''Analyze this YouTube music video title and return a JSON object:
+{
+  "artist": "<artist name, empty string if unknown>",
+  "genre": "<music genre>",
+  "isMix": <true if compilation/mix/greatest hits in any language, false if individual song>,
+  "suggestedQueries": ["<query1>", "<query2>", "<query3>", "<query4>", "<query5>"]
+}
+
+For suggestedQueries:
+- Individual song: artist most popular songs, similar artists, same genre hits
+- Mix/compilation: similar mixes of same genre/style in any language
+
+Return ONLY valid JSON, no markdown.
+
+Title: "$videoTitle"'''
                 }
               ]
             }
           ],
-          'generationConfig': {'maxOutputTokens': 30, 'temperature': 0.1},
+          'generationConfig': {'maxOutputTokens': 200, 'temperature': 0.2},
         }),
       );
+
       if (response.statusCode != 200) {
-        print('[Gemini] API error ${response.statusCode}: ${response.body}');
+        print('[Gemini] API error ${response.statusCode}');
         return null;
       }
+
       final data = jsonDecode(response.body);
       final text = data['candidates']?[0]?['content']?['parts']?[0]?['text'] as String?;
       if (text == null) return null;
-      final query = text.trim();
-      print('[Gemini] suggestion query: "$query"');
-      if (query.endsWith(' music')) {
-        await _addKnownArtist(query.replaceAll(' music', '').trim());
-      }
-      return query;
+
+      final cleaned = text.replaceAll(RegExp(r'```json|```'), '').trim();
+      final metadata = SongMetadata.fromJson(jsonDecode(cleaned));
+      print('[Gemini] artist=${metadata.artist}, genre=${metadata.genre}, isMix=${metadata.isMix}');
+      print('[Gemini] queries=${metadata.suggestedQueries}');
+      await _saveToCache(key, metadata);
+      return metadata;
     } catch (e) {
       print('[Gemini] exception: $e');
       return null;
     }
   }
 
-  String? _extractFromTitle(String title) {
+  /// Only used when no API key is available
+  SongMetadata? _regexFallback(String title) {
     final cleaned = title
         .replaceAll(RegExp(r'\(.*?\)|\[.*?\]'), '')
         .replaceAll(RegExp(r'official|video|audio|lyrics|hd|4k|letra', caseSensitive: false), '')
         .trim();
-
+    String? artist;
     if (cleaned.contains(' - ')) {
       final parts = cleaned.split(' - ');
-      final artist = parts.first.trim().split(' ').length <= parts.last.trim().split(' ').length
+      artist = parts.first.trim().split(' ').length <= parts.last.trim().split(' ').length
           ? parts.first.trim()
           : parts.last.trim();
-      if (artist.isNotEmpty && artist.split(' ').length <= 5) return artist;
+    } else if (cleaned.contains(', ')) {
+      artist = cleaned.split(', ').last.trim().replaceAll(RegExp(r'\s*-\s*$'), '').trim();
     }
-
-    if (cleaned.contains(', ')) {
-      final artist = cleaned.split(', ').last.trim()
-          .replaceAll(RegExp(r'\s*-\s*$'), '').trim();
-      if (artist.isNotEmpty && artist.split(' ').length <= 5) return artist;
-    }
-
-    return null;
+    if (artist == null || artist.isEmpty) return null;
+    return SongMetadata(
+      artist: artist,
+      genre: '',
+      isMix: false,
+      suggestedQueries: ['$artist most popular songs', '$artist best hits'],
+    );
   }
 }
