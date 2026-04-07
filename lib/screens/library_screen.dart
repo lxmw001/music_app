@@ -72,7 +72,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
         itemCount: _likedSongs.length,
         itemBuilder: (context, index) {
           final song = _likedSongs[index];
-          return SongListTile(song: song, queue: _likedSongs, isLoading: loadingIds.contains(song.id));
+          return SongListTile(song: song, isLoading: loadingIds.contains(song.id));
         },
       ),
     );
