@@ -262,6 +262,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
 
     // If this is the first song of a new queue, seed suggestions in background
     if (queue != null) {
+      print('[MusicPlayerProvider] new queue set, seeding suggestions for: ${song.title}');
       _seedQueueWithSuggestions(song);
     }
   }
@@ -269,19 +270,26 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
 
   /// Fetch suggestions for the seed song and append to queue in background
   void _seedQueueWithSuggestions(Song seedSong) {
-    if (_isSeeding) return;
+    if (_isSeeding) {
+      print('[MusicPlayerProvider] already seeding, skipped for: ${seedSong.title}');
+      return;
+    }
     _isSeeding = true;
+    print('[MusicPlayerProvider] _seedQueueWithSuggestions started for: ${seedSong.title}');
     _youtubeService.getSuggestedSongs(seedSong.id, maxResults: 20).then((suggestions) {
       // Filter out songs already in queue
       final existing = _queue.map((s) => s.id).toSet();
       final toAdd = suggestions.where((s) => !existing.contains(s.id)).toList();
       if (toAdd.isNotEmpty) {
         _queue.addAll(toAdd);
+        print('[MusicPlayerProvider] added ${toAdd.length} suggestions to queue, total: ${_queue.length}');
         if (toAdd.first.audioUrl.isEmpty) {
           _youtubeService.getAudioUrl(toAdd.first.id).then((url) => toAdd.first.audioUrl = url);
         }
         _historyService.saveQueue(_queue, _currentIndex);
         notifyListeners();
+      } else {
+        print('[MusicPlayerProvider] no new suggestions to add');
       }
       _isSeeding = false;
     });
