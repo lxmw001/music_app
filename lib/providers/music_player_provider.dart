@@ -207,6 +207,12 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     }
     notifyListeners();
 
+    // Seed suggestions immediately when new queue is set (before audio fetch)
+    if (queue != null) {
+      print('[MusicPlayerProvider] new queue set, seeding suggestions for: ${song.title}');
+      _seedQueueWithSuggestions(song);
+    }
+
     // Clear suggestions when starting a new song
     _suggestedSongs = [];
     String audioUrl = song.audioUrl;
@@ -261,12 +267,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
           _youtubeService.getAudioUrl(suggested.id).then((url) => suggested.audioUrl = url);
         }
       });
-    }
-
-    // If this is the first song of a new queue, seed suggestions in background
-    if (queue != null) {
-      print('[MusicPlayerProvider] new queue set, seeding suggestions for: ${song.title}');
-      _seedQueueWithSuggestions(song);
     }
   }
   bool _isSeeding = false;
