@@ -11,6 +11,7 @@ class PlayHistoryService {
   static const _songsKey = 'known_songs';
   static const _queueKey = 'saved_queue';
   static const _queueIndexKey = 'saved_queue_index';
+  static const _searchHistoryKey = 'search_history';
 
   Future<SharedPreferences> get _prefs => SharedPreferences.getInstance();
 
@@ -50,7 +51,12 @@ class PlayHistoryService {
     final isLiked = durationSeconds >= 360
         ? listenedSeconds >= 180
         : listenedSeconds >= durationSeconds * 0.5;
-    if (isLiked) entry['likedCount'] = (entry['likedCount'] as int? ?? 0) + 1;
+    if (isLiked) {
+      entry['likedCount'] = (entry['likedCount'] as int? ?? 0) + 1;
+    } else if (listenedSeconds > 5) {
+      // Skipped after >5s but didn't meet like threshold = unliked
+      entry['unlikedCount'] = (entry['unlikedCount'] as int? ?? 0) + 1;
+    }
 
     data[song.id] = entry;
     await _saveHistory(data);
@@ -158,5 +164,35 @@ class PlayHistoryService {
     final list = (jsonDecode(raw) as List).map((e) => Song.fromJson(e)).toList();
     if (list.isEmpty) return null;
     return (queue: list, currentIndex: index.clamp(0, list.length - 1));
+  }
+
+  Future<void> saveSearch(String query) async {
+    if (query.trim().isEmpty) return;
+    final p = await _prefs;
+    final raw = p.getString(_searchHistoryKey);
+    final searches = raw != null ? List<String>.from(jsonDecode(raw)) : <String>[];
+    searches.remove(query); // avoid duplicates
+    searches.insert(0, query);
+    await p.setString(_searchHistoryKey, jsonEncode(searches.take(50).toList()));
+  }
+
+  Future<List<String>> getSearchHistory() async {
+    final p = await _prefs;
+    final raw = p.getString(_searchHistoryKey);
+    if (raw == null) return [];
+    return List<String>.from(jsonDecode(raw));
+  }
+
+  Future<List<Song>> getUnlikedSongs({int limit = 20}) async {
+    final p = await _prefs;
+    final songsRaw = p.getString(_songsKey);
+    if (songsRaw == null) return [];
+    final songsMap = Map<String, dynamic>.from(jsonDecode(songsRaw));
+    final data = await _loadHistory();
+    return songsMap.entries
+        .where((e) => (data[e.key]?['unlikedCount'] as int? ?? 0) > 0)
+        .map((e) => Song.fromJson(e.value))
+        .take(limit)
+        .toList();
   }
 }

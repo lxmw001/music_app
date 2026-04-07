@@ -37,6 +37,7 @@ class _SearchScreenState extends State<SearchScreen> {
       searchResults = results;
       isLoading = false;
     });
+    if (mounted) context.read<MusicPlayerProvider>().saveSearch(query);
   }
 
   @override

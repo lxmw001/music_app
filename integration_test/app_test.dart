@@ -84,6 +84,7 @@ class FakeMusicPlayerProvider extends ChangeNotifier implements MusicPlayerProvi
   @override Future<void> fetchSuggestions() async {}
   @override void addSuggestedToQueue(Song song) {}
   @override void clearSuggestions() {}
+  @override Future<void> saveSearch(String query) async {}
   @override Future<List<Song>> getMostLikedFromHistory() async => [];
   @override Future<List<Song>> getRecentSongs() async => [];
   @override Future<bool> isLiked(String songId) async => false;
