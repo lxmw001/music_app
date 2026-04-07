@@ -164,7 +164,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       _pendingSong = null;
       _pendingQueue = null;
       _loadingAudioIds.remove(song!.id); // clear pending spinner before re-playing
-      print('[MusicPlayerProvider] _init complete, processing pending song: ${song.id}');
+      print('[MusicPlayerProvider] _init complete, processing pending song: ${song.id}, pendingQueue=${queue?.length}');
       await playSong(song, queue: queue);
     }
   } catch (e, st) {
@@ -188,6 +188,8 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     }
     // Don't restart if same song is already playing (but allow if queue is being set)
     if (_currentSong?.id == song.id && isPlaying && queue == null) return;
+
+    print('[MusicPlayerProvider] playSong proceeding, queue=${queue?.length}, isSeeding=$_isSeeding');
 
     // Snapshot position before it resets, then record play for previous song
     final previousSong = _currentSong;
