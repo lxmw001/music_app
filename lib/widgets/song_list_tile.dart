@@ -48,10 +48,7 @@ class SongListTile extends StatelessWidget {
           );
         },
       ),
-      onTap: () {
-        print('[SongListTile] tapped: ${song.title}');
-        context.read<MusicPlayerProvider>().playSong(song, queue: [song]);
-      },
+      onTap: () => context.read<MusicPlayerProvider>().playSong(song, queue: [song]),
     );
   }
 }
