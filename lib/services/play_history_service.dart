@@ -9,6 +9,8 @@ import '../models/music_models.dart';
 class PlayHistoryService {
   static const _historyKey = 'play_history';
   static const _songsKey = 'known_songs';
+  static const _queueKey = 'saved_queue';
+  static const _queueIndexKey = 'saved_queue_index';
 
   Future<SharedPreferences> get _prefs => SharedPreferences.getInstance();
 
@@ -140,5 +142,21 @@ class PlayHistoryService {
             ))
         .toList()
       ..sort((a, b) => b.likedCount.compareTo(a.likedCount));
+  }
+
+  Future<void> saveQueue(List<Song> queue, int currentIndex) async {
+    final p = await _prefs;
+    await p.setString(_queueKey, jsonEncode(queue.map(_songToMap).toList()));
+    await p.setInt(_queueIndexKey, currentIndex);
+  }
+
+  Future<({List<Song> queue, int currentIndex})?> loadQueue() async {
+    final p = await _prefs;
+    final raw = p.getString(_queueKey);
+    if (raw == null) return null;
+    final index = p.getInt(_queueIndexKey) ?? 0;
+    final list = (jsonDecode(raw) as List).map((e) => Song.fromJson(e)).toList();
+    if (list.isEmpty) return null;
+    return (queue: list, currentIndex: index.clamp(0, list.length - 1));
   }
 }

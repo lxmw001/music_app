@@ -99,20 +99,20 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     print('[MusicPlayerProvider] AudioService.init complete');
     _isInitialized = true;
 
-    // Restore last played song so mini player shows on startup
-    final lastSongData = await _historyService.loadLastSong();
-    if (lastSongData != null && _pendingSong == null) {
-      final song = lastSongData.song;
-      _currentSong = song;
-      _queue = [song];
-      _currentIndex = 0;
-      _lastRestoredPosition = Duration(seconds: lastSongData.lastPositionSeconds);
-      print('[MusicPlayerProvider] restored song: ${song.title}, position=${lastSongData.lastPositionSeconds}s');
+    // Restore last queue and song on startup
+    final savedQueue = await _historyService.loadQueue();
+    if (savedQueue != null && _pendingSong == null) {
+      _queue = savedQueue.queue;
+      _currentIndex = savedQueue.currentIndex;
+      _currentSong = _queue[_currentIndex];
+      _lastRestoredPosition = Duration(
+        seconds: (await _historyService.loadLastSong())?.lastPositionSeconds ?? 0,
+      );
+      print('[MusicPlayerProvider] restored queue: ${_queue.length} songs, index=$_currentIndex');
       notifyListeners();
-      // Pre-fetch audio URL in background so play is instant
+      // Pre-fetch audio URL for current song
+      final song = _currentSong!;
       _youtubeService.getAudioUrl(song.id).then((url) => song.audioUrl = url);
-      // Seed queue with suggestions in background
-      _seedQueueWithSuggestions(song);
     }
     
     _audioHandler.playbackState.listen((state) {
@@ -190,6 +190,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     if (queue != null) {
       _queue = queue;
       _currentIndex = queue.indexOf(song);
+      _isSeeding = false; // reset so new queue can be seeded
     }
     notifyListeners();
 
@@ -228,6 +229,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     }
     await _audioHandler.play();
     _historyService.savePosition(song, 0);
+    _historyService.saveQueue(_queue, _currentIndex);
     _startPositionSaveTimer(song);
     notifyListeners();
 
@@ -268,6 +270,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         if (toAdd.first.audioUrl.isEmpty) {
           _youtubeService.getAudioUrl(toAdd.first.id).then((url) => toAdd.first.audioUrl = url);
         }
+        _historyService.saveQueue(_queue, _currentIndex);
         notifyListeners();
       }
       _isSeeding = false;
