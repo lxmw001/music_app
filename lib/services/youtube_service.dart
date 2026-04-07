@@ -69,7 +69,32 @@ String _extractArtistFromTitle(String cleanedTitle, String fallback) {
   return fallback;
 }
 
-Song _videoToSong(Video video, {String album = ''}) {
+/// Score a title — higher = cleaner. Prefers "Artist - Song" pattern.
+int _titleScore(String title) {
+  int score = 0;
+  if (title.contains(' - ')) score += 10;           // has artist-song separator
+  if (!title.contains('(')) score += 3;             // no parentheses noise
+  if (!title.contains('[')) score += 2;             // no bracket noise
+  if (RegExp(r'^[A-Za-záéíóúÁÉÍÓÚñÑüÜ\s\-]+$').hasMatch(title)) score += 2; // clean chars only
+  score -= (title.length / 20).floor();             // penalize very long titles
+  return score;
+}
+
+/// Deduplicate songs keeping the one with the cleanest title per unique song.
+List<Song> _deduplicateSongs(List<Song> songs) {
+  final Map<String, Song> best = {};
+  for (final song in songs) {
+    // Normalize key: lowercase title without the artist part
+    final titlePart = song.title.contains(' - ')
+        ? song.title.split(' - ').last.trim().toLowerCase()
+        : song.title.toLowerCase();
+    final key = titlePart.replaceAll(RegExp(r'[^a-z0-9áéíóúñü ]'), '').trim();
+    if (!best.containsKey(key) || _titleScore(song.title) > _titleScore(best[key]!.title)) {
+      best[key] = song;
+    }
+  }
+  return best.values.toList();
+}
   final cleanedTitle = _cleanTitle(video.title);
   final artist = _extractArtistFromTitle(cleanedTitle, video.author);
   return Song(
@@ -94,13 +119,19 @@ class YouTubeService {
         _gemini = gemini ?? GeminiService();
 
   Future<List<Song>> searchSongs(String query) =>
-      safeCall(() async => (await _gateway.search(query, limit: 20)).map(_videoToSong).toList(), [], tag: 'YouTubeService.searchSongs');
+      safeCall(() async {
+        final videos = await _gateway.search(query, limit: 20);
+        return _deduplicateSongs(videos.map(_videoToSong).toList());
+      }, [], tag: 'YouTubeService.searchSongs');
 
   Future<String> getAudioUrl(String videoId) =>
       safeCall(() => _gateway.getAudioUrl(videoId), '', tag: 'YouTubeService.getAudioUrl');
 
   Future<List<Song>> getTrendingMusic() =>
-      safeCall(() async => (await _gateway.search('regueton 2026', limit: 20)).map(_videoToSong).toList(), [], tag: 'YouTubeService.getTrendingMusic');
+      safeCall(() async {
+        final videos = await _gateway.search('regueton 2026', limit: 20);
+        return _deduplicateSongs(videos.map(_videoToSong).toList());
+      }, [], tag: 'YouTubeService.getTrendingMusic');
 
   Future<List<Song>> getPlaylistSongs(String playlistId) =>
       safeCall(() async {
@@ -116,7 +147,7 @@ class YouTubeService {
   Future<List<Song>> searchByQuery(String query, {int maxResults = 20}) =>
       safeCall(() async {
         final videos = await _gateway.search(query, limit: maxResults);
-        return videos.map(_videoToSong).toList();
+        return _deduplicateSongs(videos.map(_videoToSong).toList());
       }, [], tag: 'YouTubeService.searchByQuery');
 
   Future<List<Song>> getSuggestedSongs(String videoId, {int maxResults = 5, String? knownTitle}) =>
