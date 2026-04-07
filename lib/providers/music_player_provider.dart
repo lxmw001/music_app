@@ -97,11 +97,12 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       ),
     );
     print('[MusicPlayerProvider] AudioService.init complete');
-    _isInitialized = true;
 
-    // Restore last queue and song on startup
+    // Restore last queue and song on startup BEFORE marking initialized
     final savedQueue = await _historyService.loadQueue();
     final lastSongData = await _historyService.loadLastSong();
+
+    _isInitialized = true;
     if (_pendingSong == null) {
       if (savedQueue != null) {
         _queue = savedQueue.queue;
