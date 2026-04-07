@@ -24,7 +24,7 @@ class RecentSongsGrid extends StatelessWidget {
       itemBuilder: (context, index) {
         final song = items[index];
         return GestureDetector(
-          onTap: () => context.read<MusicPlayerProvider>().playSong(song, queue: songs),
+          onTap: () => context.read<MusicPlayerProvider>().playSong(song, queue: [song]),
           child: Container(
             decoration: BoxDecoration(color: Colors.grey[800], borderRadius: BorderRadius.circular(4)),
             child: Row(
