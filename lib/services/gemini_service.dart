@@ -88,26 +88,19 @@ class GeminiService {
             {
               'parts': [
                 {
-                  'text': '''Analyze this YouTube music video title and return a JSON object:
-{
-  "artist": "<artist name, empty string if unknown>",
-  "genre": "<music genre>",
-  "isMix": <true if compilation/mix/greatest hits in any language, false if individual song>,
-  "suggestedQueries": ["<query1>", "<query2>", "<query3>", "<query4>", "<query5>"]
-}
+                  'text': '''Analyze this YouTube music title. Return ONLY this JSON (no markdown):
+{"artist":"<name>","genre":"<genre>","isMix":<bool>,"suggestedQueries":["<q1>","<q2>","<q3>","<q4>","<q5>"]}
 
-For suggestedQueries:
-- Individual song: artist most popular songs, similar artists, same genre hits
-- Mix/compilation: similar mixes of same genre/style in any language
-
-Return ONLY valid JSON, no markdown.
+isMix=true if compilation/mix/greatest hits (any language).
+suggestedQueries: if individual song use artist popular songs + similar artists; if mix use similar genre mixes.
+Keep each query under 5 words.
 
 Title: "$videoTitle"'''
                 }
               ]
             }
           ],
-          'generationConfig': {'maxOutputTokens': 500, 'temperature': 0.2},
+          'generationConfig': {'maxOutputTokens': 1024, 'temperature': 0.2},
         }),
       );
 
