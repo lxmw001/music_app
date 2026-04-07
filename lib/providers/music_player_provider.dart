@@ -105,7 +105,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     final lastSongData = await _historyService.loadLastSong();
 
     _isInitialized = true;
-    await _loadUnlikedArtists();
     if (_pendingSong == null) {
       if (savedQueue != null) {
         _queue = savedQueue.queue;
@@ -198,7 +197,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     if (previousSong != null && previousPosition > 0) {
       print('[MusicPlayerProvider] recording play: ${previousSong.title}, position=${previousPosition}s, duration=${previousSong.duration.inSeconds}s');
       _historyService.recordPlay(previousSong, previousPosition);
-      _loadUnlikedArtists(); // refresh in case this song was unliked
     }
     // Show song immediately in UI while audio URL is being fetched
     _currentSong = song;
@@ -316,17 +314,14 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
 
   Set<String> _unlikedArtists = {};
 
-  Future<void> _loadUnlikedArtists() async {
-    final unliked = await _historyService.getUnlikedSongs();
-    _unlikedArtists = unliked.map((s) => s.artist.toLowerCase()).toSet();
-  }
+  // TODO: Filter unliked songs from queue by title+artist key to avoid same song
+  // with different video IDs, while still allowing other songs from same artist.
 
   void _addToQueue(List<Song> songs, String excludeId) {
     final existing = _queue.map((s) => s.id).toSet();
     final toAdd = songs.where((s) =>
       s.id != excludeId &&
-      !existing.contains(s.id) &&
-      !_unlikedArtists.contains(s.artist.toLowerCase())
+      !existing.contains(s.id)
     ).toList();
     if (toAdd.isNotEmpty) {
       _queue.addAll(toAdd);

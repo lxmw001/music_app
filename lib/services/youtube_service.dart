@@ -45,15 +45,43 @@ class YoutubeExplodeGateway implements YoutubeGateway {
   }
 }
 
-Song _videoToSong(Video video, {String album = ''}) => Song(
-      id: video.id.value,
-      title: video.title,
-      artist: video.author,
-      album: album,
-      imageUrl: video.thumbnails.highResUrl,
-      audioUrl: '',
-      duration: video.duration ?? Duration.zero,
-    );
+/// Clean a YouTube video title into "Song Title" format
+/// removing noise like (Official Video), [HD], ft., etc.
+String _cleanTitle(String raw) {
+  var title = raw
+      .replaceAll(RegExp(r'\((?:official|video|audio|lyrics|letra|hd|4k|mv|music video|visualizer|lyric video|clip oficial|videoclip)[^)]*\)', caseSensitive: false), '')
+      .replaceAll(RegExp(r'\[(?:official|video|audio|lyrics|letra|hd|4k|mv)[^\]]*\]', caseSensitive: false), '')
+      .replaceAll(RegExp(r'\s*[\|｜]\s*.*$'), '') // remove everything after | 
+      .replaceAll(RegExp(r'\s*//.*$'), '')         // remove everything after //
+      .replaceAll(RegExp(r'\bft\.?\b|\bfeat\.?\b', caseSensitive: false), 'ft.')
+      .replaceAll(RegExp(r'\s{2,}'), ' ')
+      .trim();
+  // Remove trailing punctuation
+  title = title.replaceAll(RegExp(r'[\s\-_]+$'), '').trim();
+  return title.isEmpty ? raw : title;
+}
+
+/// Extract artist from cleaned title if it follows "Artist - Song" pattern
+String _extractArtistFromTitle(String cleanedTitle, String fallback) {
+  if (cleanedTitle.contains(' - ')) {
+    return cleanedTitle.split(' - ').first.trim();
+  }
+  return fallback;
+}
+
+Song _videoToSong(Video video, {String album = ''}) {
+  final cleanedTitle = _cleanTitle(video.title);
+  final artist = _extractArtistFromTitle(cleanedTitle, video.author);
+  return Song(
+    id: video.id.value,
+    title: cleanedTitle,
+    artist: artist,
+    album: album,
+    imageUrl: video.thumbnails.highResUrl,
+    audioUrl: '',
+    duration: video.duration ?? Duration.zero,
+  );
+}
 
 class YouTubeService {
   final YoutubeGateway _gateway;
