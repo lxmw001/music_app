@@ -91,9 +91,11 @@ class GeminiService {
                   'text': '''Analyze this YouTube music title. Return ONLY this JSON (no markdown):
 {"artist":"<name>","genre":"<genre>","isMix":<bool>,"suggestedQueries":["<q1>","<q2>","<q3>","<q4>","<q5>"]}
 
-isMix=true if compilation/mix/greatest hits (any language).
-suggestedQueries: if individual song use artist popular songs + similar artists; if mix use similar genre mixes.
-Keep each query under 5 words.
+Rules:
+- isMix=true if compilation/mix/greatest hits/playlist in any language
+- If individual song: artist=detected artist, suggestedQueries = mix of similar artist names AND genre terms (no song titles). Example for Latin Pop: ["Juanes","Latin Pop hits","Shakira","Carlos Vives","pop latino"]
+- If mix: artist="", suggestedQueries = genre/style search terms only (no artist or song names). Example: ["salsa mix","vallenato exitos","cumbia mix"]
+- Return ONLY valid JSON, no markdown.
 
 Title: "$videoTitle"'''
                 }

@@ -5,6 +5,7 @@ import '../models/music_models.dart';
 import '../services/audio_handler.dart';
 import '../services/youtube_service.dart';
 import '../services/play_history_service.dart';
+import '../services/gemini_service.dart';
 
 abstract class MusicPlayerProvider extends ChangeNotifier {
   Song? get currentSong;
@@ -167,10 +168,10 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     print('[MusicPlayerProvider] _init complete, processing pending song: ${song.id}');
       await playSong(song, queue: queue);
     }
-  } catch (e, st) {
+    } catch (e, st) {
     print('[MusicPlayerProvider] _init ERROR: $e\n$st');
   }
-}
+  }
 
   Future<void> playSong(Song song, {List<Song>? queue, Duration? seekTo}) async {
     if (!_isInitialized) {
@@ -201,7 +202,9 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     if (queue != null) {
       _queue = queue;
       _currentIndex = queue.indexOf(song);
-      _isSeeding = false; // reset so new queue can be seeded
+      _isSeeding = false;
+      _pendingSeedQueries = [];
+      _usedSeedQueries.clear();
     }
     notifyListeners();
 
@@ -276,24 +279,54 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       return;
     }
     _isSeeding = true;
+    _doSeed(seedSong);
+  }
+
+  Future<void> _doSeed(Song seedSong) async {
     print('[MusicPlayerProvider] _seedQueueWithSuggestions started for: ${seedSong.title}');
-    _youtubeService.getSuggestedSongs(seedSong.id, maxResults: 20, knownTitle: seedSong.title).then((suggestions) {
-      // Filter out songs already in queue
-      final existing = _queue.map((s) => s.id).toSet();
-      final toAdd = suggestions.where((s) => !existing.contains(s.id)).toList();
-      if (toAdd.isNotEmpty) {
-        _queue.addAll(toAdd);
-        print('[MusicPlayerProvider] added ${toAdd.length} suggestions to queue, total: ${_queue.length}');
-        if (toAdd.first.audioUrl.isEmpty) {
-          _youtubeService.getAudioUrl(toAdd.first.id).then((url) => toAdd.first.audioUrl = url);
-        }
-        _historyService.saveQueue(_queue, _currentIndex);
-        notifyListeners();
+    try {
+      final metadata = await _youtubeService.getMetadata(seedSong.title);
+
+      if (metadata == null || metadata.isMix) {
+        await _seedWithQueries(seedSong, metadata?.suggestedQueries ?? []);
       } else {
-        print('[MusicPlayerProvider] no new suggestions to add');
+        final artistQuery = '${metadata.artist} best songs';
+        print('[MusicPlayerProvider] seeding with artist: $artistQuery');
+        final artistSongs = await _youtubeService.searchByQuery(artistQuery, maxResults: 20);
+        _addToQueue(artistSongs, seedSong.id);
+        _pendingSeedQueries = List.from(metadata.suggestedQueries)..shuffle();
       }
+    } finally {
       _isSeeding = false;
-    });
+    }
+  }
+
+  List<String> _pendingSeedQueries = [];
+  final Set<String> _usedSeedQueries = {};
+
+  void _addToQueue(List<Song> songs, String excludeId) {
+    final existing = _queue.map((s) => s.id).toSet();
+    final toAdd = songs.where((s) => s.id != excludeId && !existing.contains(s.id)).toList();
+    if (toAdd.isNotEmpty) {
+      _queue.addAll(toAdd);
+      print('[MusicPlayerProvider] added ${toAdd.length} songs to queue, total: ${_queue.length}');
+      if (toAdd.first.audioUrl.isEmpty) {
+        _youtubeService.getAudioUrl(toAdd.first.id).then((url) => toAdd.first.audioUrl = url);
+      }
+      _historyService.saveQueue(_queue, _currentIndex);
+      notifyListeners();
+    }
+  }
+
+  Future<void> _seedWithQueries(Song seedSong, List<String> queries) async {
+    final shuffled = List<String>.from(queries)..shuffle();
+    for (final query in shuffled) {
+      if (_usedSeedQueries.contains(query)) continue;
+      _usedSeedQueries.add(query);
+      final songs = await _youtubeService.searchByQuery(query, maxResults: 20);
+      _addToQueue(songs, seedSong.id);
+      break; // one query at a time, more will be fetched as queue runs out
+    }
   }
 
   Future<void> pause() async {
@@ -355,7 +388,23 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   Future<void> _fetchAndPlaySuggestion() async {
     if (_currentSong == null || _isSeeding) return;
     try {
-      final suggestions = await _youtubeService.getSuggestedSongs(_currentSong!.id, maxResults: 1);
+      // Use pending seed queries first (no repeats)
+      if (_pendingSeedQueries.isNotEmpty) {
+        final query = _pendingSeedQueries.removeAt(0);
+        if (!_usedSeedQueries.contains(query)) {
+          _usedSeedQueries.add(query);
+          print('[MusicPlayerProvider] fetching more from query: $query');
+          final songs = await _youtubeService.searchByQuery(query, maxResults: 20);
+          _addToQueue(songs, _currentSong!.id);
+          if (_queue.isNotEmpty && _currentIndex < _queue.length - 1) {
+            _currentIndex++;
+            playSong(_queue[_currentIndex]);
+            return;
+          }
+        }
+      }
+      // Fallback
+      final suggestions = await _youtubeService.getSuggestedSongs(_currentSong!.id, maxResults: 1, knownTitle: _currentSong!.title);
       if (suggestions.isNotEmpty) {
         _queue.add(suggestions.first);
         _currentIndex = _queue.length - 1;
