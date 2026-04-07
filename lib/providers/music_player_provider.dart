@@ -186,8 +186,8 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       notifyListeners();
       return;
     }
-    // Don't restart if same song is already playing
-    if (_currentSong?.id == song.id && isPlaying) return;
+    // Don't restart if same song is already playing (but allow if queue is being set)
+    if (_currentSong?.id == song.id && isPlaying && queue == null) return;
 
     // Snapshot position before it resets, then record play for previous song
     final previousSong = _currentSong;
