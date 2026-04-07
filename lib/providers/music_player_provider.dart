@@ -101,18 +101,26 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
 
     // Restore last queue and song on startup
     final savedQueue = await _historyService.loadQueue();
-    if (savedQueue != null && _pendingSong == null) {
-      _queue = savedQueue.queue;
-      _currentIndex = savedQueue.currentIndex;
-      _currentSong = _queue[_currentIndex];
-      _lastRestoredPosition = Duration(
-        seconds: (await _historyService.loadLastSong())?.lastPositionSeconds ?? 0,
-      );
-      print('[MusicPlayerProvider] restored queue: ${_queue.length} songs, index=$_currentIndex');
-      notifyListeners();
-      // Pre-fetch audio URL for current song
-      final song = _currentSong!;
-      _youtubeService.getAudioUrl(song.id).then((url) => song.audioUrl = url);
+    final lastSongData = await _historyService.loadLastSong();
+    if (_pendingSong == null) {
+      if (savedQueue != null) {
+        _queue = savedQueue.queue;
+        _currentIndex = savedQueue.currentIndex;
+        _currentSong = _queue[_currentIndex];
+        _lastRestoredPosition = Duration(seconds: lastSongData?.lastPositionSeconds ?? 0);
+        print('[MusicPlayerProvider] restored queue: ${_queue.length} songs, index=$_currentIndex');
+      } else if (lastSongData != null) {
+        _currentSong = lastSongData.song;
+        _queue = [lastSongData.song];
+        _currentIndex = 0;
+        _lastRestoredPosition = Duration(seconds: lastSongData.lastPositionSeconds);
+        print('[MusicPlayerProvider] restored last song: ${lastSongData.song.title}');
+      }
+      if (_currentSong != null) {
+        notifyListeners();
+        final song = _currentSong!;
+        _youtubeService.getAudioUrl(song.id).then((url) => song.audioUrl = url);
+      }
     }
     
     _audioHandler.playbackState.listen((state) {
