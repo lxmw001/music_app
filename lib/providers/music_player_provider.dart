@@ -290,10 +290,17 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       if (metadata == null || metadata.isMix) {
         await _seedWithQueries(seedSong, metadata?.suggestedQueries ?? []);
       } else {
+        // 1. Artist best songs
         final artistQuery = '${metadata.artist} best songs';
         print('[MusicPlayerProvider] seeding with artist: $artistQuery');
         final artistSongs = await _youtubeService.searchByQuery(artistQuery, maxResults: 20);
         _addToQueue(artistSongs, seedSong.id);
+
+        // 2. YouTube algorithm suggestions
+        final ytSuggestions = await _youtubeService.getSuggestedSongs(seedSong.id, maxResults: 10, knownTitle: seedSong.title);
+        _addToQueue(ytSuggestions, seedSong.id);
+
+        // 3. Gemini genre queries for when above run out
         _pendingSeedQueries = List.from(metadata.suggestedQueries)..shuffle();
       }
     } finally {
