@@ -93,8 +93,11 @@ class GeminiService {
 
 Rules:
 - isMix=true if compilation/mix/greatest hits/playlist in any language
-- If individual song: artist=detected artist, suggestedQueries = mix of similar artist names AND genre terms (no song titles). Example for Latin Pop: ["Juanes","Latin Pop hits","Shakira","Carlos Vives","pop latino"]
-- If mix: artist="", suggestedQueries = genre/style search terms only (no artist or song names). Example: ["salsa mix","vallenato exitos","cumbia mix"]
+- artist = detected artist name (empty string if unknown or mix)
+- genre = primary music genre
+- suggestedQueries = 5 search queries in format "<genre or subgenre> best songs" or "<genre> most popular", covering the same genre and related subgenres. Never include artist names or song titles.
+  Example for vallenato: ["vallenato romantico best songs","vallenato clasico most popular","cumbia colombiana best songs","musica tropical best songs","vallenato moderno hits"]
+  Example for reggaeton: ["reggaeton best songs","reggaeton romantico most popular","latin trap hits","perreo hits","urbano latino best songs"]
 - Return ONLY valid JSON, no markdown.
 
 Title: "$videoTitle"'''
