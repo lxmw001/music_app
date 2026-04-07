@@ -276,7 +276,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     }
     _isSeeding = true;
     print('[MusicPlayerProvider] _seedQueueWithSuggestions started for: ${seedSong.title}');
-    _youtubeService.getSuggestedSongs(seedSong.id, maxResults: 20).then((suggestions) {
+    _youtubeService.getSuggestedSongs(seedSong.id, maxResults: 20, knownTitle: seedSong.title).then((suggestions) {
       // Filter out songs already in queue
       final existing = _queue.map((s) => s.id).toSet();
       final toAdd = suggestions.where((s) => !existing.contains(s.id)).toList();

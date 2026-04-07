@@ -83,11 +83,12 @@ class YouTubeService {
   Future<bool> testYouTubeConnectivity() =>
       safeCall(() async => (await _httpClient.get(Uri.parse('https://www.youtube.com'))).statusCode == 200, false);
 
-  Future<List<Song>> getSuggestedSongs(String videoId, {int maxResults = 5}) =>
+  Future<List<Song>> getSuggestedSongs(String videoId, {int maxResults = 5, String? knownTitle}) =>
       safeCall(() async {
-        final video = await _gateway.getVideo(videoId);
-        final metadata = await _gemini.getSongMetadata(video.title);
-        final query = metadata?.randomQuery() ?? _extractSearchQuery(video.title, video.author);
+        // Use known title if provided to skip the getVideo network call
+        final title = knownTitle ?? (await _gateway.getVideo(videoId)).title;
+        final metadata = await _gemini.getSongMetadata(title);
+        final query = metadata?.randomQuery() ?? _extractSearchQuery(title, '');
         print('[YouTubeService] suggestions query: "$query"');
         final videos = await _gateway.search(query, limit: maxResults + 3);
         return videos
