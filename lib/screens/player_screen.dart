@@ -193,92 +193,80 @@ class PlayerScreen extends StatelessWidget {
   }
 
   void _showQueueSheet(BuildContext context) {
-    final player = context.read<MusicPlayerProvider>();
     showModalBottomSheet(
       context: context,
+      useRootNavigator: false,
       isScrollControlled: true,
       backgroundColor: Colors.grey[900],
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (_) => DraggableScrollableSheet(
-        initialChildSize: 0.6,
-        minChildSize: 0.4,
-        maxChildSize: 0.95,
-        expand: false,
-        builder: (_, controller) {
-          // Auto-scroll to current song
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (player.currentIndex > 0) {
-              controller.animateTo(
-                player.currentIndex * 72.0,
-                duration: const Duration(milliseconds: 300),
-                curve: Curves.easeOut,
-              );
-            }
-          });
-          return Column(
-          children: [
-            Container(
-              margin: const EdgeInsets.symmetric(vertical: 8),
-              width: 40, height: 4,
-              decoration: BoxDecoration(color: Colors.grey, borderRadius: BorderRadius.circular(2)),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              child: Row(
-                children: [
-                  const Text('Up Next', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                  const Spacer(),
-                  Text('${player.queue.length} songs', style: const TextStyle(color: Colors.grey)),
-                ],
-              ),
-            ),
-            const Divider(color: Colors.grey),
-            Expanded(
-              child: ListenableBuilder(
-                listenable: player,
-                builder: (_, __) => ListView.builder(
-                  controller: controller,
-                  itemCount: player.queue.length,
-                  itemBuilder: (context, i) {
-                    final song = player.queue[i];
-                    final isCurrent = i == player.currentIndex;
-                    return ListTile(
-                      leading: ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: Image.network(
-                          song.imageUrl,
-                          width: 48, height: 48, fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
-                            width: 48, height: 48, color: Colors.grey[800],
-                            child: const Icon(Icons.music_note, size: 20),
+      builder: (ctx) => ChangeNotifierProvider.value(
+        value: context.read<MusicPlayerProvider>(),
+        child: DraggableScrollableSheet(
+          initialChildSize: 0.6,
+          minChildSize: 0.4,
+          maxChildSize: 0.95,
+          expand: false,
+          builder: (_, controller) => Consumer<MusicPlayerProvider>(
+            builder: (context, player, __) => Column(
+              children: [
+                Container(
+                  margin: const EdgeInsets.symmetric(vertical: 8),
+                  width: 40, height: 4,
+                  decoration: BoxDecoration(color: Colors.grey, borderRadius: BorderRadius.circular(2)),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  child: Row(
+                    children: [
+                      const Text('Up Next', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                      const Spacer(),
+                      Text('${player.queue.length} songs', style: const TextStyle(color: Colors.grey)),
+                    ],
+                  ),
+                ),
+                const Divider(color: Colors.grey),
+                Expanded(
+                  child: ListView.builder(
+                    controller: controller,
+                    itemCount: player.queue.length,
+                    itemBuilder: (context, i) {
+                      final song = player.queue[i];
+                      final isCurrent = i == player.currentIndex;
+                      return ListTile(
+                        leading: ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: Image.network(
+                            song.imageUrl,
+                            width: 48, height: 48, fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              width: 48, height: 48, color: Colors.grey[800],
+                              child: const Icon(Icons.music_note, size: 20),
+                            ),
                           ),
                         ),
-                      ),
-                      title: Text(song.title,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                              color: isCurrent ? Colors.green : Colors.white,
-                              fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal)),
-                      subtitle: Text(song.artist,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: i < player.currentIndex ? Colors.grey[700] : Colors.grey)),
-                      trailing: isCurrent
-                          ? const Icon(Icons.equalizer, color: Colors.green)
-                          : null,
-                      onTap: () {
-                        player.playSong(song);
-                        Navigator.pop(context);
-                      },
-                    );
-                  },
+                        title: Text(song.title,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                color: isCurrent ? Colors.green : Colors.white,
+                                fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal)),
+                        subtitle: Text(song.artist,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: i < player.currentIndex ? Colors.grey[700] : Colors.grey)),
+                        trailing: isCurrent ? const Icon(Icons.equalizer, color: Colors.green) : null,
+                        onTap: () {
+                          player.playSong(song);
+                          Navigator.pop(context);
+                        },
+                      );
+                    },
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
-        );
-        },
+          ),
+        ),
       ),
     );
   }
