@@ -117,7 +117,7 @@ class _SearchScreenState extends State<SearchScreen> {
             itemCount: searchResults.length,
             itemBuilder: (context, index) {
               final song = searchResults[index];
-              return SongListTile(song: song, queue: searchResults, isLoading: loadingIds.contains(song.id));
+              return SongListTile(song: song, isLoading: loadingIds.contains(song.id));
             },
           ),
         );

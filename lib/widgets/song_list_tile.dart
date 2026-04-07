@@ -5,10 +5,9 @@ import '../providers/music_player_provider.dart';
 
 class SongListTile extends StatelessWidget {
   final Song song;
-  final List<Song> queue;
   final bool isLoading;
 
-  const SongListTile({super.key, required this.song, required this.queue, this.isLoading = false});
+  const SongListTile({super.key, required this.song, this.isLoading = false});
 
   @override
   Widget build(BuildContext context) {
