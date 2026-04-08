@@ -6,6 +6,7 @@ import '../services/audio_handler.dart';
 import '../services/youtube_service.dart';
 import '../services/play_history_service.dart';
 import '../services/gemini_service.dart';
+import '../services/lastfm_service.dart';
 
 abstract class MusicPlayerProvider extends ChangeNotifier {
   Song? get currentSong;
@@ -48,6 +49,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   late AudioPlayerHandler _audioHandler;
   final YouTubeService _youtubeService = YouTubeService();
   final PlayHistoryService _historyService = PlayHistoryService();
+  final LastFmService _lastFmService = LastFmService();
   Timer? _positionSaveTimer;
   Duration _lastRestoredPosition = Duration.zero;
   Song? _currentSong;
@@ -291,18 +293,33 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       if (metadata == null || metadata.isMix) {
         await _seedWithQueries(seedSong, metadata?.suggestedQueries ?? []);
       } else {
-        // 1. Artist best songs
-        final artistQuery = '${metadata.artist} best songs';
-        print('[MusicPlayerProvider] seeding with artist: $artistQuery');
-        final artistSongs = await _youtubeService.searchByQuery(artistQuery, maxResults: 20);
-        _addToQueue(artistSongs, seedSong.id);
+        final artist = metadata.artist.isNotEmpty ? metadata.artist : seedSong.artist;
+
+        // 1. Last.fm top tracks (most accurate artist songs)
+        final topTracks = await _lastFmService.getArtistTopTracks(artist, limit: 10);
+        if (topTracks.isNotEmpty) {
+          print('[MusicPlayerProvider] Last.fm top tracks for $artist: ${topTracks.length}');
+          for (final track in topTracks.take(3)) {
+            final songs = await _youtubeService.searchByQuery(track, maxResults: 3);
+            _addToQueue(songs, seedSong.id);
+          }
+        } else {
+          final songs = await _youtubeService.searchByQuery('$artist best songs', maxResults: 20);
+          _addToQueue(songs, seedSong.id);
+        }
 
         // 2. YouTube algorithm suggestions
         final ytSuggestions = await _youtubeService.getSuggestedSongs(seedSong.id, maxResults: 10, knownTitle: seedSong.title);
         _addToQueue(ytSuggestions, seedSong.id);
 
-        // 3. Gemini genre queries for when above run out
-        _pendingSeedQueries = List.from(metadata.suggestedQueries)..shuffle();
+        // 3. Similar artists from Last.fm as pending queries
+        final similarArtists = await _lastFmService.getSimilarArtists(artist, limit: 5);
+        if (similarArtists.isNotEmpty) {
+          print('[MusicPlayerProvider] Last.fm similar artists: $similarArtists');
+          _pendingSeedQueries = similarArtists.map((a) => '$a best songs').toList()..shuffle();
+        } else {
+          _pendingSeedQueries = List.from(metadata.suggestedQueries)..shuffle();
+        }
       }
     } finally {
       _isSeeding = false;
