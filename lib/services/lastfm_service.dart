@@ -18,7 +18,11 @@ class LastFmService {
       };
 
   Future<dynamic> _get(String method, Map<String, String> extra) async {
-    if (!_hasApiKey) return null;
+    if (!_hasApiKey) {
+      print('[LastFm] no API key set, skipping $method');
+      return null;
+    }
+    print('[LastFm] calling $method');
     try {
       final uri = Uri.parse(_base).replace(queryParameters: _params(method, extra));
       final response = await _client.get(uri);
