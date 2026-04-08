@@ -33,19 +33,23 @@ class LastFmService {
   /// Get top tracks for an artist — replaces "<artist> best songs" YouTube search
   Future<List<String>> getArtistTopTracks(String artist, {int limit = 10}) async {
     final data = await _get('artist.getTopTracks', {'artist': artist, 'limit': '$limit'});
-    if (data == null) return [];
+    if (data == null) { print('[LastFm] no API key or error for top tracks: $artist'); return []; }
     final tracks = data['toptracks']?['track'] as List?;
     if (tracks == null) return [];
-    return tracks.map((t) => '$artist - ${t['name']}').toList();
+    final result = tracks.map((t) => '$artist - ${t['name']}').toList();
+    print('[LastFm] top tracks for "$artist": $result');
+    return result;
   }
 
   /// Get similar artists — replaces Gemini for artist-based suggestions
   Future<List<String>> getSimilarArtists(String artist, {int limit = 5}) async {
     final data = await _get('artist.getSimilar', {'artist': artist, 'limit': '$limit'});
-    if (data == null) return [];
+    if (data == null) { print('[LastFm] no API key or error for similar artists: $artist'); return []; }
     final artists = data['similarartists']?['artist'] as List?;
     if (artists == null) return [];
-    return artists.map((a) => a['name'] as String).toList();
+    final result = artists.map((a) => a['name'] as String).toList();
+    print('[LastFm] similar artists for "$artist": $result');
+    return result;
   }
 
   /// Get genre tags for an artist
@@ -54,6 +58,8 @@ class LastFmService {
     if (data == null) return [];
     final tags = data['toptags']?['tag'] as List?;
     if (tags == null) return [];
-    return tags.map((t) => t['name'] as String).toList();
+    final result = tags.map((t) => t['name'] as String).toList();
+    print('[LastFm] tags for "$artist": $result');
+    return result;
   }
 }
