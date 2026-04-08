@@ -2,6 +2,39 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.0] - 2026-04-07
+
+### Added
+- **AI-powered suggestions** via Gemini API (cached locally, falls back to regex without key)
+  - Detects artist, genre, and mix vs individual song from YouTube title
+  - Returns 5 genre-based search queries for variety
+  - Individual song: seeds queue with artist best songs → YouTube algorithm → genre queries
+  - Mix: uses genre/style queries randomly without repeats
+- **Queue persistence** — full queue saved and restored on app restart
+- **Unliked songs tracking** — songs skipped after >5s recorded for future filtering
+- **Search history** saved locally (last 50 queries)
+- **Per-song loading spinner** on search and trending cards
+- **Spotify-style queue bottom sheet** — draggable, live-updating, auto-scrolls to current song
+- **Deduplication** of search results — keeps cleanest `Artist - Song` title per unique song
+- **Title cleaning** — removes noise like `(Official Video)`, `[HD]`, `| Channel` from all results
+- **Artist extraction** from `Artist - Song` title pattern for better metadata
+- **Next button pre-fetch** — next song's audio URL fetched in background while current plays
+- **Suggested songs** seeded immediately on tap before audio URL fetch
+
+### Fixed
+- `MusicPlayerProvider` constructor missing — `AudioService.init` never called
+- Queue seeding blocked by `_isSeeding` flag across different user taps
+- Bottom sheet not updating live when suggestions loaded
+- `nextSong` skipping queued songs and going straight to suggestions
+- Mini player not showing on first tap (now shows immediately)
+- Provider type registration causing "could not find provider" error
+
+### Changed
+- `IndexedStack` preserves screen state when switching tabs
+- Gemini model switched to `gemini-2.5-flash`
+- API keys read from `--dart-define` env vars (never hardcoded)
+- `SongListTile` always starts fresh queue on tap for proper suggestion seeding
+
 ## [1.4.0] - 2026-03-28
 
 ### Added
