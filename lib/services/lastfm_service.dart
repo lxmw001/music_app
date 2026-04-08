@@ -25,11 +25,12 @@ class LastFmService {
     print('[LastFm] calling $method');
     try {
       final uri = Uri.parse(_base).replace(queryParameters: _params(method, extra));
-      final response = await _client.get(uri);
+      final response = await _client.get(uri).timeout(const Duration(seconds: 10));
+      print('[LastFm] $method response: ${response.statusCode}');
       if (response.statusCode != 200) return null;
       return jsonDecode(response.body);
     } catch (e) {
-      print('[LastFm] error: $e');
+      print('[LastFm] $method error: $e');
       return null;
     }
   }
