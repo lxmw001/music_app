@@ -86,11 +86,12 @@ int _titleScore(String title) {
 List<Song> _deduplicateSongs(List<Song> songs) {
   final Map<String, Song> best = {};
   for (final song in songs) {
-    // Normalize key: lowercase title without the artist part
     final titlePart = song.title.contains(' - ')
         ? song.title.split(' - ').last.trim().toLowerCase()
         : song.title.toLowerCase();
-    final key = titlePart.replaceAll(RegExp(r'[^a-z0-9áéíóúñü ]'), '').trim();
+    // Key by title + artist to avoid same song from different artists
+    final key = '${titlePart}|${song.artist.toLowerCase()}'
+        .replaceAll(RegExp(r'[^a-z0-9áéíóúñü|]'), '').trim();
     if (!best.containsKey(key) || _titleScore(song.title) > _titleScore(best[key]!.title)) {
       best[key] = song;
     }
@@ -148,7 +149,7 @@ class YouTubeService {
         if (lfmTracks.isEmpty) return ytSongs;
 
         // Match YouTube results to Last.fm by title similarity and replace metadata
-        return ytSongs.map((song) {
+        final enriched = ytSongs.map((song) {
           final match = lfmTracks.firstWhere(
             (t) => _titlesMatch(song.title, t.title) || _titlesMatch(song.artist, t.artist),
             orElse: () => (title: '', artist: '', imageUrl: ''),
@@ -164,6 +165,7 @@ class YouTubeService {
             duration: song.duration,
           );
         }).toList();
+        return _deduplicateSongs(enriched);
       }, [], tag: 'YouTubeService.searchSongs');
 
   bool _titlesMatch(String a, String b) {
