@@ -148,23 +148,47 @@ class YouTubeService {
         final lfmTracks = await _lastFm.searchTracks(query, limit: 50);
         if (lfmTracks.isEmpty) return ytSongs;
 
+        // Build known artists set from all Last.fm results
+        final knownArtists = lfmTracks.map((t) => t.artist.toLowerCase()).toSet();
+
         // Enrich YouTube results with Last.fm metadata when matched, keep all results
         final enriched = ytSongs.map((song) {
           final match = lfmTracks.firstWhere(
             (t) => _titlesMatch(song.title, t.title) || _titlesMatch(song.artist, t.artist),
             orElse: () => (title: '', artist: '', imageUrl: ''),
           );
-          if (match.title.isEmpty) return song; // no match — keep YouTube result as-is
-          return Song(
-            id: song.id,
-            title: match.title,
-            artist: match.artist,
-            album: song.album,
-            // imageUrl: match.imageUrl.isNotEmpty ? match.imageUrl : song.imageUrl,
-            imageUrl: song.imageUrl,
-            audioUrl: song.audioUrl,
-            duration: song.duration,
+          if (match.title.isNotEmpty) {
+            return Song(
+              id: song.id,
+              title: match.title,
+              artist: match.artist,
+              album: song.album,
+              // imageUrl: match.imageUrl.isNotEmpty ? match.imageUrl : song.imageUrl,
+              imageUrl: song.imageUrl,
+              audioUrl: song.audioUrl,
+              duration: song.duration,
+            );
+          }
+          // No direct match — try to find a known artist in the YouTube title
+          final foundArtist = knownArtists.firstWhere(
+            (a) => song.title.toLowerCase().contains(a) || song.artist.toLowerCase().contains(a),
+            orElse: () => '',
           );
+          if (foundArtist.isNotEmpty) {
+            // Get proper casing from Last.fm
+            final properArtist = lfmTracks.firstWhere((t) => t.artist.toLowerCase() == foundArtist).artist;
+            final songTitle = _stripArtistFromTitle(song.title, properArtist);
+            return Song(
+              id: song.id,
+              title: songTitle.isNotEmpty ? songTitle : song.title,
+              artist: properArtist,
+              album: song.album,
+              imageUrl: song.imageUrl,
+              audioUrl: song.audioUrl,
+              duration: song.duration,
+            );
+          }
+          return song;
         }).toList();
         return _deduplicateSongs(enriched);
       }, [], tag: 'YouTubeService.searchSongs');
@@ -179,6 +203,20 @@ class YouTubeService {
     final wordsA = na.split(' ').where((w) => w.length > 2).toSet();
     final wordsB = nb.split(' ').where((w) => w.length > 2).toSet();
     return wordsA.intersection(wordsB).length >= 2;
+  }
+
+  /// Remove artist name from YouTube title, returning just the song part
+  String _stripArtistFromTitle(String title, String artist) {
+    final lower = title.toLowerCase();
+    final artistLower = artist.toLowerCase();
+    // Handle "Artist - Song" and "Song - Artist"
+    if (lower.startsWith('$artistLower -') || lower.startsWith('$artistLower–')) {
+      return title.substring(artist.length + 2).trim().replaceAll(RegExp(r'^[\s\-–]+'), '').trim();
+    }
+    if (lower.endsWith('- $artistLower') || lower.endsWith('– $artistLower')) {
+      return title.substring(0, title.length - artist.length - 2).trim().replaceAll(RegExp(r'[\s\-–]+$'), '').trim();
+    }
+    return title;
   }
 
   Future<String> getAudioUrl(String videoId) =>
