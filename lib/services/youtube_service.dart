@@ -139,33 +139,37 @@ class YouTubeService {
 
   Future<List<Song>> searchSongs(String query) =>
       safeCall(() async {
-        // Try Last.fm first for clean metadata
-        final lfmTracks = await _lastFm.searchTracks(query, limit: 20);
-        if (lfmTracks.isNotEmpty) {
-          // Search YouTube for each Last.fm result to get audio
-          final songs = <Song>[];
-          for (final track in lfmTracks.take(10)) {
-            final ytQuery = '${track.artist} - ${track.title}';
-            final videos = await _gateway.search(ytQuery, limit: 2);
-            if (videos.isNotEmpty) {
-              final video = videos.first;
-              songs.add(Song(
-                id: video.id.value,
-                title: track.title,
-                artist: track.artist,
-                album: '',
-                imageUrl: track.imageUrl.isNotEmpty ? track.imageUrl : video.thumbnails.highResUrl,
-                audioUrl: '',
-                duration: video.duration ?? Duration.zero,
-              ));
-            }
-          }
-          if (songs.isNotEmpty) return _deduplicateSongs(songs);
-        }
-        // Fallback: YouTube search with title cleaning
+        // Get YouTube results first (single search)
         final videos = await _gateway.search(query, limit: 20);
-        return _deduplicateSongs(videos.map(_videoToSong).toList());
+        final ytSongs = _deduplicateSongs(videos.map(_videoToSong).toList());
+
+        // Enrich with Last.fm metadata if available (no extra network calls)
+        final lfmTracks = await _lastFm.searchTracks(query, limit: 20);
+        if (lfmTracks.isEmpty) return ytSongs;
+
+        // Match YouTube results to Last.fm by title similarity and replace metadata
+        return ytSongs.map((song) {
+          final match = lfmTracks.firstWhere(
+            (t) => _titlesMatch(song.title, t.title) || _titlesMatch(song.artist, t.artist),
+            orElse: () => (title: '', artist: '', imageUrl: ''),
+          );
+          if (match.title.isEmpty) return song;
+          return Song(
+            id: song.id,
+            title: match.title,
+            artist: match.artist,
+            album: song.album,
+            imageUrl: match.imageUrl.isNotEmpty ? match.imageUrl : song.imageUrl,
+            audioUrl: song.audioUrl,
+            duration: song.duration,
+          );
+        }).toList();
       }, [], tag: 'YouTubeService.searchSongs');
+
+  bool _titlesMatch(String a, String b) {
+    final normalize = (String s) => s.toLowerCase().replaceAll(RegExp(r'[^\w\s]'), '').trim();
+    return normalize(a).contains(normalize(b)) || normalize(b).contains(normalize(a));
+  }
 
   Future<String> getAudioUrl(String videoId) =>
       safeCall(() => _gateway.getAudioUrl(videoId), '', tag: 'YouTubeService.getAudioUrl');
