@@ -191,7 +191,7 @@ class YouTubeService {
           }
           return song;
         }).toList();
-        final result = _deduplicateSongs(enriched);
+        final result = enriched;
         print('[YouTubeService] enriched: ${enriched.length}, final: ${result.length}');
         return result;
       }, [], tag: 'YouTubeService.searchSongs');
