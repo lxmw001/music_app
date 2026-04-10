@@ -148,27 +148,25 @@ class YouTubeService {
         final lfmTracks = await _lastFm.searchTracks(query, limit: 30);
         if (lfmTracks.isEmpty) return ytSongs;
 
-        // Only keep YouTube results that have a Last.fm match (clean metadata)
-        final enriched = <Song>[];
-        for (final song in ytSongs) {
+        // Enrich YouTube results with Last.fm metadata when matched, keep all results
+        final enriched = ytSongs.map((song) {
           final match = lfmTracks.firstWhere(
             (t) => _titlesMatch(song.title, t.title) || _titlesMatch(song.artist, t.artist),
             orElse: () => (title: '', artist: '', imageUrl: ''),
           );
-          if (match.title.isEmpty) continue; // skip — no Last.fm match
-          enriched.add(Song(
+          if (match.title.isEmpty) return song; // no match — keep YouTube result as-is
+          return Song(
             id: song.id,
             title: match.title,
             artist: match.artist,
             album: song.album,
             // imageUrl: match.imageUrl.isNotEmpty ? match.imageUrl : song.imageUrl,
-            imageUrl: song.imageUrl, // always use YouTube thumbnail
+            imageUrl: song.imageUrl,
             audioUrl: song.audioUrl,
             duration: song.duration,
-          ));
-        }
-        // If too few matches, fall back to all YouTube results
-        return _deduplicateSongs(enriched.length >= 2 ? enriched : ytSongs);
+          );
+        }).toList();
+        return _deduplicateSongs(enriched);
       }, [], tag: 'YouTubeService.searchSongs');
 
   bool _titlesMatch(String a, String b) {
