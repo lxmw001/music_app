@@ -21,6 +21,7 @@ dependencies:
   dio: ^5.4.0
   audio_service: ^0.18.18
   just_audio: ^0.10.5
+  path_provider: ^2.1.0
 
 dev_dependencies:
   flutter_test:

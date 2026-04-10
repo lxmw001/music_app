@@ -1,8 +1,52 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/music_player_provider.dart';
+import '../services/download_service.dart';
 
-class PlayerScreen extends StatelessWidget {
+class PlayerScreen extends StatefulWidget {
+  @override
+  _PlayerScreenState createState() => _PlayerScreenState();
+}
+
+class _PlayerScreenState extends State<PlayerScreen> {
+  final _downloadService = DownloadService();
+  bool _isDownloading = false;
+  double _downloadProgress = 0;
+  String? _downloadedPath;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkDownloaded();
+  }
+
+  Future<void> _checkDownloaded() async {
+    final song = context.read<MusicPlayerProvider>().currentSong;
+    if (song == null) return;
+    final path = await _downloadService.getDownloadedPath(song);
+    if (mounted) setState(() => _downloadedPath = path);
+  }
+
+  Future<void> _download(BuildContext context) async {
+    final song = context.read<MusicPlayerProvider>().currentSong;
+    if (song == null || song.audioUrl.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Play the song first to enable download')),
+      );
+      return;
+    }
+    setState(() { _isDownloading = true; _downloadProgress = 0; });
+    final path = await _downloadService.downloadSong(song, onProgress: (received, total) {
+      if (total > 0 && mounted) setState(() => _downloadProgress = received / total);
+    });
+    if (mounted) setState(() { _isDownloading = false; _downloadedPath = path; });
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(path != null ? 'Downloaded!' : 'Download failed'),
+      ));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -16,6 +60,23 @@ class PlayerScreen extends StatelessWidget {
         title: Text('Now Playing'),
         centerTitle: true,
         actions: [
+          if (_isDownloading)
+            Padding(
+              padding: const EdgeInsets.all(14),
+              child: SizedBox(
+                width: 20, height: 20,
+                child: CircularProgressIndicator(
+                  value: _downloadProgress > 0 ? _downloadProgress : null,
+                  strokeWidth: 2, color: Colors.white,
+                ),
+              ),
+            )
+          else
+            IconButton(
+              icon: Icon(_downloadedPath != null ? Icons.download_done : Icons.download),
+              color: _downloadedPath != null ? Colors.green : null,
+              onPressed: _downloadedPath != null ? null : () => _download(context),
+            ),
           IconButton(
             icon: const Icon(Icons.queue_music),
             onPressed: () => _showQueueSheet(context),

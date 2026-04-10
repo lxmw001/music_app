@@ -220,14 +220,15 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     // Clear suggestions when starting a new song
     _suggestedSongs = [];
     String audioUrl = song.audioUrl;
-    print('[MusicPlayerProvider] playSong: ${song.title}, audioUrl empty=${audioUrl.isEmpty}, loadingIds=$_loadingAudioIds');
+    print('[MusicPlayerProvider] playSong: \\${song.title}, audioUrl empty=\\${audioUrl.isEmpty}, loadingIds=\\$_loadingAudioIds');
     if (audioUrl.isEmpty) {
       _loadingAudioIds.add(song.id);
       _audioHandler.nextEnabled = false;
       notifyListeners();
       try {
-        audioUrl = await _youtubeService.getAudioUrl(song.id);
-        print('[MusicPlayerProvider] Audio URL fetched for ${song.title}: ${audioUrl.isEmpty ? "EMPTY" : "OK"}');
+        // Prefer cached file, otherwise play online
+        audioUrl = await _youtubeService.getPlayableAudioPath(song.id);
+        print('[MusicPlayerProvider] Playable audio for \\${song.title}: \\${audioUrl.isEmpty ? "EMPTY" : audioUrl}');
         song.audioUrl = audioUrl;
       } finally {
         _loadingAudioIds.remove(song.id);
@@ -236,7 +237,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       }
     }
     if (audioUrl.isEmpty) {
-      print('[MusicPlayerProvider] Could not get audio URL for ${song.title}, skipping');
+      print('[MusicPlayerProvider] Could not get audio file for \\${song.title}, skipping');
       return;
     }
     final mediaItem = MediaItem(
