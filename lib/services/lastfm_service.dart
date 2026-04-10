@@ -36,7 +36,26 @@ class LastFmService {
   }
 
   /// Get top tracks for an artist — replaces "<artist> best songs" YouTube search
-  Future<List<String>> getArtistTopTracks(String artist, {int limit = 10}) async {
+  Future<List<({String title, String artist, String imageUrl})>> searchTracks(String query, {int limit = 20}) async {
+    final data = await _get('track.search', {'track': query, 'limit': '$limit'});
+    if (data == null) return [];
+    final tracks = data['results']?['trackmatches']?['track'] as List?;
+    if (tracks == null) return [];
+    final result = tracks.map((t) => (
+      title: t['name'] as String,
+      artist: t['artist'] as String,
+      imageUrl: _bestImage(t['image'] as List?),
+    )).toList();
+    print('[LastFm] search "$query": ${result.length} results');
+    return result;
+  }
+
+  String _bestImage(List? images) {
+    if (images == null || images.isEmpty) return '';
+    // Last.fm images: small, medium, large, extralarge
+    final large = images.lastWhere((i) => (i['#text'] as String).isNotEmpty, orElse: () => images.first);
+    return large['#text'] as String? ?? '';
+  }
     final data = await _get('artist.getTopTracks', {'artist': artist, 'limit': '$limit'});
     if (data == null) { print('[LastFm] no API key or error for top tracks: $artist'); return []; }
     final tracks = data['toptracks']?['track'] as List?;

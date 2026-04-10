@@ -2,6 +2,7 @@ import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:http/http.dart' as http;
 import '../models/music_models.dart';
 import 'gemini_service.dart';
+import 'lastfm_service.dart';
 import '../utils/safe_call.dart';
 import 'audio_cache_service.dart';
 
@@ -128,13 +129,40 @@ class YouTubeService {
   final GeminiService _gemini;
   final AudioCacheService _audioCache = AudioCacheService();
 
-  YouTubeService({YoutubeGateway? gateway, http.Client? httpClient, GeminiService? gemini})
+  final LastFmService _lastFm;
+
+  YouTubeService({YoutubeGateway? gateway, http.Client? httpClient, GeminiService? gemini, LastFmService? lastFm})
       : _gateway = gateway ?? YoutubeExplodeGateway(),
         _httpClient = httpClient ?? http.Client(),
-        _gemini = gemini ?? GeminiService();
+        _gemini = gemini ?? GeminiService(),
+        _lastFm = lastFm ?? LastFmService();
 
   Future<List<Song>> searchSongs(String query) =>
       safeCall(() async {
+        // Try Last.fm first for clean metadata
+        final lfmTracks = await _lastFm.searchTracks(query, limit: 20);
+        if (lfmTracks.isNotEmpty) {
+          // Search YouTube for each Last.fm result to get audio
+          final songs = <Song>[];
+          for (final track in lfmTracks.take(10)) {
+            final ytQuery = '${track.artist} - ${track.title}';
+            final videos = await _gateway.search(ytQuery, limit: 2);
+            if (videos.isNotEmpty) {
+              final video = videos.first;
+              songs.add(Song(
+                id: video.id.value,
+                title: track.title,
+                artist: track.artist,
+                album: '',
+                imageUrl: track.imageUrl.isNotEmpty ? track.imageUrl : video.thumbnails.highResUrl,
+                audioUrl: '',
+                duration: video.duration ?? Duration.zero,
+              ));
+            }
+          }
+          if (songs.isNotEmpty) return _deduplicateSongs(songs);
+        }
+        // Fallback: YouTube search with title cleaning
         final videos = await _gateway.search(query, limit: 20);
         return _deduplicateSongs(videos.map(_videoToSong).toList());
       }, [], tag: 'YouTubeService.searchSongs');
