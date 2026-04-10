@@ -141,11 +141,11 @@ class YouTubeService {
   Future<List<Song>> searchSongs(String query) =>
       safeCall(() async {
         // Get YouTube results first (single search)
-        final videos = await _gateway.search(query, limit: 20);
+        final videos = await _gateway.search(query, limit: 30);
         final ytSongs = _deduplicateSongs(videos.map(_videoToSong).toList());
 
         // Enrich with Last.fm metadata if available (no extra network calls)
-        final lfmTracks = await _lastFm.searchTracks(query, limit: 20);
+        final lfmTracks = await _lastFm.searchTracks(query, limit: 30);
         if (lfmTracks.isEmpty) return ytSongs;
 
         // Only keep YouTube results that have a Last.fm match (clean metadata)
@@ -168,12 +168,19 @@ class YouTubeService {
           ));
         }
         // If too few matches, fall back to all YouTube results
-        return _deduplicateSongs(enriched.length >= 3 ? enriched : ytSongs);
+        return _deduplicateSongs(enriched.length >= 2 ? enriched : ytSongs);
       }, [], tag: 'YouTubeService.searchSongs');
 
   bool _titlesMatch(String a, String b) {
-    final normalize = (String s) => s.toLowerCase().replaceAll(RegExp(r'[^\w\s]'), '').trim();
-    return normalize(a).contains(normalize(b)) || normalize(b).contains(normalize(a));
+    if (a.isEmpty || b.isEmpty) return false;
+    final normalize = (String s) => s.toLowerCase().replaceAll(RegExp(r'[^\w\sáéíóúñü]'), '').trim();
+    final na = normalize(a);
+    final nb = normalize(b);
+    if (na.contains(nb) || nb.contains(na)) return true;
+    // Word overlap: at least 2 words in common
+    final wordsA = na.split(' ').where((w) => w.length > 2).toSet();
+    final wordsB = nb.split(' ').where((w) => w.length > 2).toSet();
+    return wordsA.intersection(wordsB).length >= 2;
   }
 
   Future<String> getAudioUrl(String videoId) =>
