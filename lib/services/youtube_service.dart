@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import '../models/music_models.dart';
 import 'gemini_service.dart';
 import '../utils/safe_call.dart';
+import 'audio_cache_service.dart';
 
 /// Thin abstraction over YoutubeExplode to allow testing without real network calls.
 abstract class YoutubeGateway {
@@ -99,9 +100,20 @@ List<Song> _deduplicateSongs(List<Song> songs) {
 Song _videoToSong(Video video, {String album = ''}) {
   final cleanedTitle = _cleanTitle(video.title);
   final artist = _extractArtistFromTitle(cleanedTitle, video.author);
+  // Strip artist from title regardless of position (handles both "Artist - Song" and "Song - Artist")
+  String songTitle = cleanedTitle;
+  if (cleanedTitle.contains(' - ')) {
+    final parts = cleanedTitle.split(' - ');
+    final artistLower = artist.toLowerCase();
+    if (parts.first.trim().toLowerCase() == artistLower) {
+      songTitle = parts.skip(1).join(' - ').trim(); // Artist - Song
+    } else if (parts.last.trim().toLowerCase() == artistLower) {
+      songTitle = parts.take(parts.length - 1).join(' - ').trim(); // Song - Artist
+    }
+  }
   return Song(
     id: video.id.value,
-    title: cleanedTitle,
+    title: songTitle,
     artist: artist,
     album: album,
     imageUrl: video.thumbnails.highResUrl,
@@ -114,6 +126,7 @@ class YouTubeService {
   final YoutubeGateway _gateway;
   final http.Client _httpClient;
   final GeminiService _gemini;
+  final AudioCacheService _audioCache = AudioCacheService();
 
   YouTubeService({YoutubeGateway? gateway, http.Client? httpClient, GeminiService? gemini})
       : _gateway = gateway ?? YoutubeExplodeGateway(),
@@ -217,6 +230,29 @@ class YouTubeService {
 
       return (results..shuffle()).take(maxResults).toList();
     }, [], tag: 'YouTubeService.getSuggestionsFromHistory');
+  }
+
+  /// Returns a local file path to the cached audio, downloading if needed.
+  Future<String> getCachedOrDownloadAudio(String videoId) async {
+    final yt = _gateway is YoutubeExplodeGateway
+        ? (_gateway as YoutubeExplodeGateway)._yt
+        : YoutubeExplode();
+    if (await _audioCache.isCached(videoId)) {
+      return (await _audioCache.getCachedFile(videoId)).path;
+    }
+    return await _audioCache.downloadAndCacheAudio(videoId, yt);
+  }
+
+  /// Returns a local file path to the cached audio if available, otherwise fetches the online URL.
+  Future<String> getPlayableAudioPath(String videoId) async {
+    final cachedPath = await _audioCache.getCachedAudioPath(videoId);
+    if (cachedPath != null) {
+      print('[YouTubeService] Using cached audio for $videoId: $cachedPath');
+      return cachedPath;
+    }
+    final url = await getAudioUrl(videoId);
+    print('[YouTubeService] Using online audio URL for $videoId: $url');
+    return url;
   }
 
   void dispose() {}
