@@ -143,6 +143,7 @@ class YouTubeService {
         // Get YouTube results first (single search)
         final videos = await _gateway.search(query, limit: 30);
         final ytSongs = _deduplicateSongs(videos.map(_videoToSong).toList());
+        print('[YouTubeService] search "$query": ${videos.length} raw, ${ytSongs.length} after dedup');
 
         // Enrich with Last.fm metadata if available (no extra network calls)
         final lfmTracks = await _lastFm.searchTracks(query, limit: 50);
@@ -190,7 +191,9 @@ class YouTubeService {
           }
           return song;
         }).toList();
-        return _deduplicateSongs(enriched);
+        final result = _deduplicateSongs(enriched);
+        print('[YouTubeService] enriched: ${enriched.length}, final: ${result.length}');
+        return result;
       }, [], tag: 'YouTubeService.searchSongs');
 
   bool _titlesMatch(String a, String b) {
