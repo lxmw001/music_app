@@ -56,6 +56,8 @@ class LastFmService {
     final large = images.lastWhere((i) => (i['#text'] as String).isNotEmpty, orElse: () => images.first);
     return large['#text'] as String? ?? '';
   }
+
+  Future<List<String>> getArtistTopTracks(String artist, {int limit = 10}) async {
     final data = await _get('artist.getTopTracks', {'artist': artist, 'limit': '$limit'});
     if (data == null) { print('[LastFm] no API key or error for top tracks: $artist'); return []; }
     final tracks = data['toptracks']?['track'] as List?;
