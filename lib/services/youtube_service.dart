@@ -145,7 +145,7 @@ class YouTubeService {
         final ytSongs = _deduplicateSongs(videos.map(_videoToSong).toList());
 
         // Enrich with Last.fm metadata if available (no extra network calls)
-        final lfmTracks = await _lastFm.searchTracks(query, limit: 30);
+        final lfmTracks = await _lastFm.searchTracks(query, limit: 50);
         if (lfmTracks.isEmpty) return ytSongs;
 
         // Enrich YouTube results with Last.fm metadata when matched, keep all results
