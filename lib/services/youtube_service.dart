@@ -172,7 +172,11 @@ class YouTubeService {
           }
           // No direct match — try to find a known artist in the YouTube title
           final foundArtist = knownArtists.firstWhere(
-            (a) => song.title.toLowerCase().contains(a) || song.artist.toLowerCase().contains(a),
+            (a) => a.length > 3 && // avoid short false matches
+                (song.title.toLowerCase().contains(' $a ') ||
+                 song.title.toLowerCase().startsWith('$a ') ||
+                 song.title.toLowerCase().startsWith('$a -') ||
+                 song.artist.toLowerCase() == a),
             orElse: () => '',
           );
           if (foundArtist.isNotEmpty) {
@@ -191,7 +195,12 @@ class YouTubeService {
           }
           return song;
         }).toList();
-        final result = enriched;
+        // Deduplicate by title+artist (keep first/best match per unique song)
+        final seen = <String>{};
+        final result = enriched.where((s) {
+          final key = '${s.title.toLowerCase()}|${s.artist.toLowerCase()}';
+          return seen.add(key);
+        }).toList();
         print('[YouTubeService] enriched: ${enriched.length}, final: ${result.length}');
         return result;
       }, [], tag: 'YouTubeService.searchSongs');
