@@ -83,10 +83,12 @@ class AudioPlayerHandler extends BaseAudioHandler {
 
   Future<void> setAudioSource(String url, MediaItem mediaItem) async {
     this.mediaItem.add(mediaItem);
+    final isLocal = url.startsWith('/') || url.startsWith('file://');
+    final uri = isLocal ? Uri.file(url) : Uri.parse(url);
     await _player.setAudioSource(
       AudioSource.uri(
-        Uri.parse(url),
-        headers: {
+        uri,
+        headers: isLocal ? null : {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           'Accept-Language': 'en-US,en;q=0.9',
           'Referer': 'https://www.youtube.com/',
@@ -116,6 +118,7 @@ class AudioPlayerHandler extends BaseAudioHandler {
   }
 
   Stream<Duration> get positionStream => _player.positionStream;
+  Duration get currentPosition => _player.position;
   Stream<Duration?> get durationStream => _player.durationStream;
   Stream<bool> get playingStream => _player.playingStream;
 }

@@ -4,8 +4,9 @@ class Song {
   final String artist;
   final String album;
   final String imageUrl;
-   String audioUrl;
+  String audioUrl;
   final Duration duration;
+  final List<String> genres; // genre tags from server
 
   Song({
     required this.id,
@@ -15,6 +16,7 @@ class Song {
     required this.imageUrl,
     required this.audioUrl,
     required this.duration,
+    this.genres = const [],
   });
 
   factory Song.fromJson(Map<String, dynamic> json) {
@@ -22,12 +24,19 @@ class Song {
       id: json['id'],
       title: json['title'],
       artist: json['artist'],
-      album: json['album'],
-      imageUrl: json['imageUrl'],
-      audioUrl: json['audioUrl'],
-      duration: Duration(seconds: json['duration']),
+      album: json['album'] ?? '',
+      imageUrl: json['imageUrl'] ?? '',
+      audioUrl: json['audioUrl'] ?? '',
+      duration: Duration(seconds: json['duration'] ?? 0),
+      genres: List<String>.from(json['genres'] ?? []),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id, 'title': title, 'artist': artist, 'album': album,
+    'imageUrl': imageUrl, 'audioUrl': audioUrl,
+    'duration': duration.inSeconds, 'genres': genres,
+  };
 }
 
 class Playlist {

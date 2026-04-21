@@ -5,6 +5,8 @@ import 'gemini_service.dart';
 import 'lastfm_service.dart';
 import '../utils/safe_call.dart';
 import 'audio_cache_service.dart';
+import 'download_service.dart';
+import 'music_server_service.dart';
 
 /// Thin abstraction over YoutubeExplode to allow testing without real network calls.
 abstract class YoutubeGateway {
@@ -63,12 +65,38 @@ String _cleanTitle(String raw) {
   return title.isEmpty ? raw : title;
 }
 
-/// Extract artist from cleaned title if it follows "Artist - Song" pattern
-String _extractArtistFromTitle(String cleanedTitle, String fallback) {
-  if (cleanedTitle.contains(' - ')) {
-    return cleanedTitle.split(' - ').first.trim();
+/// Extract artist from cleaned title, using the channel name to resolve
+/// "Artist - Song" vs "Song - Artist" ambiguity.
+String _extractArtistFromTitle(String cleanedTitle, String channelAuthor) {
+  if (!cleanedTitle.contains(' - ')) return channelAuthor;
+
+  final parts = cleanedTitle.split(' - ');
+  final first = parts.first.trim();
+  final last  = parts.last.trim();
+  final channel = channelAuthor.toLowerCase()
+      .replaceAll(RegExp(r'\s*(vevo|official|music|records|tv)$', caseSensitive: false), '')
+      .trim();
+
+  // If the channel name matches the first segment → Artist - Song
+  if (channel.contains(first.toLowerCase()) || first.toLowerCase().contains(channel)) {
+    return first;
   }
-  return fallback;
+  // If the channel name matches the last segment → Song - Artist
+  if (channel.contains(last.toLowerCase()) || last.toLowerCase().contains(channel)) {
+    return last;
+  }
+  // Heuristic: song titles are more likely to contain common words
+  final songWords = RegExp(
+    r'\b(de|la|el|los|las|mi|tu|su|amor|vida|corazon|heart|love|night|day|time|way|world|huella|quiero|eres|para)\b',
+    caseSensitive: false,
+  );
+  final firstSongScore = songWords.allMatches(first.toLowerCase()).length;
+  final lastSongScore  = songWords.allMatches(last.toLowerCase()).length;
+  if (lastSongScore > firstSongScore) return first; // last looks like song → first is artist
+  if (firstSongScore > lastSongScore) return last;  // first looks like song → last is artist
+
+  // Default: assume Artist - Song
+  return first;
 }
 
 /// Score a title — higher = cleaner. Prefers "Artist - Song" pattern.
@@ -129,89 +157,74 @@ class YouTubeService {
   final http.Client _httpClient;
   final GeminiService _gemini;
   final AudioCacheService _audioCache = AudioCacheService();
-
   final LastFmService _lastFm;
+  final MusicServerService _server;
+  late final DownloadService _downloadService;
 
-  YouTubeService({YoutubeGateway? gateway, http.Client? httpClient, GeminiService? gemini, LastFmService? lastFm})
+  YouTubeService({YoutubeGateway? gateway, http.Client? httpClient, GeminiService? gemini, LastFmService? lastFm, DownloadService? downloadService, MusicServerService? server})
       : _gateway = gateway ?? YoutubeExplodeGateway(),
         _httpClient = httpClient ?? http.Client(),
         _gemini = gemini ?? GeminiService(),
-        _lastFm = lastFm ?? LastFmService();
+        _lastFm = lastFm ?? LastFmService(),
+        _server = server ?? MusicServerService() {
+    _downloadService = downloadService ?? DownloadService();
+  }
 
   Future<List<Song>> searchSongs(String query) =>
       safeCall(() async {
-        // Get YouTube results first (single search)
-        final videos = await _gateway.search(query, limit: 30);
-        final ytSongs = _deduplicateSongs(videos.map(_videoToSong).toList());
-        print('[YouTubeService] search "$query": ${videos.length} raw, ${ytSongs.length} after dedup');
+        final serverSongs = await _server.searchSongs(query);
+        if (serverSongs.isNotEmpty) return serverSongs;
 
-        // Enrich with Last.fm metadata if available (no extra network calls)
-        final lfmTracks = await _lastFm.searchTracks(query, limit: 50);
-        if (lfmTracks.isEmpty) return ytSongs;
-
-        // Build known artists set from all Last.fm results
-        final knownArtists = lfmTracks.map((t) => t.artist.toLowerCase()).toSet();
-
-        // Enrich YouTube results with Last.fm metadata when matched, keep all results
-        final enriched = ytSongs.map((song) {
-          final match = lfmTracks.firstWhere(
-            (t) => _titlesMatch(song.title, t.title) || _titlesMatch(song.artist, t.artist),
-            orElse: () => (title: '', artist: '', imageUrl: ''),
-          );
-          if (match.title.isNotEmpty) {
-            return Song(
-              id: song.id,
-              title: match.title,
-              artist: match.artist,
-              album: song.album,
-              // imageUrl: match.imageUrl.isNotEmpty ? match.imageUrl : song.imageUrl,
-              imageUrl: song.imageUrl,
-              audioUrl: song.audioUrl,
-              duration: song.duration,
-            );
-          }
-          // No direct match — try to find a known artist in the YouTube title
-          final foundArtist = knownArtists.firstWhere(
-            (a) => a.length > 3 && // avoid short false matches
-                (song.title.toLowerCase().contains(' $a ') ||
-                 song.title.toLowerCase().startsWith('$a ') ||
-                 song.title.toLowerCase().startsWith('$a -') ||
-                 song.artist.toLowerCase() == a),
-            orElse: () => '',
-          );
-          if (foundArtist.isNotEmpty) {
-            // Get proper casing from Last.fm
-            final properArtist = lfmTracks.firstWhere((t) => t.artist.toLowerCase() == foundArtist).artist;
-            final songTitle = _stripArtistFromTitle(song.title, properArtist);
-            return Song(
-              id: song.id,
-              title: songTitle.isNotEmpty ? songTitle : song.title,
-              artist: properArtist,
-              album: song.album,
-              imageUrl: song.imageUrl,
-              audioUrl: song.audioUrl,
-              duration: song.duration,
-            );
-          }
-          return song;
-        }).toList();
-        // Deduplicate by title+artist (keep first/best match per unique song)
-        final seen = <String>{};
-        final result = enriched.where((s) {
-          final key = '${s.title.toLowerCase()}|${s.artist.toLowerCase()}';
-          return seen.add(key);
-        }).toList();
-        print('[YouTubeService] enriched: ${enriched.length}, final: ${result.length}');
-        return result;
+        print('[YouTubeService] server empty, using YouTube fallback');
+        return await _youtubeSearch(query);
       }, [], tag: 'YouTubeService.searchSongs');
+
+  Future<List<Song>> _youtubeSearch(String query) async {
+    final videos = await _gateway.search(query, limit: 30);
+    final ytSongs = _deduplicateSongs(videos.map(_videoToSong).toList());
+    print('[YouTubeService] search "$query": ${videos.length} raw, ${ytSongs.length} after dedup');
+
+    final lfmTracks = await _lastFm.searchTracks(query, limit: 50);
+    if (lfmTracks.isEmpty) return ytSongs;
+
+    final knownArtists = lfmTracks.map((t) => t.artist.toLowerCase()).toSet();
+    final enriched = ytSongs.map((song) {
+      final match = lfmTracks.firstWhere(
+        (t) => _titlesMatch(song.title, t.title),
+        orElse: () => (title: '', artist: '', imageUrl: ''),
+      );
+      if (match.title.isNotEmpty) {
+        return Song(id: song.id, title: match.title, artist: match.artist,
+            album: song.album, imageUrl: song.imageUrl, audioUrl: song.audioUrl, duration: song.duration);
+      }
+      final foundArtist = knownArtists.firstWhere(
+        (a) => a.length > 3 && song.artist.toLowerCase() == a, orElse: () => '');
+      if (foundArtist.isNotEmpty) {
+        final properArtist = lfmTracks.firstWhere((t) => t.artist.toLowerCase() == foundArtist).artist;
+        return Song(id: song.id, title: song.title, artist: properArtist,
+            album: song.album, imageUrl: song.imageUrl, audioUrl: song.audioUrl, duration: song.duration);
+      }
+      return song;
+    }).toList();
+    final seen = <String>{};
+    final result = enriched.where((s) {
+      final key = '${s.title.toLowerCase()}|${s.artist.toLowerCase()}';
+      return seen.add(key);
+    }).toList();
+    print('[YouTubeService] enriched: ${enriched.length}, final: ${result.length}');
+    return result;
+  }
 
   bool _titlesMatch(String a, String b) {
     if (a.isEmpty || b.isEmpty) return false;
     final normalize = (String s) => s.toLowerCase().replaceAll(RegExp(r'[^\w\sáéíóúñü]'), '').trim();
     final na = normalize(a);
     final nb = normalize(b);
-    if (na.contains(nb) || nb.contains(na)) return true;
-    // Word overlap: at least 2 words in common
+    // Only use substring match when the shorter string has meaningful length (>3 chars)
+    final shorter = na.length <= nb.length ? na : nb;
+    final longer  = na.length <= nb.length ? nb : na;
+    if (shorter.length > 3 && longer.contains(shorter)) return true;
+    // Word overlap: at least 2 words longer than 2 chars in common
     final wordsA = na.split(' ').where((w) => w.length > 2).toSet();
     final wordsB = nb.split(' ').where((w) => w.length > 2).toSet();
     return wordsA.intersection(wordsB).length >= 2;
@@ -221,12 +234,15 @@ class YouTubeService {
   String _stripArtistFromTitle(String title, String artist) {
     final lower = title.toLowerCase();
     final artistLower = artist.toLowerCase();
-    // Handle "Artist - Song" and "Song - Artist"
-    if (lower.startsWith('$artistLower -') || lower.startsWith('$artistLower–')) {
-      return title.substring(artist.length + 2).trim().replaceAll(RegExp(r'^[\s\-–]+'), '').trim();
-    }
-    if (lower.endsWith('- $artistLower') || lower.endsWith('– $artistLower')) {
-      return title.substring(0, title.length - artist.length - 2).trim().replaceAll(RegExp(r'[\s\-–]+$'), '').trim();
+    // Handle "Artist - Song" and "Song - Artist" (both ASCII dash and en-dash)
+    final separators = [' - ', ' – ', '–', ' -', '- '];
+    for (final sep in separators) {
+      if (lower.startsWith('$artistLower$sep')) {
+        return title.substring(artistLower.length + sep.length).trim();
+      }
+      if (lower.endsWith('$sep$artistLower')) {
+        return title.substring(0, title.length - sep.length - artistLower.length).trim();
+      }
     }
     return title;
   }
@@ -236,6 +252,9 @@ class YouTubeService {
 
   Future<List<Song>> getTrendingMusic() =>
       safeCall(() async {
+        final serverSongs = await _server.getTrending(limit: 20);
+        if (serverSongs.isNotEmpty) return serverSongs;
+
         final videos = await _gateway.search('regueton 2026', limit: 20);
         return _deduplicateSongs(videos.map(_videoToSong).toList());
       }, [], tag: 'YouTubeService.getTrendingMusic');
@@ -337,6 +356,13 @@ class YouTubeService {
 
   /// Returns a local file path to the cached audio if available, otherwise fetches the online URL.
   Future<String> getPlayableAudioPath(String videoId) async {
+    // 1. Permanent downloads (documents/downloads/) — highest priority
+    final downloadedPath = await _downloadService.getDownloadedPathById(videoId);
+    if (downloadedPath != null) {
+      print('[YouTubeService] Using downloaded file for $videoId: $downloadedPath');
+      return downloadedPath;
+    }
+    // 2. Temp audio cache
     final cachedPath = await _audioCache.getCachedAudioPath(videoId);
     if (cachedPath != null) {
       print('[YouTubeService] Using cached audio for $videoId: $cachedPath');

@@ -174,7 +174,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                       Column(
                         children: [
                           Slider(
-                            value: player.currentPosition.inSeconds.toDouble(),
+                            value: player.currentPosition.inSeconds.toDouble().clamp(0.0, player.totalDuration.inSeconds.toDouble().clamp(1.0, double.infinity)),
                             max: player.totalDuration.inSeconds.toDouble().clamp(1.0, double.infinity),
                             onChanged: (value) {
                               player.seekTo(Duration(seconds: value.toInt()));

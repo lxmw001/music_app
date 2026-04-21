@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
 
 class LastFmService {
@@ -78,14 +80,23 @@ class LastFmService {
     return result;
   }
 
-  /// Get genre tags for an artist
+  /// Get genre tags for an artist — cached in SharedPreferences for offline use
   Future<List<String>> getArtistTags(String artist, {int limit = 3}) async {
+    final cacheKey = 'lfm_tags_${artist.toLowerCase().replaceAll(' ', '_')}';
+    final prefs = await SharedPreferences.getInstance();
+
     final data = await _get('artist.getTopTags', {'artist': artist, 'limit': '$limit'});
-    if (data == null) return [];
+    if (data == null) {
+      // Offline — return cached tags if available
+      final cached = prefs.getStringList(cacheKey);
+      if (cached != null) print('[LastFm] tags for "$artist" from cache: $cached');
+      return cached ?? [];
+    }
     final tags = data['toptags']?['tag'] as List?;
     if (tags == null) return [];
     final result = tags.map((t) => t['name'] as String).toList();
     print('[LastFm] tags for "$artist": $result');
+    await prefs.setStringList(cacheKey, result); // cache for offline use
     return result;
   }
 }

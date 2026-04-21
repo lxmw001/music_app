@@ -43,11 +43,16 @@ class _LibraryScreenState extends State<LibraryScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: _showing != null
-            ? IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => setState(() => _showing = null))
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () async {
+                  await _loadDownloadedSongs();
+                  if (mounted) setState(() => _showing = null);
+                })
             : null,
       ),
       body: _showing == 'liked'
-          ? _buildSongList(_likedSongs)
+          ? _buildSongList(_likedSongs, onDelete: _removeLikedSong)
           : _showing == 'downloaded'
               ? _buildSongList(_downloadedSongs, onDelete: _deleteDownload)
               : _buildLibrary(),
@@ -83,16 +88,20 @@ class _LibraryScreenState extends State<LibraryScreen> {
           title: const Text('Downloaded'),
           subtitle: Text('${_downloadedSongs.length} songs'),
           trailing: const Icon(Icons.chevron_right),
-          onTap: () => setState(() => _showing = 'downloaded'),
+          onTap: () async {
+            await _loadDownloadedSongs();
+            if (mounted) setState(() => _showing = 'downloaded');
+          },
         ),
       ],
     );
   }
 
   Widget _buildSongList(List<Song> songs, {Future<void> Function(Song)? onDelete}) {
+    final isDownloads = _showing == 'downloaded';
     if (songs.isEmpty) {
       return Center(child: Text(
-        _showing == 'downloaded' ? 'No downloaded songs yet.\nTap ↓ in the player to download.' : 'No liked songs yet.\nTap ♥ on any song to like it.',
+        isDownloads ? 'No downloaded songs yet.\nTap ↓ on any song to download.' : 'No liked songs yet.',
         textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey),
       ));
     }
@@ -104,7 +113,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
           final song = songs[index];
           return Dismissible(
             key: Key(song.id),
-            direction: onDelete != null ? DismissDirection.endToStart : DismissDirection.none,
+            direction: isDownloads && onDelete != null ? DismissDirection.endToStart : DismissDirection.none,
             background: Container(
               color: Colors.red, alignment: Alignment.centerRight,
               padding: const EdgeInsets.only(right: 16),
@@ -114,11 +123,22 @@ class _LibraryScreenState extends State<LibraryScreen> {
               await onDelete!(song);
               setState(() => songs.remove(song));
             },
-            child: SongListTile(song: song, isLoading: loadingIds.contains(song.id)),
+            child: SongListTile(
+              song: song,
+              isLoading: loadingIds.contains(song.id),
+              onRemove: !isDownloads && onDelete != null ? () async {
+                await onDelete(song);
+              } : null,
+            ),
           );
         },
       ),
     );
+  }
+
+  Future<void> _removeLikedSong(Song song) async {
+    await context.read<MusicPlayerProvider>().toggleLike(song);
+    setState(() => _likedSongs.remove(song));
   }
 
   Future<void> _deleteDownload(Song song) async {

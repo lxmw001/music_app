@@ -1,12 +1,15 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:audio_service/audio_service.dart';
+import 'dart:async';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import '../models/music_models.dart';
 import '../services/audio_handler.dart';
 import '../services/youtube_service.dart';
 import '../services/play_history_service.dart';
 import '../services/gemini_service.dart';
 import '../services/lastfm_service.dart';
+import '../services/download_service.dart';
 
 abstract class MusicPlayerProvider extends ChangeNotifier {
   Song? get currentSong;
@@ -49,8 +52,10 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   late AudioPlayerHandler _audioHandler;
   final YouTubeService _youtubeService = YouTubeService();
   final PlayHistoryService _historyService = PlayHistoryService();
+  final DownloadService _downloadService = DownloadService();
   final LastFmService _lastFmService = LastFmService();
   Timer? _positionSaveTimer;
+  Timer? _stallTimer;
   Duration _lastRestoredPosition = Duration.zero;
   Song? _currentSong;
   List<Song> _queue = [];
@@ -78,7 +83,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   List<Song> get suggestedSongs => _suggestedSongs;
 
   bool get isPlaying => _isInitialized ? _audioHandler.playbackState.value.playing : false;
-  Duration get currentPosition => _isInitialized ? _audioHandler.playbackState.value.updatePosition : Duration.zero;
+  Duration get currentPosition => _isInitialized ? _audioHandler.currentPosition : Duration.zero;
   Duration get totalDuration => _isInitialized ? _audioHandler.mediaItem.value?.duration ?? Duration.zero : Duration.zero;
 
   MusicPlayerProviderImpl() {
@@ -133,12 +138,20 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     _audioHandler.playbackState.listen((state) {
       if (state.processingState == AudioProcessingState.completed && !_isFetchingSuggestions) {
         print('[MusicPlayerProvider] song completed, calling nextSong');
-        // Record full duration as listened since song completed naturally
         if (_currentSong != null) {
           _historyService.recordPlay(_currentSong!, _currentSong!.duration.inSeconds);
         }
         nextSong();
       }
+
+      // Stall detection: if buffering for >8s, re-fetch URL and retry
+      if (state.processingState == AudioProcessingState.buffering && state.playing) {
+        _stallTimer ??= Timer(const Duration(seconds: 8), _handleStall);
+      } else {
+        _stallTimer?.cancel();
+        _stallTimer = null;
+      }
+
       notifyListeners();
     });
     _audioHandler.mediaItem.listen((_) {
@@ -149,7 +162,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     _audioHandler.positionStream.listen((position) {
       if (_currentSong != null && _autoAddSuggestions) {
         final duration = totalDuration;
-        // When song is 10 seconds from ending, fetch suggestions in background
         if (duration.inSeconds > 0 && 
             (duration - position).inSeconds <= 10 && 
             !_isFetchingSuggestions &&
@@ -157,6 +169,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
           _fetchSuggestionsInBackground();
         }
       }
+      notifyListeners();
     });
     
     notifyListeners();
@@ -174,6 +187,66 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     } catch (e, st) {
     print('[MusicPlayerProvider] _init ERROR: $e\n$st');
   }
+  }
+
+  Future<void> _handleStall() async {
+    final song = _currentSong;
+    if (song == null) return;
+    print('[MusicPlayerProvider] stall detected for "${song.title}"');
+
+    // Check connectivity
+    final connectivity = await Connectivity().checkConnectivity();
+    final hasInternet = connectivity.any((c) =>
+        c == ConnectivityResult.wifi || c == ConnectivityResult.mobile);
+
+    if (!hasInternet) {
+      print('[MusicPlayerProvider] no internet — switching to offline queue');
+      await _playOfflineByGenre(song);
+      return;
+    }
+
+    // Has internet — re-fetch URL and retry from current position
+    print('[MusicPlayerProvider] has internet — re-fetching URL...');
+    final position = currentPosition;
+    song.audioUrl = '';
+    try {
+      await playSong(song, seekTo: position);
+      print('[MusicPlayerProvider] stall recovery succeeded');
+    } catch (e) {
+      print('[MusicPlayerProvider] stall recovery failed: $e');
+    }
+  }
+
+  Future<void> _playOfflineByGenre(Song stalledSong) async {
+    final downloaded = await _downloadService.getDownloadedSongs();
+    if (downloaded.isEmpty) {
+      print('[MusicPlayerProvider] no downloaded songs available offline');
+      return;
+    }
+
+    final stalledTags = stalledSong.genres.map((t) => t.toLowerCase()).toSet();
+    print('[MusicPlayerProvider] offline genre match using tags: $stalledTags');
+
+    List<Song> offlineQueue;
+    if (stalledTags.isNotEmpty) {
+      final scored = downloaded
+          .where((s) => s.id != stalledSong.id)
+          .map((s) {
+            final shared = s.genres.map((t) => t.toLowerCase()).toSet()
+                .intersection(stalledTags).length;
+            return (song: s, score: shared);
+          })
+          .toList()
+        ..sort((a, b) => b.score.compareTo(a.score));
+      offlineQueue = scored.map((e) => e.song).toList();
+    } else {
+      offlineQueue = downloaded.where((s) => s.id != stalledSong.id).toList();
+    }
+
+    if (offlineQueue.isEmpty) offlineQueue = downloaded;
+
+    print('[MusicPlayerProvider] offline queue: ${offlineQueue.length} songs, first: ${offlineQueue.first.title}');
+    await playSong(offlineQueue.first, queue: offlineQueue);
   }
 
   Future<void> playSong(Song song, {List<Song>? queue, Duration? seekTo}) async {
