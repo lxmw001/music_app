@@ -27,7 +27,7 @@ abstract class MusicPlayerProvider extends ChangeNotifier {
   Duration get currentPosition;
   Duration get totalDuration;
 
-  Future<void> playSong(Song song, {List<Song>? queue, Duration? seekTo});
+  Future<void> playSong(Song song, {List<Song>? queue, Duration? seekTo, bool fromQueue = false});
   Future<void> pause();
   Future<void> resume();
   Future<void> stop();
@@ -251,7 +251,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     await playSong(offlineQueue.first, queue: offlineQueue);
   }
 
-  Future<void> playSong(Song song, {List<Song>? queue, Duration? seekTo}) async {
+  Future<void> playSong(Song song, {List<Song>? queue, Duration? seekTo, bool fromQueue = false}) async {
     if (!_isInitialized) {
       print('[MusicPlayerProvider] not initialized yet, queuing: ${song.title}');
       _pendingSong = song;
@@ -277,27 +277,34 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     }
     // Show song immediately in UI while audio URL is being fetched
     _currentSong = song;
-    // Always start with the tapped song as the queue, then expand via generatePlaylist
-    _queue = [song];
-    _currentIndex = 0;
-    _isSeeding = false;
-    _pendingSeedQueries = [];
-    _usedSeedQueries.clear();
-    notifyListeners();
+    // Only skip generatePlaylist when navigating within existing queue (next/prev)
+    if (fromQueue) {
+      _currentIndex = _queue.indexWhere((s) => s.id == song.id);
+      if (_currentIndex < 0) _currentIndex = 0;
+    } else {
+      // User tapped a song — always reset queue and generate fresh playlist
+      _queue = [song];
+      _currentIndex = 0;
+      _isSeeding = false;
+      _pendingSeedQueries = [];
+      _usedSeedQueries.clear();
 
-    // Fire generate-playlist in background — replaces queue when ready
-    _youtubeService.generatePlaylist(song).then((playlist) {
-      if (playlist.isEmpty) {
-        print('[MusicPlayerProvider] generate-playlist returned empty for ${song.id}');
-        return;
-      }
-      if (_currentSong?.id == song.id) {
-        _queue = playlist;
-        _currentIndex = 0;
-        print('[MusicPlayerProvider] queue updated from generate-playlist: ${playlist.length} songs');
-        notifyListeners();
-      }
-    });
+      _youtubeService.generatePlaylist(song).then((playlist) {
+        if (playlist.isEmpty) {
+          print('[MusicPlayerProvider] generate-playlist returned empty for ${song.id}');
+          return;
+        }
+        if (_currentSong?.id == song.id) {
+          _queue = [song, ...playlist];
+          _currentIndex = 0;
+          print('[MusicPlayerProvider] queue updated: ${_queue.length} songs');
+          prefetchAudioUrls(_queue.skip(1).take(2).toList());
+          _historyService.saveQueue(_queue, _currentIndex);
+          notifyListeners();
+        }
+      });
+    }
+    notifyListeners();
 
     // Clear suggestions when starting a new song
     _suggestedSongs = [];
@@ -484,18 +491,19 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   void nextSong() {
     if (!_isInitialized) return;
     if (_queue.isNotEmpty && _currentIndex < _queue.length - 1) {
-      // Play next song already in queue
       _currentIndex++;
-      playSong(_queue[_currentIndex]);
+      playSong(_queue[_currentIndex], fromQueue: true);
+      if (_currentIndex + 1 < _queue.length) {
+        prefetchAudioUrls([_queue[_currentIndex + 1]]);
+      }
+      _historyService.saveQueue(_queue, _currentIndex);
     } else if (_suggestedSongs.isNotEmpty) {
-      // Use pre-fetched suggestion
       final next = _suggestedSongs.first;
       _suggestedSongs = [];
       _queue.add(next);
       _currentIndex = _queue.length - 1;
-      playSong(next);
+      playSong(next, fromQueue: true);
     } else if (_currentSong != null) {
-      // Fetch a new suggestion on demand
       _fetchAndPlaySuggestion();
     }
   }
@@ -534,7 +542,8 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     if (!_isInitialized) return;
     if (_queue.isNotEmpty && _currentIndex > 0) {
       _currentIndex--;
-      playSong(_queue[_currentIndex]);
+      playSong(_queue[_currentIndex], fromQueue: true);
+      _historyService.saveQueue(_queue, _currentIndex);
     }
   }
 

@@ -39,6 +39,9 @@ class _HomeScreenState extends State<HomeScreen> {
       recentSongs = recent;
       isLoading = false;
     });
+    if (mounted && songs.isNotEmpty) {
+      context.read<MusicPlayerProvider>().prefetchAudioUrls(songs.take(3).toList());
+    }
     _loadSuggestions();
   }
 

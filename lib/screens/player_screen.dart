@@ -317,7 +317,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             style: TextStyle(color: i < player.currentIndex ? Colors.grey[700] : Colors.grey)),
                         trailing: isCurrent ? const Icon(Icons.equalizer, color: Colors.green) : null,
                         onTap: () {
-                          player.playSong(song);
+                          player.playSong(song, fromQueue: true);
                           Navigator.pop(context);
                         },
                       );

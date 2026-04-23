@@ -37,7 +37,13 @@ class _SearchScreenState extends State<SearchScreen> {
       searchResults = results;
       isLoading = false;
     });
-    if (mounted) context.read<MusicPlayerProvider>().saveSearch(query);
+    if (mounted) {
+      context.read<MusicPlayerProvider>().saveSearch(query);
+      // Prefetch audio URLs for top results so tapping is instant
+      if (results.isNotEmpty) {
+        context.read<MusicPlayerProvider>().prefetchAudioUrls(results.take(3).toList());
+      }
+    }
   }
 
   @override
