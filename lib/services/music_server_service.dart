@@ -53,14 +53,31 @@ class MusicServerService {
     }
   }
 
+  Future<List<Song>> generatePlaylist(String youtubeId, {int limit = 30}) async {
+    final uri = Uri.parse('$_base/songs/$youtubeId/generate-playlist')        .replace(queryParameters: {'limit': '$limit'});
+    print('[MusicServer] GET $uri');
+    try {
+      final response = await _client.get(uri).timeout(const Duration(seconds: 30));
+      print('[MusicServer] generate-playlist status: ${response.statusCode}');
+      if (response.statusCode < 200 || response.statusCode >= 300) return [];
+      final data = jsonDecode(response.body);
+      final songs = data is List ? data : (data['songs'] as List? ?? []);
+      return _mapSongs(songs as List);
+    } catch (e) {
+      print('[MusicServer] generate-playlist error: $e');
+      return [];
+    }
+  }
+
   List<Song> _mapSongs(List songs) => songs.map((s) => Song(
     id: s['youtubeId'] as String,
+    serverId: s['id'] as String? ?? '',
     title: s['title'] as String,
     artist: s['artistName'] as String,
-    album: '',
+    album: s['album'] as String? ?? '',
     imageUrl: s['thumbnailUrl'] as String? ?? '',
     audioUrl: '',
-    duration: Duration.zero,
+    duration: Duration(seconds: (s['duration'] as num?)?.toInt() ?? 0),
     genres: List<String>.from(s['genres'] ?? s['tags'] ?? []),
   )).toList();
 }

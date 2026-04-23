@@ -1,5 +1,6 @@
 class Song {
-  final String id;
+  final String id;       // YouTube video ID
+  final String serverId; // Firestore document ID (empty if not from server)
   final String title;
   final String artist;
   final String album;
@@ -10,6 +11,7 @@ class Song {
 
   Song({
     required this.id,
+    this.serverId = '',
     required this.title,
     required this.artist,
     required this.album,
@@ -22,6 +24,7 @@ class Song {
   factory Song.fromJson(Map<String, dynamic> json) {
     return Song(
       id: json['id'],
+      serverId: json['serverId'] ?? '',
       title: json['title'],
       artist: json['artist'],
       album: json['album'] ?? '',
@@ -33,7 +36,7 @@ class Song {
   }
 
   Map<String, dynamic> toJson() => {
-    'id': id, 'title': title, 'artist': artist, 'album': album,
+    'id': id, 'serverId': serverId, 'title': title, 'artist': artist, 'album': album,
     'imageUrl': imageUrl, 'audioUrl': audioUrl,
     'duration': duration.inSeconds, 'genres': genres,
   };

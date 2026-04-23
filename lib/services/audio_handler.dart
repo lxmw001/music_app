@@ -119,6 +119,7 @@ class AudioPlayerHandler extends BaseAudioHandler {
 
   Stream<Duration> get positionStream => _player.positionStream;
   Duration get currentPosition => _player.position;
+  Duration get duration => _player.duration ?? Duration.zero;
   Stream<Duration?> get durationStream => _player.durationStream;
   Stream<bool> get playingStream => _player.playingStream;
 }

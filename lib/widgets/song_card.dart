@@ -13,7 +13,7 @@ class SongCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => context.read<MusicPlayerProvider>().playSong(song, queue: [song]),
+      onTap: () => context.read<MusicPlayerProvider>().playSong(song),
       child: Container(
         width: 160,
         margin: const EdgeInsets.only(right: 16),

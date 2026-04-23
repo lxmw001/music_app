@@ -250,6 +250,12 @@ class YouTubeService {
   Future<String> getAudioUrl(String videoId) =>
       safeCall(() => _gateway.getAudioUrl(videoId), '', tag: 'YouTubeService.getAudioUrl');
 
+  Future<List<Song>> generatePlaylist(Song song) =>
+      safeCall(() => _server.generatePlaylist(
+            song.serverId.isNotEmpty ? song.serverId : song.id,
+            limit: 30,
+          ), [], tag: 'YouTubeService.generatePlaylist');
+
   Future<List<Song>> getTrendingMusic() =>
       safeCall(() async {
         final serverSongs = await _server.getTrending(limit: 20);

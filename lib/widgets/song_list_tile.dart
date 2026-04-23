@@ -7,9 +7,10 @@ import '../services/download_service.dart';
 class SongListTile extends StatefulWidget {
   final Song song;
   final bool isLoading;
-  final VoidCallback? onRemove; // shown in ⋮ menu when non-null
+  final VoidCallback? onRemove;
+  final List<Song>? queue;
 
-  const SongListTile({super.key, required this.song, this.isLoading = false, this.onRemove});
+  const SongListTile({super.key, required this.song, this.isLoading = false, this.onRemove, this.queue});
 
   @override
   State<SongListTile> createState() => _SongListTileState();
@@ -92,7 +93,7 @@ class _SongListTileState extends State<SongListTile> {
             ),
         ],
       ),
-      onTap: () => context.read<MusicPlayerProvider>().playSong(widget.song, queue: [widget.song]),
+      onTap: () => context.read<MusicPlayerProvider>().playSong(widget.song),
     );
   }
 }

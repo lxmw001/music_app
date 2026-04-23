@@ -84,7 +84,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
 
   bool get isPlaying => _isInitialized ? _audioHandler.playbackState.value.playing : false;
   Duration get currentPosition => _isInitialized ? _audioHandler.currentPosition : Duration.zero;
-  Duration get totalDuration => _isInitialized ? _audioHandler.mediaItem.value?.duration ?? Duration.zero : Duration.zero;
+  Duration get totalDuration => _isInitialized ? _audioHandler.duration : Duration.zero;
 
   MusicPlayerProviderImpl() {
     _init();
@@ -171,6 +171,8 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       }
       notifyListeners();
     });
+
+    _audioHandler.durationStream.listen((_) => notifyListeners());
     
     notifyListeners();
     
@@ -275,20 +277,27 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     }
     // Show song immediately in UI while audio URL is being fetched
     _currentSong = song;
-    if (queue != null) {
-      _queue = queue;
-      _currentIndex = queue.indexOf(song);
-      _isSeeding = false;
-      _pendingSeedQueries = [];
-      _usedSeedQueries.clear();
-    }
+    // Always start with the tapped song as the queue, then expand via generatePlaylist
+    _queue = [song];
+    _currentIndex = 0;
+    _isSeeding = false;
+    _pendingSeedQueries = [];
+    _usedSeedQueries.clear();
     notifyListeners();
 
-    // Seed suggestions immediately when new queue is set (before audio fetch)
-    if (queue != null) {
-      print('[MusicPlayerProvider] new queue set, seeding suggestions for: ${song.title}');
-      _seedQueueWithSuggestions(song);
-    }
+    // Fire generate-playlist in background — replaces queue when ready
+    _youtubeService.generatePlaylist(song).then((playlist) {
+      if (playlist.isEmpty) {
+        print('[MusicPlayerProvider] generate-playlist returned empty for ${song.id}');
+        return;
+      }
+      if (_currentSong?.id == song.id) {
+        _queue = playlist;
+        _currentIndex = 0;
+        print('[MusicPlayerProvider] queue updated from generate-playlist: ${playlist.length} songs');
+        notifyListeners();
+      }
+    });
 
     // Clear suggestions when starting a new song
     _suggestedSongs = [];

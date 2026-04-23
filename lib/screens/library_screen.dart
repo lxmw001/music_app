@@ -126,6 +126,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
             child: SongListTile(
               song: song,
               isLoading: loadingIds.contains(song.id),
+              queue: songs,
               onRemove: !isDownloads && onDelete != null ? () async {
                 await onDelete(song);
               } : null,
