@@ -28,13 +28,27 @@ class YoutubeExplodeGateway implements YoutubeGateway {
 
   @override
   Future<String> getAudioUrl(String videoId) async {
-    final manifest = await _yt.videos.streamsClient.getManifest(
-      videoId,
-      ytClients: [YoutubeApiClient.ios, YoutubeApiClient.androidVr],
-    );
-    final streams = manifest.audioOnly.toList()
-      ..sort((a, b) => a.bitrate.compareTo(b.bitrate));
-    return streams.first.url.toString();
+    // Try clients in order of reliability — fall through on failure
+    final clientSets = [
+      [YoutubeApiClient.tv, YoutubeApiClient.mediaConnect],
+      [YoutubeApiClient.android, YoutubeApiClient.androidMusic],
+      [YoutubeApiClient.ios, YoutubeApiClient.androidVr],
+      [YoutubeApiClient.mweb, YoutubeApiClient.safari],
+    ];
+    for (final clients in clientSets) {
+      try {
+        final manifest = await _yt.videos.streamsClient.getManifest(
+          videoId,
+          ytClients: clients,
+        );
+        final streams = manifest.audioOnly.toList()
+          ..sort((a, b) => a.bitrate.compareTo(b.bitrate));
+        if (streams.isNotEmpty) return streams.first.url.toString();
+      } catch (_) {
+        continue;
+      }
+    }
+    throw Exception('All YouTube clients failed for $videoId');
   }
 
   @override
