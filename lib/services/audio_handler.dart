@@ -16,7 +16,7 @@ class AudioPlayerHandler extends BaseAudioHandler {
   void _init() {
     _player.playbackEventStream.map(_transformEvent).pipe(playbackState);
     _player.sequenceStateStream.listen((sequenceState) {
-      final currentItem = sequenceState?.currentSource?.tag as MediaItem?;
+      final currentItem = sequenceState.currentSource?.tag as MediaItem?;
       if (currentItem != null) {
         mediaItem.add(currentItem);
       }

@@ -109,7 +109,7 @@ void main() {
   group('AudioPlayerHandler.setQueue', () {
     test('calls AudioPlayer.setAudioSources with one source per song', () async {
       final songs = [_song(id: 's1', audioUrl: 'https://a.com/1.mp4'), _song(id: 's2', audioUrl: 'https://a.com/2.mp4')];
-      when(mockPlayer.setAudioSources(any)).thenAnswer((_) async {});
+      when(mockPlayer.setAudioSources(any)).thenAnswer((_) async => null);
 
       await handler.setQueue(songs);
 

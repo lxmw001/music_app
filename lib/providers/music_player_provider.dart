@@ -1,13 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:audio_service/audio_service.dart';
-import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../models/music_models.dart';
 import '../services/audio_handler.dart';
 import '../services/youtube_service.dart';
 import '../services/play_history_service.dart';
-import '../services/gemini_service.dart';
 import '../services/lastfm_service.dart';
 import '../services/download_service.dart';
 
@@ -419,6 +417,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   List<String> _pendingSeedQueries = [];
   final Set<String> _usedSeedQueries = {};
 
+  // ignore: unused_field
   Set<String> _unlikedArtists = {};
 
   // TODO: Filter unliked songs from queue by title+artist key to avoid same song
