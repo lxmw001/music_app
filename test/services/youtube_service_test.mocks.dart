@@ -10,6 +10,9 @@ import 'dart:typed_data' as _i8;
 import 'package:http/http.dart' as _i3;
 import 'package:mockito/mockito.dart' as _i1;
 import 'package:mockito/src/dummies.dart' as _i6;
+import 'package:music_app/models/music_models.dart' as _i10;
+import 'package:music_app/services/gemini_service.dart' as _i11;
+import 'package:music_app/services/music_server_service.dart' as _i9;
 import 'package:music_app/services/youtube_service.dart' as _i4;
 import 'package:youtube_explode_dart/youtube_explode_dart.dart' as _i2;
 
@@ -368,4 +371,86 @@ class MockClient extends _i1.Mock implements _i3.Client {
         ),
         returnValueForMissingStub: null,
       );
+}
+
+/// A class which mocks [MusicServerService].
+///
+/// See the documentation for Mockito's code generation for more information.
+class MockMusicServerService extends _i1.Mock
+    implements _i9.MusicServerService {
+  MockMusicServerService() {
+    _i1.throwOnMissingStub(this);
+  }
+
+  @override
+  _i5.Future<List<_i10.Song>> searchSongs(String? query) => (super.noSuchMethod(
+        Invocation.method(
+          #searchSongs,
+          [query],
+        ),
+        returnValue: _i5.Future<List<_i10.Song>>.value(<_i10.Song>[]),
+      ) as _i5.Future<List<_i10.Song>>);
+
+  @override
+  _i5.Future<List<_i10.Song>> getTrending({
+    int? limit = 20,
+    List<String>? genres = const [],
+  }) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #getTrending,
+          [],
+          {
+            #limit: limit,
+            #genres: genres,
+          },
+        ),
+        returnValue: _i5.Future<List<_i10.Song>>.value(<_i10.Song>[]),
+      ) as _i5.Future<List<_i10.Song>>);
+
+  @override
+  _i5.Future<List<String>> getSearchSuggestions() => (super.noSuchMethod(
+        Invocation.method(
+          #getSearchSuggestions,
+          [],
+        ),
+        returnValue: _i5.Future<List<String>>.value(<String>[]),
+      ) as _i5.Future<List<String>>);
+
+  @override
+  _i5.Future<List<_i10.Song>> generatePlaylist(
+    String? id, {
+    int? limit = 30,
+    String? search,
+  }) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #generatePlaylist,
+          [id],
+          {
+            #limit: limit,
+            #search: search,
+          },
+        ),
+        returnValue: _i5.Future<List<_i10.Song>>.value(<_i10.Song>[]),
+      ) as _i5.Future<List<_i10.Song>>);
+}
+
+/// A class which mocks [GeminiService].
+///
+/// See the documentation for Mockito's code generation for more information.
+class MockGeminiService extends _i1.Mock implements _i11.GeminiService {
+  MockGeminiService() {
+    _i1.throwOnMissingStub(this);
+  }
+
+  @override
+  _i5.Future<_i11.SongMetadata?> getSongMetadata(String? videoTitle) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #getSongMetadata,
+          [videoTitle],
+        ),
+        returnValue: _i5.Future<_i11.SongMetadata?>.value(),
+      ) as _i5.Future<_i11.SongMetadata?>);
 }

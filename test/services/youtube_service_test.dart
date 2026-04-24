@@ -5,13 +5,18 @@ import 'package:http/http.dart' as http;
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
 import 'package:music_app/services/youtube_service.dart';
+import 'package:music_app/services/music_server_service.dart';
+import 'package:music_app/services/gemini_service.dart';
 
 import 'youtube_service_test.mocks.dart';
 
-@GenerateMocks([YoutubeGateway, http.Client])
+@GenerateMocks([YoutubeGateway, http.Client, MusicServerService, GeminiService])
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   late MockYoutubeGateway mockGateway;
   late MockClient mockHttpClient;
+  late MockMusicServerService mockServer;
+  late MockGeminiService mockGemini;
   late YouTubeService service;
 
   // VideoId requires a valid 11-character YouTube video ID format
@@ -47,7 +52,12 @@ void main() {
   setUp(() {
     mockGateway = MockYoutubeGateway();
     mockHttpClient = MockClient();
-    service = YouTubeService(gateway: mockGateway, httpClient: mockHttpClient);
+    mockServer = MockMusicServerService();
+    mockGemini = MockGeminiService();
+    when(mockServer.searchSongs(any)).thenAnswer((_) async => []);
+    when(mockServer.getTrending(limit: anyNamed('limit'))).thenAnswer((_) async => []);
+    when(mockGemini.getSongMetadata(any)).thenAnswer((_) async => null);
+    service = YouTubeService(gateway: mockGateway, httpClient: mockHttpClient, server: mockServer, gemini: mockGemini);
   });
 
   group('YouTubeService.searchSongs', () {
@@ -110,7 +120,7 @@ void main() {
 
   group('YouTubeService.getTrendingMusic', () {
     test('returns up to 2 songs', () async {
-      final videos = List.generate(2, (i) => _fakeVideo(id: ids[i]));
+      final videos = List.generate(2, (i) => _fakeVideo(id: ids[i], title: 'Song $i - Artist $i'));
       when(mockGateway.search(any, limit: anyNamed('limit')))
           .thenAnswer((_) async => videos);
 

@@ -230,23 +230,6 @@ class YouTubeService {
     return wordsA.intersection(wordsB).length >= 2;
   }
 
-  /// Remove artist name from YouTube title, returning just the song part
-  String _stripArtistFromTitle(String title, String artist) {
-    final lower = title.toLowerCase();
-    final artistLower = artist.toLowerCase();
-    // Handle "Artist - Song" and "Song - Artist" (both ASCII dash and en-dash)
-    final separators = [' - ', ' – ', '–', ' -', '- '];
-    for (final sep in separators) {
-      if (lower.startsWith('$artistLower$sep')) {
-        return title.substring(artistLower.length + sep.length).trim();
-      }
-      if (lower.endsWith('$sep$artistLower')) {
-        return title.substring(0, title.length - sep.length - artistLower.length).trim();
-      }
-    }
-    return title;
-  }
-
   Future<String> getAudioUrl(String videoId) =>
       safeCall(() => _gateway.getAudioUrl(videoId), '', tag: 'YouTubeService.getAudioUrl');
 

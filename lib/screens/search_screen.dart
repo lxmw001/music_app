@@ -143,7 +143,6 @@ class _SearchScreenState extends State<SearchScreen> {
             : null,
       ),
       body: Builder(builder: (context) {
-        final player = context.read<MusicPlayerProvider>();
         if (isLoading) return Center(child: CircularProgressIndicator());
         if (searchResults.isEmpty) return SingleChildScrollView(
           padding: const EdgeInsets.all(16),

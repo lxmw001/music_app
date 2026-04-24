@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:music_app/services/youtube_service.dart';
@@ -9,7 +10,7 @@ import 'package:music_app/models/music_models.dart';
 /// YouTube calls are intentionally minimal (2 searches) to avoid rate limiting.
 /// Last.fm calls are free — key is injected at runtime:
 ///
-///   flutter test integration_test/matching_test.dart -d <device> \
+///   flutter test integration_test/matching_test.dart -d &lt;device&gt; \
 ///     --dart-define=LASTFM_API_KEY=0fffe55280e74f07ec60ac7510483dbd
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -69,9 +70,9 @@ void main() {
     for (final entry in queries.entries) {
       test('query: "${entry.key}"', () async {
         final tracks = await lfmService.searchTracks(entry.key, limit: 10);
-        print('\n[LFM search] "${entry.key}": ${tracks.length} results');
+        debugPrint('\n[LFM search] "${entry.key}": ${tracks.length} results');
         for (final t in tracks.take(3)) {
-          print('  "${t.title}" — ${t.artist}');
+          debugPrint('  "${t.title}" — ${t.artist}');
         }
         if (entry.value) {
           expect(tracks, isNotEmpty);
@@ -95,7 +96,7 @@ void main() {
     for (final artist in artists) {
       test(artist, () async {
         final tracks = await lfmService.getArtistTopTracks(artist, limit: 5);
-        print('\n[LFM top tracks] $artist: $tracks');
+        debugPrint('\n[LFM top tracks] $artist: $tracks');
         expect(tracks, isNotEmpty);
         expect(tracks.every((t) => t.contains(artist) || t.isNotEmpty), isTrue);
       });
@@ -108,7 +109,7 @@ void main() {
     for (final artist in artists) {
       test(artist, () async {
         final similar = await lfmService.getSimilarArtists(artist, limit: 5);
-        print('\n[LFM similar] $artist → $similar');
+        debugPrint('\n[LFM similar] $artist → $similar');
         expect(similar, isNotEmpty);
         expect(similar.every((a) => a.isNotEmpty), isTrue);
       });
@@ -157,7 +158,7 @@ double _matchRate(List<Song> ytSongs, List<({String title, String artist, String
 void _printMatchReport(String label, List<Song> ytSongs,
     List<({String title, String artist, String imageUrl})> lfm) {
   int matched = 0;
-  print('\n=== Match report: "$label" ===');
+  debugPrint('\n=== Match report: "$label" ===');
   for (final s in ytSongs) {
     final hit = lfm.firstWhere(
       (t) => _match(s.title, t.title) || _match(s.artist, t.artist),
@@ -165,18 +166,19 @@ void _printMatchReport(String label, List<Song> ytSongs,
     );
     if (hit.title.isNotEmpty) {
       matched++;
-      print('  ✓ "${s.title}/${s.artist}" → "${hit.title}/${hit.artist}"');
+      debugPrint('  ✓ "${s.title}/${s.artist}" → "${hit.title}/${hit.artist}"');
     } else {
-      print('  ✗ "${s.title}/${s.artist}"');
+      debugPrint('  ✗ "${s.title}/${s.artist}"');
     }
   }
-  print('  Result: $matched/${ytSongs.length} matched (${(matched / ytSongs.length * 100).toStringAsFixed(0)}%)');
+  debugPrint('  Result: $matched/${ytSongs.length} matched (${(matched / ytSongs.length * 100).toStringAsFixed(0)}%)');
 }
+
+String _normalizeStr(String s) => s.toLowerCase().replaceAll(RegExp(r'[^\w\sáéíóúñü]'), '').trim();
 
 bool _match(String a, String b) {
   if (a.isEmpty || b.isEmpty) return false;
-  final n = (String s) => s.toLowerCase().replaceAll(RegExp(r'[^\w\sáéíóúñü]'), '').trim();
-  final na = n(a), nb = n(b);
+  final na = _normalizeStr(a), nb = _normalizeStr(b);
   final shorter = na.length <= nb.length ? na : nb;
   final longer  = na.length <= nb.length ? nb : na;
   if (shorter.length > 3 && longer.contains(shorter)) return true;

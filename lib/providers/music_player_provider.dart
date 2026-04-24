@@ -1,13 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:audio_service/audio_service.dart';
-import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../models/music_models.dart';
 import '../services/audio_handler.dart';
 import '../services/youtube_service.dart';
 import '../services/play_history_service.dart';
-import '../services/gemini_service.dart';
 import '../services/lastfm_service.dart';
 import '../services/download_service.dart';
 
@@ -65,6 +63,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   bool _isInitialized = false;
   bool _autoAddSuggestions = true;
   final Set<String> _loadingAudioIds = {};
+  @override
   bool isLoadingAudio(String songId) => _loadingAudioIds.contains(songId);
   bool _isFetchingSuggestions = false;
   List<Song> _suggestedSongs = [];
@@ -72,18 +71,30 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   Song? _pendingSong;
   List<Song>? _pendingQueue;
 
+  @override
   Song? get currentSong => _currentSong;
+  @override
   List<Song> get queue => _queue;
+  @override
   int get currentIndex => _currentIndex;
+  @override
   bool get isShuffled => _isShuffled;
+  @override
   bool get isRepeating => _isRepeating;
+  @override
   bool get isInitialized => _isInitialized;
+  @override
   bool get autoAddSuggestions => _autoAddSuggestions;
+  @override
   bool get isFetchingSuggestions => _isFetchingSuggestions;
+  @override
   List<Song> get suggestedSongs => _suggestedSongs;
 
+  @override
   bool get isPlaying => _isInitialized ? _audioHandler.playbackState.value.playing : false;
+  @override
   Duration get currentPosition => _isInitialized ? _audioHandler.currentPosition : Duration.zero;
+  @override
   Duration get totalDuration => _isInitialized ? _audioHandler.duration : Duration.zero;
 
   MusicPlayerProviderImpl() {
@@ -251,6 +262,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     await playSong(offlineQueue.first, queue: offlineQueue);
   }
 
+  @override
   Future<void> playSong(Song song, {List<Song>? queue, Duration? seekTo, bool fromQueue = false, String? searchQuery}) async {
     if (!_isInitialized) {
       print('[MusicPlayerProvider] not initialized yet, queuing: ${song.title}');
@@ -419,6 +431,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   List<String> _pendingSeedQueries = [];
   final Set<String> _usedSeedQueries = {};
 
+  // ignore: unused_field
   Set<String> _unlikedArtists = {};
 
   // TODO: Filter unliked songs from queue by title+artist key to avoid same song
@@ -451,6 +464,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     }
   }
 
+  @override
   Future<void> pause() async {
     if (!_isInitialized) return;
     if (_currentSong != null) {
@@ -461,6 +475,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     await _audioHandler.pause();
   }
 
+  @override
   Future<void> resume() async {
     if (!_isInitialized) return;
     if (_currentSong != null && !_audioHandler.playbackState.value.playing &&
@@ -473,6 +488,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     await _audioHandler.play();
   }
 
+  @override
   Future<void> stop() async {
     if (!_isInitialized) return;
     if (_currentSong != null) {
@@ -483,11 +499,13 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     await _audioHandler.stop();
   }
 
+  @override
   Future<void> seekTo(Duration position) async {
     if (!_isInitialized) return;
     await _audioHandler.seek(position);
   }
 
+  @override
   void nextSong() {
     if (!_isInitialized) return;
     if (_queue.isNotEmpty && _currentIndex < _queue.length - 1) {
@@ -538,6 +556,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     }
   }
 
+  @override
   void previousSong() {
     if (!_isInitialized) return;
     if (_queue.isNotEmpty && _currentIndex > 0) {
@@ -547,16 +566,19 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     }
   }
 
+  @override
   void toggleShuffle() {
     _isShuffled = !_isShuffled;
     notifyListeners();
   }
 
+  @override
   void toggleRepeat() {
     _isRepeating = !_isRepeating;
     notifyListeners();
   }
 
+  @override
   void toggleAutoAddSuggestions() {
     _autoAddSuggestions = !_autoAddSuggestions;
     notifyListeners();
@@ -577,6 +599,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   }
   
   /// Pre-fetch audio URLs for a list of songs in the background
+  @override
   void prefetchAudioUrls(List<Song> songs) {
     for (int i = 0; i < songs.length; i++) {
       final song = songs[i];
@@ -606,6 +629,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       }
     }
   }
+  @override
   Future<void> fetchSuggestions() async {
     _suggestedSongs = [];
     await _fetchSuggestionsInBackground();
@@ -620,19 +644,26 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     });
   }
 
+  @override
   Future<List<Song>> getMostLikedFromHistory() => _historyService.getMostLikedSongs();
+  @override
   Future<List<Song>> getRecentSongs() => _historyService.getRecentSongs();
+  @override
   Future<bool> isLiked(String songId) => _historyService.isLiked(songId);
+  @override
   Future<void> toggleLike(Song song) async {
     await _historyService.toggleLike(song);
     notifyListeners();
   }
 
+  @override
   Future<List<({Song song, int likedCount, int playCount})>> getMostLiked(List<Song> knownSongs) =>
       _historyService.getMostLiked(knownSongs);
 
+  @override
   Future<void> saveSearch(String query) => _historyService.saveSearch(query);
   /// Add a suggested song to the queue
+  @override
   void addSuggestedToQueue(Song song) {
     if (!_queue.contains(song)) {
       _queue.add(song);
@@ -641,6 +672,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   }
   
   /// Clear suggested songs list
+  @override
   void clearSuggestions() {
     _suggestedSongs = [];
     notifyListeners();

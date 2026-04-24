@@ -68,18 +68,26 @@ void main() {
   });
 
   group('AudioPlayerHandler.skipToNext', () {
-    test('delegates to AudioPlayer.seekToNext()', () async {
-      when(mockPlayer.seekToNext()).thenAnswer((_) async {});
-      await handler.skipToNext();
-      verify(mockPlayer.seekToNext()).called(1);
+    test('calls onSkipToNext callback', () async {
+      bool called = false;
+      final h = AudioPlayerHandler(
+        player: mockPlayer,
+        onSkipToNext: () => called = true,
+      );
+      await h.skipToNext();
+      expect(called, isTrue);
     });
   });
 
   group('AudioPlayerHandler.skipToPrevious', () {
-    test('delegates to AudioPlayer.seekToPrevious()', () async {
-      when(mockPlayer.seekToPrevious()).thenAnswer((_) async {});
-      await handler.skipToPrevious();
-      verify(mockPlayer.seekToPrevious()).called(1);
+    test('calls onSkipToPrevious callback', () async {
+      bool called = false;
+      final h = AudioPlayerHandler(
+        player: mockPlayer,
+        onSkipToPrevious: () => called = true,
+      );
+      await h.skipToPrevious();
+      expect(called, isTrue);
     });
   });
 
@@ -94,22 +102,23 @@ void main() {
   });
 
   group('AudioPlayerHandler.setAudioSource', () {
-    test('calls AudioPlayer.setAudioSource with correct URI', () async {
+    test('calls AudioPlayer.setAudioSource with a ConcatenatingAudioSource', () async {
       const url = 'https://audio.example.com/track.mp4';
       final item = MediaItem(id: 's1', title: 'Title');
-      when(mockPlayer.setAudioSource(any)).thenAnswer((_) async => null);
+      when(mockPlayer.setAudioSource(any, initialIndex: anyNamed('initialIndex'), initialPosition: anyNamed('initialPosition'), preload: anyNamed('preload')))
+          .thenAnswer((_) async => null);
 
       await handler.setAudioSource(url, item);
 
-      final captured = verify(mockPlayer.setAudioSource(captureAny)).captured.single as UriAudioSource;
-      expect(captured.uri, Uri.parse(url));
+      final captured = verify(mockPlayer.setAudioSource(captureAny, initialIndex: anyNamed('initialIndex'), initialPosition: anyNamed('initialPosition'), preload: anyNamed('preload'))).captured.single;
+      expect(captured, isA<ConcatenatingAudioSource>());
     });
   });
 
   group('AudioPlayerHandler.setQueue', () {
     test('calls AudioPlayer.setAudioSources with one source per song', () async {
       final songs = [_song(id: 's1', audioUrl: 'https://a.com/1.mp4'), _song(id: 's2', audioUrl: 'https://a.com/2.mp4')];
-      when(mockPlayer.setAudioSources(any)).thenAnswer((_) async {});
+      when(mockPlayer.setAudioSources(any)).thenAnswer((_) async => null);
 
       await handler.setQueue(songs);
 

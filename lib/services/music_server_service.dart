@@ -44,8 +44,8 @@ class MusicServerService {
       if (response.statusCode < 200 || response.statusCode >= 300) return [];
 
       final data = jsonDecode(response.body);
-      final songs = data is List ? data : (data['songs'] as List? ?? []);
-      final result = _mapSongs(songs as List);
+      final List songs = data is List ? data : (data['songs'] as List? ?? []);
+      final result = _mapSongs(songs);
       print('[MusicServer] trending: ${result.length} songs — ${result.take(3).map((s) => "${s.title}/${s.artist}").join(", ")}');
       return result;
     } catch (e) {
@@ -90,8 +90,8 @@ class MusicServerService {
       print('[MusicServer] generate-playlist status: ${response.statusCode}');
       if (response.statusCode < 200 || response.statusCode >= 300) return [];
       final data = jsonDecode(response.body);
-      final songs = data is List ? data : (data['songs'] as List? ?? []);
-      return _mapSongs(songs as List);
+      final List songs = data is List ? data : (data['songs'] as List? ?? []);
+      return _mapSongs(songs);
     } catch (e) {
       print('[MusicServer] generate-playlist error: $e');
       return [];
