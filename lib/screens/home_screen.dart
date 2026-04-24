@@ -11,6 +11,7 @@ class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, this.youtubeService});
 
   @override
+  // ignore: library_private_types_in_public_api
   _HomeScreenState createState() => _HomeScreenState();
 }
 
@@ -18,7 +19,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late final YouTubeService _youtubeService;
   List<Song> trendingSongs = [];
   List<Song> suggestedSongs = [];
-  List<Song> recentSongs = [];
+  List<Playlist> recentPlaylists = [];
   bool isLoading = true;
 
   @override
@@ -31,12 +32,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadTrendingMusic() async {
     final songs = await _youtubeService.getTrendingMusic();
     final provider = context.read<MusicPlayerProvider>();
-    final allRecent = await provider.getRecentSongs();
-    final currentId = provider.currentSong?.id;
-    final recent = allRecent.where((s) => s.id != currentId).toList();
+    final playlists = await provider.loadPlaylists();
     setState(() {
       trendingSongs = songs;
-      recentSongs = recent;
+      recentPlaylists = playlists;
       isLoading = false;
     });
     if (mounted && songs.isNotEmpty) {
@@ -92,10 +91,10 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             const Text('Recently Played', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
-            if (recentSongs.isEmpty)
-              const Text('No recently played songs yet.', style: TextStyle(color: Colors.grey))
+            if (recentPlaylists.isEmpty)
+              const Text('No playlists yet. Search for a song to generate one.', style: TextStyle(color: Colors.grey))
             else
-              RecentSongsGrid(songs: recentSongs),
+              RecentPlaylistsGrid(playlists: recentPlaylists),
             const SizedBox(height: 32),
             const Text('Trending Music', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
