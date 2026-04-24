@@ -10,6 +10,7 @@ permissions:
 jobs:
   build-android:
     runs-on: ubuntu-latest
+    environment: prod
     steps:
       - uses: actions/checkout@v4
 
@@ -27,7 +28,7 @@ jobs:
       - run: flutter pub get
 
       - name: Decode keystore
-        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/music_app.jks
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | tr -d ' \n\r' | base64 -d > android/app/music_app.jks
 
       - run: |
           flutter build apk --release \
