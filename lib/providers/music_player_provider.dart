@@ -112,10 +112,11 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         onSkipToPrevious: () => previousSong(),
       ),
       config: const AudioServiceConfig(
-        androidNotificationChannelId: 'com.example.music_app.channel.audio',
+        androidNotificationChannelId: 'com.lxmw.musicapp.channel.audio',
         androidNotificationChannelName: 'Music Player',
         androidNotificationOngoing: true,
         androidShowNotificationBadge: true,
+        androidStopForegroundOnPause: false,
       ),
     );
     print('[MusicPlayerProvider] AudioService.init complete');
