@@ -4,10 +4,12 @@ import 'package:http/http.dart' as http;
 class UpdateService {
   static const _repo = 'lxmw001/music_app';
   static const _currentVersion =
-      String.fromEnvironment('APP_VERSION', defaultValue: '0.1.0+1');
+      String.fromEnvironment('APP_VERSION', defaultValue: '');
 
   /// Returns the download URL if a newer release exists, null otherwise.
   Future<String?> checkForUpdate() async {
+    // Skip if version wasn't injected at build time (dev/debug builds)
+    if (_currentVersion.isEmpty) return null;
     try {
       final res = await http.get(
         Uri.parse('https://api.github.com/repos/$_repo/releases/latest'),
