@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'providers/music_player_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/search_screen.dart';
@@ -50,6 +49,7 @@ class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
   late final List<Widget> _screens;
   String? _updateUrl;
+  double? _downloadProgress; // null = not downloading, 0.0-1.0 = progress
 
   @override
   void initState() {
@@ -71,20 +71,35 @@ class _MainScreenState extends State<MainScreen> {
         children: [
           if (_updateUrl != null)
             MaterialBanner(
-              content: const Text('A new version is available!'),
-              actions: [
-                TextButton(
-                  onPressed: () async => launchUrl(
-                    Uri.parse(_updateUrl!),
-                    mode: LaunchMode.externalApplication,
-                  ),
-                  child: const Text('UPDATE'),
-                ),
-                TextButton(
-                  onPressed: () => setState(() => _updateUrl = null),
-                  child: const Text('DISMISS'),
-                ),
-              ],
+              content: _downloadProgress != null
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Downloading update... ${(_downloadProgress! * 100).toInt()}%'),
+                        const SizedBox(height: 6),
+                        LinearProgressIndicator(value: _downloadProgress),
+                      ],
+                    )
+                  : const Text('A new version is available!'),
+              actions: _downloadProgress != null
+                  ? [const SizedBox.shrink()]
+                  : [
+                      TextButton(
+                        onPressed: () async {
+                          setState(() => _downloadProgress = 0.0);
+                          await UpdateService().downloadAndInstall(
+                            _updateUrl!,
+                            onProgress: (p) => setState(() => _downloadProgress = p),
+                          );
+                          setState(() { _updateUrl = null; _downloadProgress = null; });
+                        },
+                        child: const Text('UPDATE'),
+                      ),
+                      TextButton(
+                        onPressed: () => setState(() => _updateUrl = null),
+                        child: const Text('DISMISS'),
+                      ),
+                    ],
             ),
           Expanded(
             child: IndexedStack(
