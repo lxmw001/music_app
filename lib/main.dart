@@ -42,6 +42,7 @@ class MainScreen extends StatefulWidget {
   const MainScreen({super.key, this.youtubeService});
 
   @override
+  // ignore: library_private_types_in_public_api
   _MainScreenState createState() => _MainScreenState();
 }
 
