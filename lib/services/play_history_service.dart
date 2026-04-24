@@ -150,6 +150,49 @@ class PlayHistoryService {
       ..sort((a, b) => b.likedCount.compareTo(a.likedCount));
   }
 
+  static const _playlistsKey = 'saved_playlists';
+
+  Future<void> savePlaylist(String name, List<Song> songs) async {
+    if (songs.isEmpty) return;
+    final p = await _prefs;
+    final raw = p.getString(_playlistsKey);
+    final playlists = raw != null
+        ? List<Map<String, dynamic>>.from(jsonDecode(raw))
+        : <Map<String, dynamic>>[];
+
+    // Replace existing playlist with same name, otherwise prepend
+    playlists.removeWhere((pl) => pl['name'] == name);
+    playlists.insert(0, {
+      'id': DateTime.now().millisecondsSinceEpoch.toString(),
+      'name': name,
+      'imageUrl': songs.first.imageUrl,
+      'songs': songs.map(_songToMap).toList(),
+    });
+
+    await p.setString(_playlistsKey, jsonEncode(playlists.take(50).toList()));
+  }
+
+  Future<List<Playlist>> loadPlaylists() async {
+    final p = await _prefs;
+    final raw = p.getString(_playlistsKey);
+    if (raw == null) return [];
+    return (jsonDecode(raw) as List).map((pl) => Playlist(
+      id: pl['id'],
+      name: pl['name'],
+      imageUrl: pl['imageUrl'] ?? '',
+      songs: (pl['songs'] as List).map((s) => Song.fromJson(s)).toList(),
+    )).toList();
+  }
+
+  Future<void> deletePlaylist(String id) async {
+    final p = await _prefs;
+    final raw = p.getString(_playlistsKey);
+    if (raw == null) return;
+    final playlists = List<Map<String, dynamic>>.from(jsonDecode(raw));
+    playlists.removeWhere((pl) => pl['id'] == id);
+    await p.setString(_playlistsKey, jsonEncode(playlists));
+  }
+
   Future<void> saveQueue(List<Song> queue, int currentIndex) async {
     final p = await _prefs;
     await p.setString(_queueKey, jsonEncode(queue.map(_songToMap).toList()));

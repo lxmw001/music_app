@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:provider/provider.dart';
-import 'package:youtube_explode_dart/youtube_explode_dart.dart';
+import 'package:youtube_explode_dart/youtube_explode_dart.dart' hide Playlist;
 
 import 'package:music_app/main.dart';
 import 'package:music_app/models/music_models.dart';
@@ -90,6 +90,8 @@ class FakeMusicPlayerProvider extends ChangeNotifier implements MusicPlayerProvi
   @override Future<bool> isLiked(String songId) async => false;
   @override Future<void> toggleLike(Song song) async {}
   @override Future<List<({Song song, int likedCount, int playCount})>> getMostLiked(List<Song> knownSongs) async => [];
+  @override Future<List<Playlist>> loadPlaylists() async => [];
+  @override Future<void> deletePlaylist(String id) async {}
 }
 
 // --- Test app ---

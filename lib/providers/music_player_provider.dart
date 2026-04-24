@@ -44,6 +44,8 @@ abstract class MusicPlayerProvider extends ChangeNotifier {
   Future<void> toggleLike(Song song);
   Future<List<({Song song, int likedCount, int playCount})>> getMostLiked(List<Song> knownSongs);
   Future<void> saveSearch(String query);
+  Future<List<Playlist>> loadPlaylists();
+  Future<void> deletePlaylist(String id);
 }
 
 class MusicPlayerProviderImpl extends MusicPlayerProvider {
@@ -110,10 +112,11 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         onSkipToPrevious: () => previousSong(),
       ),
       config: const AudioServiceConfig(
-        androidNotificationChannelId: 'com.example.music_app.channel.audio',
+        androidNotificationChannelId: 'com.lxmw.musicapp.channel.audio',
         androidNotificationChannelName: 'Music Player',
         androidNotificationOngoing: true,
         androidShowNotificationBadge: true,
+        androidStopForegroundOnPause: false,
       ),
     );
     print('[MusicPlayerProvider] AudioService.init complete');
@@ -312,6 +315,11 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
           print('[MusicPlayerProvider] queue updated: ${_queue.length} songs');
           prefetchAudioUrls(_queue.skip(1).take(2).toList());
           _historyService.saveQueue(_queue, _currentIndex);
+          // Save as named playlist using the seed song as the name
+          final playlistName = searchQuery?.isNotEmpty == true
+              ? searchQuery!
+              : '${song.title} Radio';
+          _historyService.savePlaylist(playlistName, _queue);
           notifyListeners();
         }
       });
@@ -482,7 +490,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         _audioHandler.playbackState.value.processingState == AudioProcessingState.idle) {
       final seekTo = _lastRestoredPosition > Duration.zero ? _lastRestoredPosition : null;
       _lastRestoredPosition = Duration.zero;
-      await playSong(_currentSong!, seekTo: seekTo);
+      await playSong(_currentSong!, fromQueue: true, seekTo: seekTo);
       return;
     }
     await _audioHandler.play();
@@ -662,6 +670,10 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
 
   @override
   Future<void> saveSearch(String query) => _historyService.saveSearch(query);
+  @override
+  Future<List<Playlist>> loadPlaylists() => _historyService.loadPlaylists();
+  @override
+  Future<void> deletePlaylist(String id) => _historyService.deletePlaylist(id);
   /// Add a suggested song to the queue
   @override
   void addSuggestedToQueue(Song song) {
