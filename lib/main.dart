@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'providers/music_player_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/library_screen.dart';
 import 'screens/player_screen.dart';
 import 'services/youtube_service.dart';
+import 'services/update_service.dart';
 
 void main() {
   runApp(
@@ -46,6 +48,7 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
   late final List<Widget> _screens;
+  String? _updateUrl;
 
   @override
   void initState() {
@@ -55,6 +58,9 @@ class _MainScreenState extends State<MainScreen> {
       SearchScreen(youtubeService: widget.youtubeService),
       LibraryScreen(),
     ];
+    UpdateService().checkForUpdate().then((url) {
+      if (url != null && mounted) setState(() => _updateUrl = url);
+    });
   }
 
   @override
@@ -62,6 +68,23 @@ class _MainScreenState extends State<MainScreen> {
     return Scaffold(
       body: Column(
         children: [
+          if (_updateUrl != null)
+            MaterialBanner(
+              content: const Text('A new version is available!'),
+              actions: [
+                TextButton(
+                  onPressed: () async => launchUrl(
+                    Uri.parse(_updateUrl!),
+                    mode: LaunchMode.externalApplication,
+                  ),
+                  child: const Text('UPDATE'),
+                ),
+                TextButton(
+                  onPressed: () => setState(() => _updateUrl = null),
+                  child: const Text('DISMISS'),
+                ),
+              ],
+            ),
           Expanded(
             child: IndexedStack(
               index: _currentIndex,
