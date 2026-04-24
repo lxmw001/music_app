@@ -1,4 +1,4 @@
-package com.example.music_app
+package com.lxmw.musicapp
 
 // Ensure this is the only FlutterActivity import
 import com.ryanheise.audioservice.AudioServiceActivity
