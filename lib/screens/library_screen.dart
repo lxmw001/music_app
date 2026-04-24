@@ -16,38 +16,46 @@ class _LibraryScreenState extends State<LibraryScreen> {
   final _downloadService = DownloadService();
   List<Song> _likedSongs = [];
   List<Song> _downloadedSongs = [];
-  String? _showing; // null=library, 'liked', 'downloaded'
+  List<Playlist> _playlists = [];
+  String? _showing; // null=library, 'liked', 'downloaded', 'playlist'
+  Playlist? _activePlaylist;
 
   @override
   void initState() {
     super.initState();
-    _loadLikedSongs();
-    _loadDownloadedSongs();
+    _loadAll();
   }
 
-  Future<void> _loadLikedSongs() async {
-    final songs = await context.read<MusicPlayerProvider>().getMostLikedFromHistory();
-    if (mounted) setState(() => _likedSongs = songs);
-  }
-
-  Future<void> _loadDownloadedSongs() async {
-    final songs = await _downloadService.getDownloadedSongs();
-    if (mounted) setState(() => _downloadedSongs = songs);
+  Future<void> _loadAll() async {
+    final provider = context.read<MusicPlayerProvider>();
+    final liked = await provider.getMostLikedFromHistory();
+    final downloaded = await _downloadService.getDownloadedSongs();
+    final playlists = await provider.loadPlaylists();
+    if (mounted) setState(() {
+      _likedSongs = liked;
+      _downloadedSongs = downloaded;
+      _playlists = playlists;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    String title = 'Your Library';
+    if (_showing == 'liked') title = 'Liked Songs';
+    if (_showing == 'downloaded') title = 'Downloaded';
+    if (_showing == 'playlist') title = _activePlaylist?.name ?? 'Playlist';
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(_showing == 'liked' ? 'Liked Songs' : _showing == 'downloaded' ? 'Downloaded' : 'Your Library'),
+        title: Text(title),
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: _showing != null
             ? IconButton(
                 icon: const Icon(Icons.arrow_back),
                 onPressed: () async {
-                  await _loadDownloadedSongs();
-                  if (mounted) setState(() => _showing = null);
+                  await _loadAll();
+                  if (mounted) setState(() { _showing = null; _activePlaylist = null; });
                 })
             : null,
       ),
@@ -55,7 +63,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
           ? _buildSongList(_likedSongs, onDelete: _removeLikedSong)
           : _showing == 'downloaded'
               ? _buildSongList(_downloadedSongs, onDelete: _deleteDownload)
-              : _buildLibrary(),
+              : _showing == 'playlist' && _activePlaylist != null
+                  ? _buildPlaylistDetail(_activePlaylist!)
+                  : _buildLibrary(),
     );
   }
 
@@ -89,9 +99,84 @@ class _LibraryScreenState extends State<LibraryScreen> {
           subtitle: Text('${_downloadedSongs.length} songs'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () async {
-            await _loadDownloadedSongs();
+            await _loadAll();
             if (mounted) setState(() => _showing = 'downloaded');
           },
+        ),
+        if (_playlists.isNotEmpty) ...[
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Text('Playlists', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          ),
+          ..._playlists.map((pl) => Dismissible(
+            key: Key(pl.id),
+            direction: DismissDirection.endToStart,
+            background: Container(
+              color: Colors.red, alignment: Alignment.centerRight,
+              padding: const EdgeInsets.only(right: 16),
+              child: const Icon(Icons.delete, color: Colors.white),
+            ),
+            onDismissed: (_) async {
+              await context.read<MusicPlayerProvider>().deletePlaylist(pl.id);
+              setState(() => _playlists.remove(pl));
+            },
+            child: ListTile(
+              leading: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: pl.imageUrl.isNotEmpty
+                    ? Image.network(pl.imageUrl, width: 50, height: 50, fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _playlistIcon())
+                    : _playlistIcon(),
+              ),
+              title: Text(pl.name, overflow: TextOverflow.ellipsis),
+              subtitle: Text('${pl.songs.length} songs'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => setState(() { _activePlaylist = pl; _showing = 'playlist'; }),
+            ),
+          )),
+        ],
+      ],
+    );
+  }
+
+  Widget _playlistIcon() => Container(
+    width: 50, height: 50,
+    decoration: BoxDecoration(
+      color: Colors.grey[800], borderRadius: BorderRadius.circular(4),
+    ),
+    child: const Icon(Icons.queue_music, color: Colors.white),
+  );
+
+  Widget _buildPlaylistDetail(Playlist playlist) {
+    final songs = playlist.songs;
+    if (songs.isEmpty) return const Center(child: Text('No songs', style: TextStyle(color: Colors.grey)));
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: ElevatedButton.icon(
+            onPressed: () => context.read<MusicPlayerProvider>()
+                .playSong(songs.first, queue: songs),
+            icon: const Icon(Icons.play_arrow),
+            label: const Text('Play All'),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+          ),
+        ),
+        Expanded(
+          child: Selector<MusicPlayerProvider, Set<String>>(
+            selector: (_, p) => Set.from(songs.map((s) => s.id).where((id) => p.isLoadingAudio(id))),
+            builder: (context, loadingIds, _) => ListView.builder(
+              itemCount: songs.length,
+              itemBuilder: (context, index) {
+                final song = songs[index];
+                return SongListTile(
+                  song: song,
+                  isLoading: loadingIds.contains(song.id),
+                  queue: songs,
+                );
+              },
+            ),
+          ),
         ),
       ],
     );
@@ -144,6 +229,6 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
   Future<void> _deleteDownload(Song song) async {
     await _downloadService.deleteDownload(song);
-    await _loadDownloadedSongs();
+    await _loadAll();
   }
 }
