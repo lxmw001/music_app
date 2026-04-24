@@ -11,7 +11,7 @@
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">
         <activity
-            android:name="com.example.music_app.MainActivity"
+            android:name="com.lxmw.musicapp.MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
             android:taskAffinity=""
