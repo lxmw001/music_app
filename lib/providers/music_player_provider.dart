@@ -27,7 +27,7 @@ abstract class MusicPlayerProvider extends ChangeNotifier {
   Duration get currentPosition;
   Duration get totalDuration;
 
-  Future<void> playSong(Song song, {List<Song>? queue, Duration? seekTo, bool fromQueue = false});
+  Future<void> playSong(Song song, {List<Song>? queue, Duration? seekTo, bool fromQueue = false, String? searchQuery});
   Future<void> pause();
   Future<void> resume();
   Future<void> stop();
@@ -251,7 +251,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     await playSong(offlineQueue.first, queue: offlineQueue);
   }
 
-  Future<void> playSong(Song song, {List<Song>? queue, Duration? seekTo, bool fromQueue = false}) async {
+  Future<void> playSong(Song song, {List<Song>? queue, Duration? seekTo, bool fromQueue = false, String? searchQuery}) async {
     if (!_isInitialized) {
       print('[MusicPlayerProvider] not initialized yet, queuing: ${song.title}');
       _pendingSong = song;
@@ -289,7 +289,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       _pendingSeedQueries = [];
       _usedSeedQueries.clear();
 
-      _youtubeService.generatePlaylist(song).then((playlist) {
+      _youtubeService.generatePlaylist(song, search: searchQuery).then((playlist) {
         if (playlist.isEmpty) {
           print('[MusicPlayerProvider] generate-playlist returned empty for ${song.id}');
           return;
@@ -578,15 +578,31 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   
   /// Pre-fetch audio URLs for a list of songs in the background
   void prefetchAudioUrls(List<Song> songs) {
-    for (final song in songs) {
+    for (int i = 0; i < songs.length; i++) {
+      final song = songs[i];
+      final isNext = i == 0; // first song in list is the immediate next
       if (song.audioUrl.isEmpty && !_loadingAudioIds.contains(song.id)) {
         _loadingAudioIds.add(song.id);
-        notifyListeners();
         _youtubeService.getAudioUrl(song.id).then((url) {
           song.audioUrl = url;
           _loadingAudioIds.remove(song.id);
+          // Queue the immediate next song in the audio player for background buffering
+          if (isNext && url.isNotEmpty && _currentSong != null) {
+            _audioHandler.setNextSource(url, MediaItem(
+              id: song.id, title: song.title, artist: song.artist,
+              artUri: Uri.tryParse(song.imageUrl),
+              duration: song.duration,
+            ));
+          }
           notifyListeners();
         });
+      } else if (isNext && song.audioUrl.isNotEmpty && _currentSong != null) {
+        // URL already cached — queue immediately
+        _audioHandler.setNextSource(song.audioUrl, MediaItem(
+          id: song.id, title: song.title, artist: song.artist,
+          artUri: Uri.tryParse(song.imageUrl),
+          duration: song.duration,
+        ));
       }
     }
   }

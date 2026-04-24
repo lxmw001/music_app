@@ -9,8 +9,9 @@ class SongListTile extends StatefulWidget {
   final bool isLoading;
   final VoidCallback? onRemove;
   final List<Song>? queue;
+  final VoidCallback? onTap;
 
-  const SongListTile({super.key, required this.song, this.isLoading = false, this.onRemove, this.queue});
+  const SongListTile({super.key, required this.song, this.isLoading = false, this.onRemove, this.queue, this.onTap});
 
   @override
   State<SongListTile> createState() => _SongListTileState();
@@ -93,7 +94,7 @@ class _SongListTileState extends State<SongListTile> {
             ),
         ],
       ),
-      onTap: () => context.read<MusicPlayerProvider>().playSong(widget.song),
+      onTap: widget.onTap ?? () => context.read<MusicPlayerProvider>().playSong(widget.song),
     );
   }
 }

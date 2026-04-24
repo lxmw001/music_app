@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/music_models.dart';
 
 class MusicServerService {
@@ -53,8 +54,36 @@ class MusicServerService {
     }
   }
 
-  Future<List<Song>> generatePlaylist(String youtubeId, {int limit = 30}) async {
-    final uri = Uri.parse('$_base/songs/$youtubeId/generate-playlist')        .replace(queryParameters: {'limit': '$limit'});
+  static const _suggestionsCacheKey = 'server_search_suggestions';
+
+  Future<List<String>> getSearchSuggestions() async {
+    try {
+      final uri = Uri.parse('$_base/songs/searches');
+      final response = await _client.get(uri).timeout(const Duration(seconds: 10));
+      if (response.statusCode < 200 || response.statusCode >= 300) return _cachedSuggestions();
+      final data = jsonDecode(response.body);
+      final list = (data is List ? data : data['searches'] as List? ?? [])
+          .map((e) => e.toString())
+          .toList();
+      // Cache for offline use
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(_suggestionsCacheKey, list.cast<String>());
+      return list.cast<String>();
+    } catch (_) {
+      return _cachedSuggestions();
+    }
+  }
+
+  Future<List<String>> _cachedSuggestions() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getStringList(_suggestionsCacheKey) ?? [];
+  }
+
+  Future<List<Song>> generatePlaylist(String id, {int limit = 30, String? search}) async {
+    final params = <String, String>{'limit': '$limit'};
+    if (search != null && search.isNotEmpty) params['search'] = search;
+    final uri = Uri.parse('$_base/songs/$id/generate-playlist')
+        .replace(queryParameters: params);
     print('[MusicServer] GET $uri');
     try {
       final response = await _client.get(uri).timeout(const Duration(seconds: 30));
