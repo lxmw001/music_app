@@ -15,34 +15,47 @@ class RecentPlaylistsGrid extends StatelessWidget {
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        childAspectRatio: 3,
+        childAspectRatio: 1.4,
         crossAxisSpacing: 8,
         mainAxisSpacing: 8,
       ),
       itemCount: items.length,
       itemBuilder: (context, index) {
         final playlist = items[index];
+        final coverUrl = playlist.imageUrl.isNotEmpty
+            ? playlist.imageUrl
+            : playlist.songs.isNotEmpty ? playlist.songs.first.imageUrl : '';
         return GestureDetector(
           onTap: () => _openPlaylist(context, playlist),
-          child: Container(
-            decoration: BoxDecoration(color: Colors.grey[800], borderRadius: BorderRadius.circular(4)),
-            child: Row(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Stack(
+              fit: StackFit.expand,
               children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.only(topLeft: Radius.circular(4), bottomLeft: Radius.circular(4)),
-                  child: playlist.imageUrl.isNotEmpty
-                      ? Image.network(playlist.imageUrl, width: 56, height: 56, fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => _icon())
-                      : _icon(),
+                coverUrl.isNotEmpty
+                    ? Image.network(coverUrl, fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(color: Colors.grey[800]))
+                    : Container(color: Colors.grey[800], child: const Icon(Icons.queue_music, size: 40)),
+                // Dark gradient overlay
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Colors.transparent, Colors.black.withOpacity(0.75)],
+                    ),
+                  ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
+                Positioned(
+                  bottom: 8, left: 8, right: 8,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(playlist.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12), overflow: TextOverflow.ellipsis),
-                      Text('${playlist.songs.length} songs', style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                      Text(playlist.name,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
+                          overflow: TextOverflow.ellipsis),
+                      Text('${playlist.songs.length} songs',
+                          style: const TextStyle(color: Colors.white70, fontSize: 11)),
                     ],
                   ),
                 ),
@@ -53,8 +66,6 @@ class RecentPlaylistsGrid extends StatelessWidget {
       },
     );
   }
-
-  Widget _icon() => Container(width: 56, height: 56, color: Colors.grey[700], child: const Icon(Icons.queue_music, size: 20));
 
   void _openPlaylist(BuildContext context, Playlist playlist) {
     showModalBottomSheet(

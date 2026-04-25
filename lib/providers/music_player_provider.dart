@@ -608,31 +608,15 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   /// Pre-fetch audio URLs for a list of songs in the background
   @override
   void prefetchAudioUrls(List<Song> songs) {
-    for (int i = 0; i < songs.length; i++) {
-      final song = songs[i];
-      final isNext = i == 0; // first song in list is the immediate next
+    for (final song in songs) {
+      if (song.id == _currentSong?.id) continue;
       if (song.audioUrl.isEmpty && !_loadingAudioIds.contains(song.id)) {
         _loadingAudioIds.add(song.id);
         _youtubeService.getAudioUrl(song.id).then((url) {
           song.audioUrl = url;
           _loadingAudioIds.remove(song.id);
-          // Queue the immediate next song in the audio player for background buffering
-          if (isNext && url.isNotEmpty && _currentSong != null) {
-            _audioHandler.setNextSource(url, MediaItem(
-              id: song.id, title: song.title, artist: song.artist,
-              artUri: Uri.tryParse(song.imageUrl),
-              duration: song.duration,
-            ));
-          }
           notifyListeners();
         });
-      } else if (isNext && song.audioUrl.isNotEmpty && _currentSong != null) {
-        // URL already cached — queue immediately
-        _audioHandler.setNextSource(song.audioUrl, MediaItem(
-          id: song.id, title: song.title, artist: song.artist,
-          artUri: Uri.tryParse(song.imageUrl),
-          duration: song.duration,
-        ));
       }
     }
   }

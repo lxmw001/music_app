@@ -41,17 +41,13 @@ class _SearchScreenState extends State<SearchScreen> {
     setState(() => isLoading = true);
 
     final results = await _youtubeService.searchSongs(query);
-    final top5 = results.take(5).toList();
     setState(() {
-      searchResults = top5;
+      searchResults = results;
       isLoading = false;
       _currentQuery = query;
     });
     if (mounted) {
       context.read<MusicPlayerProvider>().saveSearch(query);
-      if (top5.isNotEmpty) {
-        context.read<MusicPlayerProvider>().prefetchAudioUrls(top5.take(3).toList());
-      }
     }
   }
 
