@@ -8,7 +8,8 @@ import 'screens/player_screen.dart';
 import 'services/youtube_service.dart';
 import 'services/update_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(
     MultiProvider(
       providers: [
