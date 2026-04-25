@@ -45,7 +45,7 @@ class YoutubeExplodeGateway implements YoutubeGateway {
         final manifest = await _yt.videos.streamsClient.getManifest(
           videoId,
           ytClients: [client],
-        );
+        ).timeout(const Duration(seconds: 8));
         final streams = manifest.audioOnly.toList()
           ..sort((a, b) => b.bitrate.compareTo(a.bitrate));
         if (streams.isNotEmpty) {
