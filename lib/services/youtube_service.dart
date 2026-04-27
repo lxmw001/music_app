@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:http/http.dart' as http;
 import '../models/music_models.dart';
@@ -28,31 +29,28 @@ class YoutubeExplodeGateway implements YoutubeGateway {
 
   @override
   Future<String> getAudioUrl(String videoId) async {
+    // Sequential — parallel requests trigger YouTube rate limiting
     final clients = [
-      YoutubeApiClient.tv,
-      YoutubeApiClient.tvSimplyEmbedded,
       YoutubeApiClient.ios,
-      YoutubeApiClient.mweb,
-      YoutubeApiClient.safari,
-      YoutubeApiClient.webCreator,
-      YoutubeApiClient.mediaConnect,
+      YoutubeApiClient.tv,
       YoutubeApiClient.androidVr,
-      YoutubeApiClient.android,
-      YoutubeApiClient.androidMusic,
+      YoutubeApiClient.safari,
     ];
     for (final client in clients) {
       try {
-        final manifest = await _yt.videos.streamsClient.getManifest(
-          videoId,
-          ytClients: [client],
-        );
+        final manifest = await _yt.videos.streamsClient
+            .getManifest(videoId, ytClients: [client])
+            .timeout(const Duration(seconds: 8));
         final streams = manifest.audioOnly.toList()
           ..sort((a, b) => b.bitrate.compareTo(a.bitrate));
         if (streams.isNotEmpty) {
-          print('[YoutubeGateway] client ${client.runtimeType} succeeded for $videoId');
+          print('[YoutubeGateway] $client succeeded for $videoId');
           return streams.first.url.toString();
         }
-      } catch (_) {
+      } catch (e) {
+        print('[YoutubeGateway] $client failed: $e');
+        // Stop on rate limit — further requests will also fail
+        if (e.toString().contains('RequestLimitExceeded')) break;
         continue;
       }
     }
@@ -192,14 +190,15 @@ class YouTubeService {
     _downloadService = downloadService ?? DownloadService();
   }
 
-  Future<List<Song>> searchSongs(String query) =>
+  Future<MusicSearchResult> searchSongs(String query) =>
       safeCall(() async {
-        final serverSongs = await _server.searchSongs(query);
-        if (serverSongs.isNotEmpty) return serverSongs;
+        final result = await _server.searchSongs(query);
+        if (!result.isEmpty) return result;
 
         print('[YouTubeService] server empty, using YouTube fallback');
-        return await _youtubeSearch(query);
-      }, [], tag: 'YouTubeService.searchSongs');
+        final songs = await _youtubeSearch(query);
+        return MusicSearchResult(songs: songs);
+      }, const MusicSearchResult(), tag: 'YouTubeService.searchSongs');
 
   Future<List<Song>> _youtubeSearch(String query) async {
     final videos = await _gateway.search(query, limit: 30);

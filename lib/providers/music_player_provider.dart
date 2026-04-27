@@ -312,7 +312,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
           _queue = [song, ...playlist];
           _currentIndex = 0;
           print('[MusicPlayerProvider] queue updated: ${_queue.length} songs');
-          prefetchAudioUrls(_queue.skip(1).take(2).toList());
           _historyService.saveQueue(_queue, _currentIndex);
           // Save as named playlist using the seed song as the name
           final playlistName = searchQuery?.isNotEmpty == true
@@ -518,9 +517,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     if (_queue.isNotEmpty && _currentIndex < _queue.length - 1) {
       _currentIndex++;
       playSong(_queue[_currentIndex], fromQueue: true);
-      if (_currentIndex + 1 < _queue.length) {
-        prefetchAudioUrls([_queue[_currentIndex + 1]]);
-      }
       _historyService.saveQueue(_queue, _currentIndex);
     } else if (_suggestedSongs.isNotEmpty) {
       final next = _suggestedSongs.first;
@@ -608,31 +604,15 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   /// Pre-fetch audio URLs for a list of songs in the background
   @override
   void prefetchAudioUrls(List<Song> songs) {
-    for (int i = 0; i < songs.length; i++) {
-      final song = songs[i];
-      final isNext = i == 0; // first song in list is the immediate next
+    for (final song in songs) {
+      if (song.id == _currentSong?.id) continue;
       if (song.audioUrl.isEmpty && !_loadingAudioIds.contains(song.id)) {
         _loadingAudioIds.add(song.id);
         _youtubeService.getAudioUrl(song.id).then((url) {
           song.audioUrl = url;
           _loadingAudioIds.remove(song.id);
-          // Queue the immediate next song in the audio player for background buffering
-          if (isNext && url.isNotEmpty && _currentSong != null) {
-            _audioHandler.setNextSource(url, MediaItem(
-              id: song.id, title: song.title, artist: song.artist,
-              artUri: Uri.tryParse(song.imageUrl),
-              duration: song.duration,
-            ));
-          }
           notifyListeners();
         });
-      } else if (isNext && song.audioUrl.isNotEmpty && _currentSong != null) {
-        // URL already cached — queue immediately
-        _audioHandler.setNextSource(song.audioUrl, MediaItem(
-          id: song.id, title: song.title, artist: song.artist,
-          artUri: Uri.tryParse(song.imageUrl),
-          duration: song.duration,
-        ));
       }
     }
   }

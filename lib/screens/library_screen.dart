@@ -153,13 +153,21 @@ class _LibraryScreenState extends State<LibraryScreen> {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.all(16),
-          child: ElevatedButton.icon(
-            onPressed: () => context.read<MusicPlayerProvider>()
-                .playSong(songs.first, queue: songs),
-            icon: const Icon(Icons.play_arrow),
-            label: const Text('Play All'),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () => context.read<MusicPlayerProvider>()
+                      .playSong(songs.first, queue: songs),
+                  icon: const Icon(Icons.play_arrow),
+                  label: const Text('Play All'),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                ),
+              ),
+              const SizedBox(width: 8),
+              PlaylistDownloadButton(songs: songs, downloadService: _downloadService),
+            ],
           ),
         ),
         Expanded(
@@ -245,5 +253,55 @@ class _LibraryScreenState extends State<LibraryScreen> {
   Future<void> _deleteDownload(Song song) async {
     await _downloadService.deleteDownload(song);
     await _loadAll();
+  }
+}
+
+class PlaylistDownloadButton extends StatefulWidget {
+  final List<Song> songs;
+  final DownloadService downloadService;
+  const PlaylistDownloadButton({super.key, required this.songs, required this.downloadService});
+
+  @override
+  State<PlaylistDownloadButton> createState() => _PlaylistDownloadButtonState();
+}
+
+class _PlaylistDownloadButtonState extends State<PlaylistDownloadButton> {
+  bool _downloading = false;
+  int _done = 0;
+
+  Future<void> _downloadAll() async {
+    setState(() { _downloading = true; _done = 0; });
+    for (final song in widget.songs) {
+      await widget.downloadService.downloadSong(song);
+      if (mounted) setState(() => _done++);
+    }
+    if (mounted) setState(() => _downloading = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_downloading) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 20, height: 20,
+              child: CircularProgressIndicator(
+                value: widget.songs.isEmpty ? null : _done / widget.songs.length,
+                strokeWidth: 2, color: Colors.white,
+              ),
+            ),
+            Text('$_done/${widget.songs.length}', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+          ],
+        ),
+      );
+    }
+    return IconButton(
+      icon: const Icon(Icons.download),
+      tooltip: 'Download all',
+      onPressed: _downloadAll,
+    );
   }
 }
