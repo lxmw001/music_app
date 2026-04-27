@@ -89,7 +89,16 @@ class _HomeScreenState extends State<HomeScreen> {
             const Text('Recently Played', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
             if (recentPlaylists.isEmpty)
-              const Text('No playlists yet. Search for a song to generate one.', style: TextStyle(color: Colors.grey))
+              Column(
+                children: const [
+                  SizedBox(height: 16),
+                  Icon(Icons.queue_music, size: 48, color: Colors.grey),
+                  SizedBox(height: 8),
+                  Text('No playlists yet', style: TextStyle(color: Colors.grey, fontSize: 15)),
+                  Text('Search for a song to generate one', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                  SizedBox(height: 16),
+                ],
+              )
             else
               RecentPlaylistsGrid(playlists: recentPlaylists),
             const SizedBox(height: 32),

@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/music_models.dart';
 import '../providers/music_player_provider.dart';
-import '../services/download_service.dart';
-import '../screens/library_screen.dart' show PlaylistDownloadButton;
 
 class RecentPlaylistsGrid extends StatelessWidget {
   final List<Playlist> playlists;
@@ -11,63 +9,47 @@ class RecentPlaylistsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final items = playlists.take(6).toList();
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 1.4,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
-      ),
-      itemCount: items.length,
-      itemBuilder: (context, index) {
-        final playlist = items[index];
-        final coverUrl = playlist.imageUrl.isNotEmpty
-            ? playlist.imageUrl
-            : playlist.songs.isNotEmpty ? playlist.songs.first.imageUrl : '';
-        return GestureDetector(
-          onTap: () => _openPlaylist(context, playlist),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                coverUrl.isNotEmpty
-                    ? Image.network(coverUrl, fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(color: Colors.grey[800]))
-                    : Container(color: Colors.grey[800], child: const Icon(Icons.queue_music, size: 40)),
-                // Dark gradient overlay
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [Colors.transparent, Colors.black.withOpacity(0.75)],
-                    ),
+    final items = playlists.take(10).toList();
+    return SizedBox(
+      height: 180,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: items.length,
+        itemBuilder: (context, index) {
+          final playlist = items[index];
+          return GestureDetector(
+            onTap: () => _openPlaylist(context, playlist),
+            child: Container(
+              width: 140,
+              margin: const EdgeInsets.only(right: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: playlist.imageUrl.isNotEmpty
+                        ? Image.network(playlist.imageUrl, width: 140, height: 130, fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => _icon(140, 130))
+                        : _icon(140, 130),
                   ),
-                ),
-                Positioned(
-                  bottom: 8, left: 8, right: 8,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(playlist.name,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.white),
-                          overflow: TextOverflow.ellipsis),
-                      Text('${playlist.songs.length} songs',
-                          style: const TextStyle(color: Colors.white70, fontSize: 11)),
-                    ],
-                  ),
-                ),
-              ],
+                  const SizedBox(height: 6),
+                  Text(playlist.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                      overflow: TextOverflow.ellipsis, maxLines: 1),
+                  Text('${playlist.songs.length} songs',
+                      style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                ],
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
+
+  Widget _icon(double w, double h) => Container(
+    width: w, height: h, color: Colors.grey[700],
+    child: const Icon(Icons.queue_music, size: 32, color: Colors.white54),
+  );
 
   void _openPlaylist(BuildContext context, Playlist playlist) {
     showModalBottomSheet(

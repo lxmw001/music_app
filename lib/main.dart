@@ -115,55 +115,60 @@ class _MainScreenState extends State<MainScreen> {
                   key: const Key('mini_player'),
                   onTap: () => Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => PlayerScreen()),
+                    MaterialPageRoute(builder: (context) => const PlayerScreen()),
                   ),
                   child: Container(
                     height: 60,
                     color: Colors.grey[900],
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Row(
+                    child: Stack(
                       children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: Image.network(
-                            player.currentSong!.imageUrl,
-                            width: 40,
-                            height: 40,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
-                              width: 40, height: 40, color: Colors.grey[700],
-                              child: const Icon(Icons.music_note, size: 20),
-                            ),
+                        Positioned(
+                          bottom: 0, left: 0, right: 0,
+                          child: LinearProgressIndicator(
+                            value: player.totalDuration.inSeconds > 0
+                                ? (player.currentPosition.inSeconds / player.totalDuration.inSeconds).clamp(0.0, 1.0)
+                                : 0.0,
+                            backgroundColor: Colors.grey[800],
+                            valueColor: const AlwaysStoppedAnimation<Color>(Colors.green),
+                            minHeight: 2,
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.center,
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Row(
                             children: [
-                              Text(
-                                player.currentSong!.title,
-                                style: const TextStyle(fontWeight: FontWeight.bold),
-                                overflow: TextOverflow.ellipsis,
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(4),
+                                child: Image.network(
+                                  player.currentSong!.imageUrl,
+                                  width: 40, height: 40, fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Container(
+                                    width: 40, height: 40, color: Colors.grey[700],
+                                    child: const Icon(Icons.music_note, size: 20),
+                                  ),
+                                ),
                               ),
-                              Text(
-                                player.currentSong!.artist,
-                                style: const TextStyle(color: Colors.grey),
-                                overflow: TextOverflow.ellipsis,
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(player.currentSong!.title,
+                                        style: const TextStyle(fontWeight: FontWeight.bold),
+                                        overflow: TextOverflow.ellipsis),
+                                    Text(player.currentSong!.artist,
+                                        style: const TextStyle(color: Colors.grey),
+                                        overflow: TextOverflow.ellipsis),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                icon: Icon(player.isPlaying ? Icons.pause : Icons.play_arrow),
+                                onPressed: () => player.isPlaying ? player.pause() : player.resume(),
                               ),
                             ],
                           ),
-                        ),
-                        IconButton(
-                          icon: Icon(player.isPlaying ? Icons.pause : Icons.play_arrow),
-                          onPressed: () {
-                            if (player.isPlaying) {
-                              player.pause();
-                            } else {
-                              player.resume();
-                            }
-                          },
                         ),
                       ],
                     ),
