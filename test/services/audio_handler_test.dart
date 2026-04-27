@@ -102,7 +102,7 @@ void main() {
   });
 
   group('AudioPlayerHandler.setAudioSource', () {
-    test('calls AudioPlayer.setAudioSource with a ConcatenatingAudioSource', () async {
+    test('calls AudioPlayer.setAudioSource with correct URI', () async {
       const url = 'https://audio.example.com/track.mp4';
       final item = MediaItem(id: 's1', title: 'Title');
       when(mockPlayer.setAudioSource(any, initialIndex: anyNamed('initialIndex'), initialPosition: anyNamed('initialPosition'), preload: anyNamed('preload')))
@@ -111,7 +111,7 @@ void main() {
       await handler.setAudioSource(url, item);
 
       final captured = verify(mockPlayer.setAudioSource(captureAny, initialIndex: anyNamed('initialIndex'), initialPosition: anyNamed('initialPosition'), preload: anyNamed('preload'))).captured.single;
-      expect(captured, isA<ConcatenatingAudioSource>());
+      expect(captured, isA<UriAudioSource>());
     });
   });
 
