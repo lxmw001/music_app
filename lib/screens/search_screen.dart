@@ -226,7 +226,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     onPressed: () async {
                       setState(() => isLoading = true);
                       final more = await _youtubeService.searchSongs(_currentQuery);
-                      final extra = more.skip(searchResults.length).take(10).toList();
+                      final extra = more.songs.skip(searchResults.length).take(10).toList();
                       setState(() { searchResults = [...searchResults, ...extra]; isLoading = false; });
                     },
                     child: const Text('Load more'),
