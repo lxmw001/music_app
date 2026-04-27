@@ -41,8 +41,8 @@ void main() {
 
   testWidgets('getTrendingMusic returns songs', (tester) async {
     final results = await service.getTrendingMusic();
-    expect(results.songs, isNotEmpty);
-    expect(results.songs.length, lessThanOrEqualTo(2));
+    expect(results, isNotEmpty);
+    expect(results.length, lessThanOrEqualTo(2));
   });
 
   testWidgets('getSuggestedSongs returns related songs', (tester) async {
