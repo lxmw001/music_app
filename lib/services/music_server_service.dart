@@ -5,29 +5,38 @@ import '../models/music_models.dart';
 
 class MusicServerService {
   static const _base = 'https://music-app-server-lupbg4y2ha-uc.a.run.app';
+
+  // TODO: Replace with FirebaseAuth.instance.currentUser?.getIdToken() once Firebase is set up
+  static const _placeholderToken = '';
+
   final http.Client _client;
 
   MusicServerService({http.Client? client}) : _client = client ?? http.Client();
 
-  Future<MusicSearchResult> searchSongs(String query) async {
+  Map<String, String> get _authHeaders => {
+    'Content-Type': 'application/json',
+    if (_placeholderToken.isNotEmpty) 'Authorization': 'Bearer $_placeholderToken',
+  };
+
+  Future<List<Song>> searchSongs(String query) async {
     final uri = Uri.parse('$_base/songs/search-youtube')
         .replace(queryParameters: {'query': query});
     print('[MusicServer] GET $uri');
     try {
       final response = await _client.get(uri).timeout(const Duration(seconds: 30));
       print('[MusicServer] search status: ${response.statusCode}');
-      if (response.statusCode < 200 || response.statusCode >= 300) return const MusicSearchResult();
+      print('[MusicServer] search body: ${response.body.length > 300 ? response.body.substring(0, 300) : response.body}');
+
+      if (response.statusCode < 200 || response.statusCode >= 300) return [];
+
       final data = jsonDecode(response.body) as Map<String, dynamic>;
-      final result = MusicSearchResult(
-        songs: _mapSongs(data['songs'] as List? ?? []),
-        mixes: _mapSongs(data['mixes'] as List? ?? []),
-        videos: _mapSongs(data['videos'] as List? ?? []),
-      );
-      print('[MusicServer] search "$query": ${result.songs.length} songs, ${result.mixes.length} mixes, ${result.videos.length} videos');
+      final songs = data['songs'] as List? ?? [];
+      final result = _mapSongs(songs);
+      print('[MusicServer] search "$query": ${result.length} songs — ${result.take(3).map((s) => "${s.title}/${s.artist}").join(", ")}');
       return result;
     } catch (e) {
       print('[MusicServer] search error: $e');
-      return const MusicSearchResult();
+      return [];
     }
   }
 
@@ -97,6 +106,78 @@ class MusicServerService {
       return [];
     }
   }
+
+  // ── /users/me ──────────────────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>?> getProfile() async {
+    try {
+      final res = await _client.get(Uri.parse('$_base/users/me'), headers: _authHeaders)
+          .timeout(const Duration(seconds: 10));
+      if (res.statusCode != 200) return null;
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (_) { return null; }
+  }
+
+  Future<List<String>> getLikedSongs() async {
+    try {
+      final res = await _client.get(Uri.parse('$_base/users/me/liked-songs'), headers: _authHeaders)
+          .timeout(const Duration(seconds: 10));
+      if (res.statusCode != 200) return [];
+      return List<String>.from(jsonDecode(res.body));
+    } catch (_) { return []; }
+  }
+
+  Future<bool> isSongLiked(String songId) async {
+    try {
+      final res = await _client.get(Uri.parse('$_base/users/me/liked-songs/$songId'), headers: _authHeaders)
+          .timeout(const Duration(seconds: 10));
+      if (res.statusCode != 200) return false;
+      return (jsonDecode(res.body) as Map<String, dynamic>)['liked'] == true;
+    } catch (_) { return false; }
+  }
+
+  Future<bool> likeSong(String songId) async {
+    try {
+      final res = await _client.post(Uri.parse('$_base/users/me/liked-songs/$songId'), headers: _authHeaders)
+          .timeout(const Duration(seconds: 10));
+      return res.statusCode == 200 || res.statusCode == 201;
+    } catch (_) { return false; }
+  }
+
+  Future<bool> unlikeSong(String songId) async {
+    try {
+      final res = await _client.delete(Uri.parse('$_base/users/me/liked-songs/$songId'), headers: _authHeaders)
+          .timeout(const Duration(seconds: 10));
+      return res.statusCode == 200 || res.statusCode == 204;
+    } catch (_) { return false; }
+  }
+
+  Future<List<String>> getDownloadedSongIds() async {
+    try {
+      final res = await _client.get(Uri.parse('$_base/users/me/downloads'), headers: _authHeaders)
+          .timeout(const Duration(seconds: 10));
+      if (res.statusCode != 200) return [];
+      return List<String>.from(jsonDecode(res.body));
+    } catch (_) { return []; }
+  }
+
+  Future<bool> markDownloaded(String songId) async {
+    try {
+      final res = await _client.post(Uri.parse('$_base/users/me/downloads/$songId'), headers: _authHeaders)
+          .timeout(const Duration(seconds: 10));
+      return res.statusCode == 200 || res.statusCode == 201;
+    } catch (_) { return false; }
+  }
+
+  Future<bool> removeDownload(String songId) async {
+    try {
+      final res = await _client.delete(Uri.parse('$_base/users/me/downloads/$songId'), headers: _authHeaders)
+          .timeout(const Duration(seconds: 10));
+      return res.statusCode == 200 || res.statusCode == 204;
+    } catch (_) { return false; }
+  }
+
+  // ── Songs ──────────────────────────────────────────────────────────────────
 
   List<Song> _mapSongs(List songs) => songs.map((s) => Song(
     id: s['youtubeId'] as String,

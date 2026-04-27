@@ -434,6 +434,78 @@ class MockMusicServerService extends _i1.Mock
         ),
         returnValue: _i5.Future<List<_i10.Song>>.value(<_i10.Song>[]),
       ) as _i5.Future<List<_i10.Song>>);
+
+  @override
+  _i5.Future<Map<String, dynamic>?> getProfile() => (super.noSuchMethod(
+        Invocation.method(
+          #getProfile,
+          [],
+        ),
+        returnValue: _i5.Future<Map<String, dynamic>?>.value(),
+      ) as _i5.Future<Map<String, dynamic>?>);
+
+  @override
+  _i5.Future<List<String>> getLikedSongs() => (super.noSuchMethod(
+        Invocation.method(
+          #getLikedSongs,
+          [],
+        ),
+        returnValue: _i5.Future<List<String>>.value(<String>[]),
+      ) as _i5.Future<List<String>>);
+
+  @override
+  _i5.Future<bool> isSongLiked(String? songId) => (super.noSuchMethod(
+        Invocation.method(
+          #isSongLiked,
+          [songId],
+        ),
+        returnValue: _i5.Future<bool>.value(false),
+      ) as _i5.Future<bool>);
+
+  @override
+  _i5.Future<bool> likeSong(String? songId) => (super.noSuchMethod(
+        Invocation.method(
+          #likeSong,
+          [songId],
+        ),
+        returnValue: _i5.Future<bool>.value(false),
+      ) as _i5.Future<bool>);
+
+  @override
+  _i5.Future<bool> unlikeSong(String? songId) => (super.noSuchMethod(
+        Invocation.method(
+          #unlikeSong,
+          [songId],
+        ),
+        returnValue: _i5.Future<bool>.value(false),
+      ) as _i5.Future<bool>);
+
+  @override
+  _i5.Future<List<String>> getDownloadedSongIds() => (super.noSuchMethod(
+        Invocation.method(
+          #getDownloadedSongIds,
+          [],
+        ),
+        returnValue: _i5.Future<List<String>>.value(<String>[]),
+      ) as _i5.Future<List<String>>);
+
+  @override
+  _i5.Future<bool> markDownloaded(String? songId) => (super.noSuchMethod(
+        Invocation.method(
+          #markDownloaded,
+          [songId],
+        ),
+        returnValue: _i5.Future<bool>.value(false),
+      ) as _i5.Future<bool>);
+
+  @override
+  _i5.Future<bool> removeDownload(String? songId) => (super.noSuchMethod(
+        Invocation.method(
+          #removeDownload,
+          [songId],
+        ),
+        returnValue: _i5.Future<bool>.value(false),
+      ) as _i5.Future<bool>);
 }
 
 /// A class which mocks [GeminiService].
