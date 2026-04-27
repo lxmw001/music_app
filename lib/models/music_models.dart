@@ -42,6 +42,14 @@ class Song {
   };
 }
 
+class MusicSearchResult {
+  final List<Song> songs;
+  final List<Song> mixes;
+  final List<Song> videos;
+  const MusicSearchResult({this.songs = const [], this.mixes = const [], this.videos = const []});
+  bool get isEmpty => songs.isEmpty && mixes.isEmpty && videos.isEmpty;
+}
+
 class Playlist {
   final String id;
   final String name;

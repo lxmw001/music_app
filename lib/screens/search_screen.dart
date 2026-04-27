@@ -18,7 +18,8 @@ class _SearchScreenState extends State<SearchScreen> {
   late final YouTubeService _youtubeService;
   final _serverService = MusicServerService();
   final TextEditingController _searchController = TextEditingController();
-  List<Song> searchResults = [];
+  final _focusNode = FocusNode();
+  MusicSearchResult _result = const MusicSearchResult();
   List<String> _suggestions = [];
   bool isLoading = false;
   String _currentQuery = '';
@@ -32,49 +33,49 @@ class _SearchScreenState extends State<SearchScreen> {
     });
   }
 
+  @override
+  void dispose() {
+    _youtubeService.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
   Future<void> _performSearch(String query) async {
     if (query.isEmpty) {
-      setState(() => searchResults = []);
+      setState(() => _result = const MusicSearchResult());
       return;
     }
     _focusNode.unfocus();
     setState(() => isLoading = true);
-
-    final results = await _youtubeService.searchSongs(query);
+    final result = await _youtubeService.searchSongs(query);
     setState(() {
-      searchResults = results;
+      _result = result;
       isLoading = false;
       _currentQuery = query;
     });
-    if (mounted) {
-      context.read<MusicPlayerProvider>().saveSearch(query);
-    }
+    if (mounted) context.read<MusicPlayerProvider>().saveSearch(query);
   }
 
   List<String> _matchingSuggestions(String input) {
     if (input.isEmpty || _suggestions.isEmpty) return [];
     final lower = input.toLowerCase();
-    // Score by match percentage (shared chars / suggestion length)
-    final scored = _suggestions
-        .map((s) {
-          final sl = s.toLowerCase();
-          if (sl.startsWith(lower)) return (s: s, score: 1.0);
-          if (sl.contains(lower)) return (s: s, score: lower.length / sl.length);
-          // word overlap
-          final inputWords = lower.split(' ').where((w) => w.length > 1).toSet();
-          final sWords = sl.split(' ').where((w) => w.length > 1).toSet();
-          final overlap = inputWords.intersection(sWords).length;
-          if (overlap == 0) return (s: s, score: 0.0);
-          return (s: s, score: overlap / sWords.length);
-        })
-        .where((e) => e.score > 0)
-        .toList()
+    final scored = _suggestions.map((s) {
+      final sl = s.toLowerCase();
+      if (sl.startsWith(lower)) return (s: s, score: 1.0);
+      if (sl.contains(lower)) return (s: s, score: lower.length / sl.length);
+      final inputWords = lower.split(' ').where((w) => w.length > 1).toSet();
+      final sWords = sl.split(' ').where((w) => w.length > 1).toSet();
+      final overlap = inputWords.intersection(sWords).length;
+      if (overlap == 0) return (s: s, score: 0.0);
+      return (s: s, score: overlap / sWords.length);
+    }).where((e) => e.score > 0).toList()
       ..sort((a, b) => b.score.compareTo(a.score));
     return scored.take(3).map((e) => e.s).toList();
   }
 
   @override
   Widget build(BuildContext context) {
+    final hasResults = !_result.isEmpty;
     return Scaffold(
       appBar: AppBar(
         title: Autocomplete<String>(
@@ -84,10 +85,8 @@ class _SearchScreenState extends State<SearchScreen> {
             _performSearch(s);
           },
           fieldViewBuilder: (ctx, controller, focusNode, onSubmit) {
-            // sync our controller
             controller.text = _searchController.text;
             controller.addListener(() => _searchController.text = controller.text);
-            // use our focusNode so we can unfocus programmatically
             return TextField(
               controller: controller,
               focusNode: _focusNode,
@@ -101,7 +100,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         onPressed: () {
                           controller.clear();
                           _searchController.clear();
-                          setState(() { searchResults = []; _currentQuery = ''; });
+                          setState(() { _result = const MusicSearchResult(); _currentQuery = ''; });
                         },
                       )
                     : null,
@@ -131,87 +130,123 @@ class _SearchScreenState extends State<SearchScreen> {
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: searchResults.isNotEmpty
+        leading: hasResults
             ? IconButton(
                 icon: const Icon(Icons.arrow_back),
-                onPressed: () => setState(() => searchResults = []),
+                onPressed: () => setState(() => _result = const MusicSearchResult()),
               )
             : null,
       ),
-      body: Builder(builder: (context) {
-        if (isLoading) return Center(child: CircularProgressIndicator());
-        if (searchResults.isEmpty) return SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (_suggestions.isNotEmpty) ...[
-                const Text('Popular searches', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8, runSpacing: 8,
-                  children: _suggestions.take(5).map((s) => ActionChip(
-                    label: Text(s),
-                    onPressed: () {
-                      _searchController.text = s;
-                      _focusNode.unfocus();
-                      _performSearch(s);
-                    },
-                  )).toList(),
-                ),
-                const SizedBox(height: 24),
-              ],
-              const Text('Browse by genre', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2, childAspectRatio: 1.5,
-                  crossAxisSpacing: 16, mainAxisSpacing: 16,
-                ),
-                itemCount: 8,
-                itemBuilder: (context, index) {
-                  final genres = ['Pop','Rock','Hip-Hop','Jazz','Classical','Electronic','Country','R&B'];
-                  final colors = [Colors.red,Colors.blue,Colors.green,Colors.orange,Colors.purple,Colors.pink,Colors.teal,Colors.amber];
-                  return GestureDetector(
-                    onTap: () => _performSearch(genres[index]),
-                    child: Container(
-                      decoration: BoxDecoration(color: colors[index], borderRadius: BorderRadius.circular(8)),
-                      child: Center(child: Text(genres[index], style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white))),
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-        );
-        return Selector<MusicPlayerProvider, Set<String>>(
-          selector: (_, p) => Set.from(searchResults.map((s) => s.id).where((id) => p.isLoadingAudio(id))),
-          builder: (context, loadingIds, _) => ListView.builder(
-            itemCount: searchResults.length,
-            itemBuilder: (context, index) {
-              final song = searchResults[index];
-              return SongListTile(
-                song: song,
-                isLoading: loadingIds.contains(song.id),
-                queue: searchResults,
-                onTap: () => context.read<MusicPlayerProvider>()
-                    .playSong(song, searchQuery: _currentQuery),
-              );
-            },
-          ),
-        );
-      }),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : hasResults
+              ? _buildResults()
+              : _buildEmptyState(),
     );
   }
 
-  final _focusNode = FocusNode();
+  Widget _buildResults() {
+    return DefaultTabController(
+      length: 2,
+      child: Column(
+        children: [
+          const TabBar(
+            tabs: [Tab(text: 'Songs'), Tab(text: 'Mixes')],
+            indicatorColor: Colors.green,
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.grey,
+          ),
+          Expanded(
+            child: Selector<MusicPlayerProvider, Set<String>>(
+              selector: (_, p) {
+                final allIds = [..._result.songs, ..._result.mixes].map((s) => s.id).toSet();
+                return allIds.where((id) => p.isLoadingAudio(id)).toSet();
+              },
+              builder: (context, loadingIds, _) => TabBarView(
+                children: [
+                  // Songs tab
+                  _buildSongSection(_result.songs, loadingIds),
+                  // Mixes tab
+                  _buildSongSection(_result.mixes, loadingIds),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-  @override
-  void dispose() {
-    _youtubeService.dispose();
-    _focusNode.dispose();
-    super.dispose();
+  Widget _buildSongSection(List<Song> songs, Set<String> loadingIds) {
+    return ListView(
+      children: [
+        ...songs.map((song) => SongListTile(
+          song: song,
+          isLoading: loadingIds.contains(song.id),
+          onTap: () => context.read<MusicPlayerProvider>()
+              .playSong(song, searchQuery: _currentQuery),
+        )),
+        // Artists section at bottom
+        _sectionHeader('Artists'),
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Text('Artists coming soon', style: TextStyle(color: Colors.grey)),
+        ),
+      ],
+    );
+  }
+
+  Widget _sectionHeader(String title) => Padding(
+    padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+    child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+  );
+
+  Widget _buildEmptyState() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_suggestions.isNotEmpty) ...[
+            const Text('Popular searches', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8, runSpacing: 8,
+              children: _suggestions.take(5).map((s) => ActionChip(
+                label: Text(s),
+                onPressed: () {
+                  _searchController.text = s;
+                  _focusNode.unfocus();
+                  _performSearch(s);
+                },
+              )).toList(),
+            ),
+            const SizedBox(height: 24),
+          ],
+          const Text('Browse by genre', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2, childAspectRatio: 1.5,
+              crossAxisSpacing: 16, mainAxisSpacing: 16,
+            ),
+            itemCount: 8,
+            itemBuilder: (context, index) {
+              final genres = ['Pop','Rock','Hip-Hop','Jazz','Classical','Electronic','Country','R&B'];
+              final colors = [Colors.red,Colors.blue,Colors.green,Colors.orange,Colors.purple,Colors.pink,Colors.teal,Colors.amber];
+              return GestureDetector(
+                onTap: () => _performSearch(genres[index]),
+                child: Container(
+                  decoration: BoxDecoration(color: colors[index], borderRadius: BorderRadius.circular(8)),
+                  child: Center(child: Text(genres[index], style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white))),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
   }
 }

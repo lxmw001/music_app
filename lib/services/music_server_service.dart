@@ -9,25 +9,25 @@ class MusicServerService {
 
   MusicServerService({http.Client? client}) : _client = client ?? http.Client();
 
-  Future<List<Song>> searchSongs(String query) async {
+  Future<MusicSearchResult> searchSongs(String query) async {
     final uri = Uri.parse('$_base/songs/search-youtube')
         .replace(queryParameters: {'query': query});
     print('[MusicServer] GET $uri');
     try {
       final response = await _client.get(uri).timeout(const Duration(seconds: 30));
       print('[MusicServer] search status: ${response.statusCode}');
-      print('[MusicServer] search body: ${response.body.length > 300 ? response.body.substring(0, 300) : response.body}');
-
-      if (response.statusCode < 200 || response.statusCode >= 300) return [];
-
+      if (response.statusCode < 200 || response.statusCode >= 300) return const MusicSearchResult();
       final data = jsonDecode(response.body) as Map<String, dynamic>;
-      final songs = data['songs'] as List? ?? [];
-      final result = _mapSongs(songs);
-      print('[MusicServer] search "$query": ${result.length} songs — ${result.take(3).map((s) => "${s.title}/${s.artist}").join(", ")}');
+      final result = MusicSearchResult(
+        songs: _mapSongs(data['songs'] as List? ?? []),
+        mixes: _mapSongs(data['mixes'] as List? ?? []),
+        videos: _mapSongs(data['videos'] as List? ?? []),
+      );
+      print('[MusicServer] search "$query": ${result.songs.length} songs, ${result.mixes.length} mixes, ${result.videos.length} videos');
       return result;
     } catch (e) {
       print('[MusicServer] search error: $e');
-      return [];
+      return const MusicSearchResult();
     }
   }
 

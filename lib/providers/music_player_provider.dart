@@ -312,7 +312,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
           _queue = [song, ...playlist];
           _currentIndex = 0;
           print('[MusicPlayerProvider] queue updated: ${_queue.length} songs');
-          prefetchAudioUrls(_queue.skip(1).take(2).toList());
           _historyService.saveQueue(_queue, _currentIndex);
           // Save as named playlist using the seed song as the name
           final playlistName = searchQuery?.isNotEmpty == true
@@ -518,9 +517,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     if (_queue.isNotEmpty && _currentIndex < _queue.length - 1) {
       _currentIndex++;
       playSong(_queue[_currentIndex], fromQueue: true);
-      if (_currentIndex + 1 < _queue.length) {
-        prefetchAudioUrls([_queue[_currentIndex + 1]]);
-      }
       _historyService.saveQueue(_queue, _currentIndex);
     } else if (_suggestedSongs.isNotEmpty) {
       final next = _suggestedSongs.first;

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/music_models.dart';
 import '../providers/music_player_provider.dart';
+import '../services/download_service.dart';
+import '../screens/library_screen.dart' show PlaylistDownloadButton;
 
 class RecentPlaylistsGrid extends StatelessWidget {
   final List<Playlist> playlists;
