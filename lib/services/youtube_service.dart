@@ -192,8 +192,8 @@ class YouTubeService {
 
   Future<MusicSearchResult> searchSongs(String query) =>
       safeCall(() async {
-        final result = await _server.searchSongs(query);
-        if (!result.isEmpty) return result;
+        final serverSongs = await _server.searchSongs(query);
+        if (serverSongs.isNotEmpty) return MusicSearchResult(songs: serverSongs);
 
         print('[YouTubeService] server empty, using YouTube fallback');
         final songs = await _youtubeSearch(query);
