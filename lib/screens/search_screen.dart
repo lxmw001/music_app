@@ -41,7 +41,7 @@ class _SearchScreenState extends State<SearchScreen> {
     setState(() => isLoading = true);
 
     final results = await _youtubeService.searchSongs(query);
-    final top15 = results.take(15).toList();
+    final top15 = results.songs.take(15).toList();
     setState(() {
       searchResults = top15;
       isLoading = false;

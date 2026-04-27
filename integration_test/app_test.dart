@@ -35,7 +35,7 @@ class FakeYouTubeService extends YouTubeService {
   FakeYouTubeService(this._songs) : super(gateway: FakeYoutubeGateway());
 
   @override
-  Future<List<Song>> searchSongs(String query) async => _songs;
+  Future<MusicSearchResult> searchSongs(String query) async => MusicSearchResult(songs: _songs);
 
   @override
   Future<List<Song>> getTrendingMusic() async => _songs;

@@ -26,8 +26,8 @@ void main() {
   setUpAll(() async {
     ytService = YouTubeService();
     lfmService = LastFmService();
-    ytEnglish = await ytService.searchSongs('Taylor Swift Anti-Hero');
-    ytSpanish = await ytService.searchSongs('Bad Bunny');
+    ytEnglish = (await ytService.searchSongs('Taylor Swift Anti-Hero')).songs;
+    ytSpanish = (await ytService.searchSongs('Bad Bunny')).songs;
   });
 
   // ─── YouTube structural quality ──────────────────────────────────────────
