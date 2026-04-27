@@ -5,9 +5,18 @@ import '../models/music_models.dart';
 
 class MusicServerService {
   static const _base = 'https://music-app-server-lupbg4y2ha-uc.a.run.app';
+
+  // TODO: Replace with FirebaseAuth.instance.currentUser?.getIdToken() once Firebase is set up
+  static const _placeholderToken = '';
+
   final http.Client _client;
 
   MusicServerService({http.Client? client}) : _client = client ?? http.Client();
+
+  Map<String, String> get _authHeaders => {
+    'Content-Type': 'application/json',
+    if (_placeholderToken.isNotEmpty) 'Authorization': 'Bearer $_placeholderToken',
+  };
 
   Future<List<Song>> searchSongs(String query) async {
     final uri = Uri.parse('$_base/songs/search-youtube')
@@ -97,6 +106,78 @@ class MusicServerService {
       return [];
     }
   }
+
+  // ── /users/me ──────────────────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>?> getProfile() async {
+    try {
+      final res = await _client.get(Uri.parse('$_base/users/me'), headers: _authHeaders)
+          .timeout(const Duration(seconds: 10));
+      if (res.statusCode != 200) return null;
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (_) { return null; }
+  }
+
+  Future<List<String>> getLikedSongs() async {
+    try {
+      final res = await _client.get(Uri.parse('$_base/users/me/liked-songs'), headers: _authHeaders)
+          .timeout(const Duration(seconds: 10));
+      if (res.statusCode != 200) return [];
+      return List<String>.from(jsonDecode(res.body));
+    } catch (_) { return []; }
+  }
+
+  Future<bool> isSongLiked(String songId) async {
+    try {
+      final res = await _client.get(Uri.parse('$_base/users/me/liked-songs/$songId'), headers: _authHeaders)
+          .timeout(const Duration(seconds: 10));
+      if (res.statusCode != 200) return false;
+      return (jsonDecode(res.body) as Map<String, dynamic>)['liked'] == true;
+    } catch (_) { return false; }
+  }
+
+  Future<bool> likeSong(String songId) async {
+    try {
+      final res = await _client.post(Uri.parse('$_base/users/me/liked-songs/$songId'), headers: _authHeaders)
+          .timeout(const Duration(seconds: 10));
+      return res.statusCode == 200 || res.statusCode == 201;
+    } catch (_) { return false; }
+  }
+
+  Future<bool> unlikeSong(String songId) async {
+    try {
+      final res = await _client.delete(Uri.parse('$_base/users/me/liked-songs/$songId'), headers: _authHeaders)
+          .timeout(const Duration(seconds: 10));
+      return res.statusCode == 200 || res.statusCode == 204;
+    } catch (_) { return false; }
+  }
+
+  Future<List<String>> getDownloadedSongIds() async {
+    try {
+      final res = await _client.get(Uri.parse('$_base/users/me/downloads'), headers: _authHeaders)
+          .timeout(const Duration(seconds: 10));
+      if (res.statusCode != 200) return [];
+      return List<String>.from(jsonDecode(res.body));
+    } catch (_) { return []; }
+  }
+
+  Future<bool> markDownloaded(String songId) async {
+    try {
+      final res = await _client.post(Uri.parse('$_base/users/me/downloads/$songId'), headers: _authHeaders)
+          .timeout(const Duration(seconds: 10));
+      return res.statusCode == 200 || res.statusCode == 201;
+    } catch (_) { return false; }
+  }
+
+  Future<bool> removeDownload(String songId) async {
+    try {
+      final res = await _client.delete(Uri.parse('$_base/users/me/downloads/$songId'), headers: _authHeaders)
+          .timeout(const Duration(seconds: 10));
+      return res.statusCode == 200 || res.statusCode == 204;
+    } catch (_) { return false; }
+  }
+
+  // ── Songs ──────────────────────────────────────────────────────────────────
 
   List<Song> _mapSongs(List songs) => songs.map((s) => Song(
     id: s['youtubeId'] as String,
