@@ -49,9 +49,6 @@ class _SearchScreenState extends State<SearchScreen> {
     });
     if (mounted) {
       context.read<MusicPlayerProvider>().saveSearch(query);
-      if (top15.isNotEmpty) {
-        context.read<MusicPlayerProvider>().prefetchAudioUrls(top15.take(3).toList());
-      }
     }
   }
 
