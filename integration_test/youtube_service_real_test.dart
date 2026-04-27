@@ -22,35 +22,35 @@ void main() {
 
   testWidgets('searchSongs returns non-empty results for a common query', (tester) async {
     final results = await service.searchSongs('coldplay');
-    expect(results, isNotEmpty);
-    expect(results.first.id, isNotEmpty);
-    expect(results.first.title, isNotEmpty);
-    expect(results.first.artist, isNotEmpty);
+    expect(results.songs, isNotEmpty);
+    expect(results.songs.first.id, isNotEmpty);
+    expect(results.songs.first.title, isNotEmpty);
+    expect(results.songs.first.artist, isNotEmpty);
   });
 
   testWidgets('searchSongs returns at most 5 results', (tester) async {
     final results = await service.searchSongs('pop');
-    expect(results.length, lessThanOrEqualTo(5));
+    expect(results.songs.length, lessThanOrEqualTo(5));
   });
 
   testWidgets('searchSongs returns empty list for gibberish query gracefully', (tester) async {
     // Should not throw — returns empty or minimal results
     final results = await service.searchSongs('xzqwerty12345notareal');
-    expect(results, isA<List>());
+    expect(results.songs, isA<List>());
   });
 
   testWidgets('getTrendingMusic returns songs', (tester) async {
     final results = await service.getTrendingMusic();
-    expect(results, isNotEmpty);
-    expect(results.length, lessThanOrEqualTo(2));
+    expect(results.songs, isNotEmpty);
+    expect(results.songs.length, lessThanOrEqualTo(2));
   });
 
   testWidgets('getSuggestedSongs returns related songs', (tester) async {
     // First get a real video ID via search
     final searchResults = await service.searchSongs('coldplay');
-    expect(searchResults, isNotEmpty);
+    expect(searchResults.songs, isNotEmpty);
 
-    final videoId = searchResults.first.id;
+    final videoId = searchResults.songs.first.id;
     final suggestions = await service.getSuggestedSongs(videoId, maxResults: 3);
 
     expect(suggestions, isNotEmpty);
@@ -61,9 +61,9 @@ void main() {
 
   testWidgets('getAudioUrl returns a non-empty URL for a valid video', (tester) async {
     final searchResults = await service.searchSongs('coldplay');
-    expect(searchResults, isNotEmpty);
+    expect(searchResults.songs, isNotEmpty);
 
-    final videoId = searchResults.first.id;
+    final videoId = searchResults.songs.first.id;
     final url = await service.getAudioUrl(videoId);
 
     expect(url, isNotEmpty);
