@@ -185,10 +185,25 @@ class _LibraryScreenState extends State<LibraryScreen> {
   Widget _buildSongList(List<Song> songs, {Future<void> Function(Song)? onDelete}) {
     final isDownloads = _showing == 'downloaded';
     if (songs.isEmpty) {
-      return Center(child: Text(
-        isDownloads ? 'No downloaded songs yet.\nTap ↓ on any song to download.' : 'No liked songs yet.',
-        textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey),
-      ));
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(isDownloads ? Icons.download_for_offline : Icons.favorite_border,
+                size: 64, color: Colors.grey[700]),
+            const SizedBox(height: 12),
+            Text(
+              isDownloads ? 'No downloaded songs yet' : 'No liked songs yet',
+              style: const TextStyle(color: Colors.grey, fontSize: 16),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              isDownloads ? 'Tap ↓ on any song to download' : 'Songs you listen to will appear here',
+              style: TextStyle(color: Colors.grey[600], fontSize: 13),
+            ),
+          ],
+        ),
+      );
     }
     return Selector<MusicPlayerProvider, Set<String>>(
       selector: (_, p) => Set.from(songs.map((s) => s.id).where((id) => p.isLoadingAudio(id))),

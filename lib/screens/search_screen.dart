@@ -41,16 +41,16 @@ class _SearchScreenState extends State<SearchScreen> {
     setState(() => isLoading = true);
 
     final results = await _youtubeService.searchSongs(query);
-    final top5 = results.take(5).toList();
+    final top15 = results.take(15).toList();
     setState(() {
-      searchResults = top5;
+      searchResults = top15;
       isLoading = false;
       _currentQuery = query;
     });
     if (mounted) {
       context.read<MusicPlayerProvider>().saveSearch(query);
-      if (top5.isNotEmpty) {
-        context.read<MusicPlayerProvider>().prefetchAudioUrls(top5.take(3).toList());
+      if (top15.isNotEmpty) {
+        context.read<MusicPlayerProvider>().prefetchAudioUrls(top15.take(3).toList());
       }
     }
   }
@@ -176,13 +176,37 @@ class _SearchScreenState extends State<SearchScreen> {
                 ),
                 itemCount: 8,
                 itemBuilder: (context, index) {
-                  final genres = ['Pop','Rock','Hip-Hop','Jazz','Classical','Electronic','Country','R&B'];
-                  final colors = [Colors.red,Colors.blue,Colors.green,Colors.orange,Colors.purple,Colors.pink,Colors.teal,Colors.amber];
+                  const genres = ['Pop','Rock','Hip-Hop','Jazz','Classical','Electronic','Country','R&B'];
+                  const gradients = [
+                    [Color(0xFFe91e63), Color(0xFFff5722)],
+                    [Color(0xFF3f51b5), Color(0xFF2196f3)],
+                    [Color(0xFF9c27b0), Color(0xFF673ab7)],
+                    [Color(0xFF009688), Color(0xFF4caf50)],
+                    [Color(0xFF795548), Color(0xFF9e9e9e)],
+                    [Color(0xFF00bcd4), Color(0xFF3f51b5)],
+                    [Color(0xFF8bc34a), Color(0xFFcddc39)],
+                    [Color(0xFFff9800), Color(0xFFf44336)],
+                  ];
+                  const icons = [
+                    Icons.music_note, Icons.music_video, Icons.headphones,
+                    Icons.piano, Icons.queue_music, Icons.graphic_eq,
+                    Icons.album, Icons.mic,
+                  ];
                   return GestureDetector(
                     onTap: () => _performSearch(genres[index]),
                     child: Container(
-                      decoration: BoxDecoration(color: colors[index], borderRadius: BorderRadius.circular(8)),
-                      child: Center(child: Text(genres[index], style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white))),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(colors: gradients[index], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        children: [
+                          Icon(icons[index], color: Colors.white.withValues(alpha: 0.8), size: 28),
+                          const SizedBox(width: 8),
+                          Text(genres[index], style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                        ],
+                      ),
                     ),
                   );
                 },
@@ -193,8 +217,22 @@ class _SearchScreenState extends State<SearchScreen> {
         return Selector<MusicPlayerProvider, Set<String>>(
           selector: (_, p) => Set.from(searchResults.map((s) => s.id).where((id) => p.isLoadingAudio(id))),
           builder: (context, loadingIds, _) => ListView.builder(
-            itemCount: searchResults.length,
+            itemCount: searchResults.length + 1,
             itemBuilder: (context, index) {
+              if (index == searchResults.length) {
+                return Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: OutlinedButton(
+                    onPressed: () async {
+                      setState(() => isLoading = true);
+                      final more = await _youtubeService.searchSongs(_currentQuery);
+                      final extra = more.skip(searchResults.length).take(10).toList();
+                      setState(() { searchResults = [...searchResults, ...extra]; isLoading = false; });
+                    },
+                    child: const Text('Load more'),
+                  ),
+                );
+              }
               final song = searchResults[index];
               return SongListTile(
                 song: song,
