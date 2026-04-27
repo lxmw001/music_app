@@ -19,5 +19,6 @@ jobs:
           cache: true
 
       - run: flutter pub get
+      - run: dart run build_runner build --delete-conflicting-outputs
       - run: flutter analyze || true
       - run: flutter test test/services/
