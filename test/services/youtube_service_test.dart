@@ -68,9 +68,9 @@ void main() {
 
       final result = await service.searchSongs('test');
 
-      expect(result.length, 3);
-      expect(result[0].title, 'Song 0');
-      expect(result[0].audioUrl, ''); // not pre-fetched
+      expect(result.songs.length, 3);
+      expect(result.songs[0].title, 'Song 0');
+      expect(result.songs[0].audioUrl, ''); // not pre-fetched
     });
 
     test('returns empty list on exception', () async {
@@ -79,7 +79,7 @@ void main() {
 
       final result = await service.searchSongs('test');
 
-      expect(result, isEmpty);
+      expect(result.songs, isEmpty);
     });
 
     test('maps video fields to Song correctly', () async {
@@ -90,7 +90,7 @@ void main() {
 
       final result = await service.searchSongs('My Song');
 
-      final song = result.first;
+      final song = result.songs.first;
       expect(song.id, 'dQw4w9WgXcQ');
       expect(song.title, 'My Song');
       expect(song.artist, 'My Artist');
