@@ -3,17 +3,17 @@
 // Do not manually edit this file.
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
-import 'dart:async' as _i5;
-import 'dart:convert' as _i7;
-import 'dart:typed_data' as _i8;
+import 'dart:async' as _i6;
+import 'dart:convert' as _i8;
+import 'dart:typed_data' as _i9;
 
 import 'package:http/http.dart' as _i3;
 import 'package:mockito/mockito.dart' as _i1;
-import 'package:mockito/src/dummies.dart' as _i6;
-import 'package:music_app/models/music_models.dart' as _i10;
+import 'package:mockito/src/dummies.dart' as _i7;
+import 'package:music_app/models/music_models.dart' as _i4;
 import 'package:music_app/services/gemini_service.dart' as _i11;
-import 'package:music_app/services/music_server_service.dart' as _i9;
-import 'package:music_app/services/youtube_service.dart' as _i4;
+import 'package:music_app/services/music_server_service.dart' as _i10;
+import 'package:music_app/services/youtube_service.dart' as _i5;
 import 'package:youtube_explode_dart/youtube_explode_dart.dart' as _i2;
 
 // ignore_for_file: type=lint
@@ -62,16 +62,27 @@ class _FakeStreamedResponse_2 extends _i1.SmartFake
         );
 }
 
+class _FakeMusicSearchResult_3 extends _i1.SmartFake
+    implements _i4.MusicSearchResult {
+  _FakeMusicSearchResult_3(
+    Object parent,
+    Invocation parentInvocation,
+  ) : super(
+          parent,
+          parentInvocation,
+        );
+}
+
 /// A class which mocks [YoutubeGateway].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockYoutubeGateway extends _i1.Mock implements _i4.YoutubeGateway {
+class MockYoutubeGateway extends _i1.Mock implements _i5.YoutubeGateway {
   MockYoutubeGateway() {
     _i1.throwOnMissingStub(this);
   }
 
   @override
-  _i5.Future<List<_i2.Video>> search(
+  _i6.Future<List<_i2.Video>> search(
     String? query, {
     int? limit = 5,
   }) =>
@@ -81,41 +92,41 @@ class MockYoutubeGateway extends _i1.Mock implements _i4.YoutubeGateway {
           [query],
           {#limit: limit},
         ),
-        returnValue: _i5.Future<List<_i2.Video>>.value(<_i2.Video>[]),
-      ) as _i5.Future<List<_i2.Video>>);
+        returnValue: _i6.Future<List<_i2.Video>>.value(<_i2.Video>[]),
+      ) as _i6.Future<List<_i2.Video>>);
 
   @override
-  _i5.Future<String> getAudioUrl(String? videoId) => (super.noSuchMethod(
+  _i6.Future<String> getAudioUrl(String? videoId) => (super.noSuchMethod(
         Invocation.method(
           #getAudioUrl,
           [videoId],
         ),
-        returnValue: _i5.Future<String>.value(_i6.dummyValue<String>(
+        returnValue: _i6.Future<String>.value(_i7.dummyValue<String>(
           this,
           Invocation.method(
             #getAudioUrl,
             [videoId],
           ),
         )),
-      ) as _i5.Future<String>);
+      ) as _i6.Future<String>);
 
   @override
-  _i5.Future<_i2.Video> getVideo(String? videoId) => (super.noSuchMethod(
+  _i6.Future<_i2.Video> getVideo(String? videoId) => (super.noSuchMethod(
         Invocation.method(
           #getVideo,
           [videoId],
         ),
-        returnValue: _i5.Future<_i2.Video>.value(_FakeVideo_0(
+        returnValue: _i6.Future<_i2.Video>.value(_FakeVideo_0(
           this,
           Invocation.method(
             #getVideo,
             [videoId],
           ),
         )),
-      ) as _i5.Future<_i2.Video>);
+      ) as _i6.Future<_i2.Video>);
 
   @override
-  _i5.Future<
+  _i6.Future<
       ({String playlistTitle, List<_i2.Video> videos})> getPlaylistVideos(
           String? playlistId) =>
       (super.noSuchMethod(
@@ -124,8 +135,8 @@ class MockYoutubeGateway extends _i1.Mock implements _i4.YoutubeGateway {
           [playlistId],
         ),
         returnValue:
-            _i5.Future<({String playlistTitle, List<_i2.Video> videos})>.value((
-          playlistTitle: _i6.dummyValue<String>(
+            _i6.Future<({String playlistTitle, List<_i2.Video> videos})>.value((
+          playlistTitle: _i7.dummyValue<String>(
             this,
             Invocation.method(
               #getPlaylistVideos,
@@ -134,7 +145,7 @@ class MockYoutubeGateway extends _i1.Mock implements _i4.YoutubeGateway {
           ),
           videos: <_i2.Video>[]
         )),
-      ) as _i5.Future<({String playlistTitle, List<_i2.Video> videos})>);
+      ) as _i6.Future<({String playlistTitle, List<_i2.Video> videos})>);
 }
 
 /// A class which mocks [Client].
@@ -146,7 +157,7 @@ class MockClient extends _i1.Mock implements _i3.Client {
   }
 
   @override
-  _i5.Future<_i3.Response> head(
+  _i6.Future<_i3.Response> head(
     Uri? url, {
     Map<String, String>? headers,
   }) =>
@@ -156,7 +167,7 @@ class MockClient extends _i1.Mock implements _i3.Client {
           [url],
           {#headers: headers},
         ),
-        returnValue: _i5.Future<_i3.Response>.value(_FakeResponse_1(
+        returnValue: _i6.Future<_i3.Response>.value(_FakeResponse_1(
           this,
           Invocation.method(
             #head,
@@ -164,10 +175,10 @@ class MockClient extends _i1.Mock implements _i3.Client {
             {#headers: headers},
           ),
         )),
-      ) as _i5.Future<_i3.Response>);
+      ) as _i6.Future<_i3.Response>);
 
   @override
-  _i5.Future<_i3.Response> get(
+  _i6.Future<_i3.Response> get(
     Uri? url, {
     Map<String, String>? headers,
   }) =>
@@ -177,7 +188,7 @@ class MockClient extends _i1.Mock implements _i3.Client {
           [url],
           {#headers: headers},
         ),
-        returnValue: _i5.Future<_i3.Response>.value(_FakeResponse_1(
+        returnValue: _i6.Future<_i3.Response>.value(_FakeResponse_1(
           this,
           Invocation.method(
             #get,
@@ -185,14 +196,14 @@ class MockClient extends _i1.Mock implements _i3.Client {
             {#headers: headers},
           ),
         )),
-      ) as _i5.Future<_i3.Response>);
+      ) as _i6.Future<_i3.Response>);
 
   @override
-  _i5.Future<_i3.Response> post(
+  _i6.Future<_i3.Response> post(
     Uri? url, {
     Map<String, String>? headers,
     Object? body,
-    _i7.Encoding? encoding,
+    _i8.Encoding? encoding,
   }) =>
       (super.noSuchMethod(
         Invocation.method(
@@ -204,7 +215,7 @@ class MockClient extends _i1.Mock implements _i3.Client {
             #encoding: encoding,
           },
         ),
-        returnValue: _i5.Future<_i3.Response>.value(_FakeResponse_1(
+        returnValue: _i6.Future<_i3.Response>.value(_FakeResponse_1(
           this,
           Invocation.method(
             #post,
@@ -216,14 +227,14 @@ class MockClient extends _i1.Mock implements _i3.Client {
             },
           ),
         )),
-      ) as _i5.Future<_i3.Response>);
+      ) as _i6.Future<_i3.Response>);
 
   @override
-  _i5.Future<_i3.Response> put(
+  _i6.Future<_i3.Response> put(
     Uri? url, {
     Map<String, String>? headers,
     Object? body,
-    _i7.Encoding? encoding,
+    _i8.Encoding? encoding,
   }) =>
       (super.noSuchMethod(
         Invocation.method(
@@ -235,7 +246,7 @@ class MockClient extends _i1.Mock implements _i3.Client {
             #encoding: encoding,
           },
         ),
-        returnValue: _i5.Future<_i3.Response>.value(_FakeResponse_1(
+        returnValue: _i6.Future<_i3.Response>.value(_FakeResponse_1(
           this,
           Invocation.method(
             #put,
@@ -247,14 +258,14 @@ class MockClient extends _i1.Mock implements _i3.Client {
             },
           ),
         )),
-      ) as _i5.Future<_i3.Response>);
+      ) as _i6.Future<_i3.Response>);
 
   @override
-  _i5.Future<_i3.Response> patch(
+  _i6.Future<_i3.Response> patch(
     Uri? url, {
     Map<String, String>? headers,
     Object? body,
-    _i7.Encoding? encoding,
+    _i8.Encoding? encoding,
   }) =>
       (super.noSuchMethod(
         Invocation.method(
@@ -266,7 +277,7 @@ class MockClient extends _i1.Mock implements _i3.Client {
             #encoding: encoding,
           },
         ),
-        returnValue: _i5.Future<_i3.Response>.value(_FakeResponse_1(
+        returnValue: _i6.Future<_i3.Response>.value(_FakeResponse_1(
           this,
           Invocation.method(
             #patch,
@@ -278,14 +289,14 @@ class MockClient extends _i1.Mock implements _i3.Client {
             },
           ),
         )),
-      ) as _i5.Future<_i3.Response>);
+      ) as _i6.Future<_i3.Response>);
 
   @override
-  _i5.Future<_i3.Response> delete(
+  _i6.Future<_i3.Response> delete(
     Uri? url, {
     Map<String, String>? headers,
     Object? body,
-    _i7.Encoding? encoding,
+    _i8.Encoding? encoding,
   }) =>
       (super.noSuchMethod(
         Invocation.method(
@@ -297,7 +308,7 @@ class MockClient extends _i1.Mock implements _i3.Client {
             #encoding: encoding,
           },
         ),
-        returnValue: _i5.Future<_i3.Response>.value(_FakeResponse_1(
+        returnValue: _i6.Future<_i3.Response>.value(_FakeResponse_1(
           this,
           Invocation.method(
             #delete,
@@ -309,10 +320,10 @@ class MockClient extends _i1.Mock implements _i3.Client {
             },
           ),
         )),
-      ) as _i5.Future<_i3.Response>);
+      ) as _i6.Future<_i3.Response>);
 
   @override
-  _i5.Future<String> read(
+  _i6.Future<String> read(
     Uri? url, {
     Map<String, String>? headers,
   }) =>
@@ -322,7 +333,7 @@ class MockClient extends _i1.Mock implements _i3.Client {
           [url],
           {#headers: headers},
         ),
-        returnValue: _i5.Future<String>.value(_i6.dummyValue<String>(
+        returnValue: _i6.Future<String>.value(_i7.dummyValue<String>(
           this,
           Invocation.method(
             #read,
@@ -330,10 +341,10 @@ class MockClient extends _i1.Mock implements _i3.Client {
             {#headers: headers},
           ),
         )),
-      ) as _i5.Future<String>);
+      ) as _i6.Future<String>);
 
   @override
-  _i5.Future<_i8.Uint8List> readBytes(
+  _i6.Future<_i9.Uint8List> readBytes(
     Uri? url, {
     Map<String, String>? headers,
   }) =>
@@ -343,25 +354,25 @@ class MockClient extends _i1.Mock implements _i3.Client {
           [url],
           {#headers: headers},
         ),
-        returnValue: _i5.Future<_i8.Uint8List>.value(_i8.Uint8List(0)),
-      ) as _i5.Future<_i8.Uint8List>);
+        returnValue: _i6.Future<_i9.Uint8List>.value(_i9.Uint8List(0)),
+      ) as _i6.Future<_i9.Uint8List>);
 
   @override
-  _i5.Future<_i3.StreamedResponse> send(_i3.BaseRequest? request) =>
+  _i6.Future<_i3.StreamedResponse> send(_i3.BaseRequest? request) =>
       (super.noSuchMethod(
         Invocation.method(
           #send,
           [request],
         ),
         returnValue:
-            _i5.Future<_i3.StreamedResponse>.value(_FakeStreamedResponse_2(
+            _i6.Future<_i3.StreamedResponse>.value(_FakeStreamedResponse_2(
           this,
           Invocation.method(
             #send,
             [request],
           ),
         )),
-      ) as _i5.Future<_i3.StreamedResponse>);
+      ) as _i6.Future<_i3.StreamedResponse>);
 
   @override
   void close() => super.noSuchMethod(
@@ -377,22 +388,30 @@ class MockClient extends _i1.Mock implements _i3.Client {
 ///
 /// See the documentation for Mockito's code generation for more information.
 class MockMusicServerService extends _i1.Mock
-    implements _i9.MusicServerService {
+    implements _i10.MusicServerService {
   MockMusicServerService() {
     _i1.throwOnMissingStub(this);
   }
 
   @override
-  _i5.Future<List<_i10.Song>> searchSongs(String? query) => (super.noSuchMethod(
+  _i6.Future<_i4.MusicSearchResult> searchSongs(String? query) =>
+      (super.noSuchMethod(
         Invocation.method(
           #searchSongs,
           [query],
         ),
-        returnValue: _i5.Future<List<_i10.Song>>.value(<_i10.Song>[]),
-      ) as _i5.Future<List<_i10.Song>>);
+        returnValue:
+            _i6.Future<_i4.MusicSearchResult>.value(_FakeMusicSearchResult_3(
+          this,
+          Invocation.method(
+            #searchSongs,
+            [query],
+          ),
+        )),
+      ) as _i6.Future<_i4.MusicSearchResult>);
 
   @override
-  _i5.Future<List<_i10.Song>> getTrending({
+  _i6.Future<List<_i4.Song>> getTrending({
     int? limit = 20,
     List<String>? genres = const [],
   }) =>
@@ -405,20 +424,54 @@ class MockMusicServerService extends _i1.Mock
             #genres: genres,
           },
         ),
-        returnValue: _i5.Future<List<_i10.Song>>.value(<_i10.Song>[]),
-      ) as _i5.Future<List<_i10.Song>>);
+        returnValue: _i6.Future<List<_i4.Song>>.value(<_i4.Song>[]),
+      ) as _i6.Future<List<_i4.Song>>);
 
   @override
-  _i5.Future<List<String>> getSearchSuggestions() => (super.noSuchMethod(
+  _i6.Future<List<String>> getSearchSuggestions() => (super.noSuchMethod(
         Invocation.method(
           #getSearchSuggestions,
           [],
         ),
-        returnValue: _i5.Future<List<String>>.value(<String>[]),
-      ) as _i5.Future<List<String>>);
+        returnValue: _i6.Future<List<String>>.value(<String>[]),
+      ) as _i6.Future<List<String>>);
 
   @override
-  _i5.Future<List<_i10.Song>> generatePlaylist(
+  _i6.Future<String> getStreamUrl(String? videoId) => (super.noSuchMethod(
+        Invocation.method(
+          #getStreamUrl,
+          [videoId],
+        ),
+        returnValue: _i6.Future<String>.value(_i7.dummyValue<String>(
+          this,
+          Invocation.method(
+            #getStreamUrl,
+            [videoId],
+          ),
+        )),
+      ) as _i6.Future<String>);
+
+  @override
+  _i6.Future<void> pushStreamUrl(
+    String? id,
+    String? streamUrl, {
+    bool? isMix = false,
+  }) =>
+      (super.noSuchMethod(
+        Invocation.method(
+          #pushStreamUrl,
+          [
+            id,
+            streamUrl,
+          ],
+          {#isMix: isMix},
+        ),
+        returnValue: _i6.Future<void>.value(),
+        returnValueForMissingStub: _i6.Future<void>.value(),
+      ) as _i6.Future<void>);
+
+  @override
+  _i6.Future<List<_i4.Song>> generatePlaylist(
     String? id, {
     int? limit = 30,
     String? search,
@@ -432,80 +485,80 @@ class MockMusicServerService extends _i1.Mock
             #search: search,
           },
         ),
-        returnValue: _i5.Future<List<_i10.Song>>.value(<_i10.Song>[]),
-      ) as _i5.Future<List<_i10.Song>>);
+        returnValue: _i6.Future<List<_i4.Song>>.value(<_i4.Song>[]),
+      ) as _i6.Future<List<_i4.Song>>);
 
   @override
-  _i5.Future<Map<String, dynamic>?> getProfile() => (super.noSuchMethod(
+  _i6.Future<Map<String, dynamic>?> getProfile() => (super.noSuchMethod(
         Invocation.method(
           #getProfile,
           [],
         ),
-        returnValue: _i5.Future<Map<String, dynamic>?>.value(),
-      ) as _i5.Future<Map<String, dynamic>?>);
+        returnValue: _i6.Future<Map<String, dynamic>?>.value(),
+      ) as _i6.Future<Map<String, dynamic>?>);
 
   @override
-  _i5.Future<List<String>> getLikedSongs() => (super.noSuchMethod(
+  _i6.Future<List<String>> getLikedSongs() => (super.noSuchMethod(
         Invocation.method(
           #getLikedSongs,
           [],
         ),
-        returnValue: _i5.Future<List<String>>.value(<String>[]),
-      ) as _i5.Future<List<String>>);
+        returnValue: _i6.Future<List<String>>.value(<String>[]),
+      ) as _i6.Future<List<String>>);
 
   @override
-  _i5.Future<bool> isSongLiked(String? songId) => (super.noSuchMethod(
+  _i6.Future<bool> isSongLiked(String? songId) => (super.noSuchMethod(
         Invocation.method(
           #isSongLiked,
           [songId],
         ),
-        returnValue: _i5.Future<bool>.value(false),
-      ) as _i5.Future<bool>);
+        returnValue: _i6.Future<bool>.value(false),
+      ) as _i6.Future<bool>);
 
   @override
-  _i5.Future<bool> likeSong(String? songId) => (super.noSuchMethod(
+  _i6.Future<bool> likeSong(String? songId) => (super.noSuchMethod(
         Invocation.method(
           #likeSong,
           [songId],
         ),
-        returnValue: _i5.Future<bool>.value(false),
-      ) as _i5.Future<bool>);
+        returnValue: _i6.Future<bool>.value(false),
+      ) as _i6.Future<bool>);
 
   @override
-  _i5.Future<bool> unlikeSong(String? songId) => (super.noSuchMethod(
+  _i6.Future<bool> unlikeSong(String? songId) => (super.noSuchMethod(
         Invocation.method(
           #unlikeSong,
           [songId],
         ),
-        returnValue: _i5.Future<bool>.value(false),
-      ) as _i5.Future<bool>);
+        returnValue: _i6.Future<bool>.value(false),
+      ) as _i6.Future<bool>);
 
   @override
-  _i5.Future<List<String>> getDownloadedSongIds() => (super.noSuchMethod(
+  _i6.Future<List<String>> getDownloadedSongIds() => (super.noSuchMethod(
         Invocation.method(
           #getDownloadedSongIds,
           [],
         ),
-        returnValue: _i5.Future<List<String>>.value(<String>[]),
-      ) as _i5.Future<List<String>>);
+        returnValue: _i6.Future<List<String>>.value(<String>[]),
+      ) as _i6.Future<List<String>>);
 
   @override
-  _i5.Future<bool> markDownloaded(String? songId) => (super.noSuchMethod(
+  _i6.Future<bool> markDownloaded(String? songId) => (super.noSuchMethod(
         Invocation.method(
           #markDownloaded,
           [songId],
         ),
-        returnValue: _i5.Future<bool>.value(false),
-      ) as _i5.Future<bool>);
+        returnValue: _i6.Future<bool>.value(false),
+      ) as _i6.Future<bool>);
 
   @override
-  _i5.Future<bool> removeDownload(String? songId) => (super.noSuchMethod(
+  _i6.Future<bool> removeDownload(String? songId) => (super.noSuchMethod(
         Invocation.method(
           #removeDownload,
           [songId],
         ),
-        returnValue: _i5.Future<bool>.value(false),
-      ) as _i5.Future<bool>);
+        returnValue: _i6.Future<bool>.value(false),
+      ) as _i6.Future<bool>);
 }
 
 /// A class which mocks [GeminiService].
@@ -517,12 +570,12 @@ class MockGeminiService extends _i1.Mock implements _i11.GeminiService {
   }
 
   @override
-  _i5.Future<_i11.SongMetadata?> getSongMetadata(String? videoTitle) =>
+  _i6.Future<_i11.SongMetadata?> getSongMetadata(String? videoTitle) =>
       (super.noSuchMethod(
         Invocation.method(
           #getSongMetadata,
           [videoTitle],
         ),
-        returnValue: _i5.Future<_i11.SongMetadata?>.value(),
-      ) as _i5.Future<_i11.SongMetadata?>);
+        returnValue: _i6.Future<_i11.SongMetadata?>.value(),
+      ) as _i6.Future<_i11.SongMetadata?>);
 }

@@ -54,7 +54,7 @@ void main() {
     mockHttpClient = MockClient();
     mockServer = MockMusicServerService();
     mockGemini = MockGeminiService();
-    when(mockServer.searchSongs(any)).thenAnswer((_) async => []);
+    when(mockServer.searchSongs(any)).thenAnswer((_) async => const MusicSearchResult());
     when(mockServer.getTrending(limit: anyNamed('limit'))).thenAnswer((_) async => []);
     when(mockGemini.getSongMetadata(any)).thenAnswer((_) async => null);
     service = YouTubeService(gateway: mockGateway, httpClient: mockHttpClient, server: mockServer, gemini: mockGemini);
