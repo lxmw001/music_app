@@ -18,25 +18,29 @@ class MusicServerService {
     if (_placeholderToken.isNotEmpty) 'Authorization': 'Bearer $_placeholderToken',
   };
 
-  Future<List<Song>> searchSongs(String query) async {
+  Future<MusicSearchResult> searchSongs(String query) async {
     final uri = Uri.parse('$_base/songs/search-youtube')
         .replace(queryParameters: {'query': query});
     print('[MusicServer] GET $uri');
     try {
       final response = await _client.get(uri).timeout(const Duration(seconds: 30));
       print('[MusicServer] search status: ${response.statusCode}');
-      print('[MusicServer] search body: ${response.body.length > 300 ? response.body.substring(0, 300) : response.body}');
 
-      if (response.statusCode < 200 || response.statusCode >= 300) return [];
+      if (response.statusCode < 200 || response.statusCode >= 300) return const MusicSearchResult();
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
-      final songs = data['songs'] as List? ?? [];
-      final result = _mapSongs(songs);
-      print('[MusicServer] search "$query": ${result.length} songs — ${result.take(3).map((s) => "${s.title}/${s.artist}").join(", ")}');
+      final result = MusicSearchResult(
+        songs: _mapSongs(data['songs'] as List? ?? []),
+        mixes: _mapSongs(data['mixes'] as List? ?? []),
+        videos: _mapSongs(data['videos'] as List? ?? []),
+        artists: ((data['artists'] as List?) ?? []).map((a) => a.toString()).toList(),
+        hasMoreSongs: data['hasMore'] as bool? ?? false,
+      );
+      print('[MusicServer] search "$query": ${result.songs.length} songs, ${result.mixes.length} mixes, ${result.videos.length} videos');
       return result;
     } catch (e) {
       print('[MusicServer] search error: $e');
-      return [];
+      return const MusicSearchResult();
     }
   }
 
@@ -86,6 +90,39 @@ class MusicServerService {
   Future<List<String>> _cachedSuggestions() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getStringList(_suggestionsCacheKey) ?? [];
+  }
+
+  Future<String> getStreamUrl(String videoId) async {
+    try {
+      final uri = Uri.parse('$_base/songs/$videoId/stream-url');
+      final response = await _client.get(uri).timeout(const Duration(seconds: 5));
+      if (response.statusCode < 200 || response.statusCode >= 300) return '';
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      return data['streamUrl'] as String? ?? '';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  /// Push a resolved stream URL to the server for caching.
+  Future<void> pushStreamUrl(String id, String streamUrl, {bool isMix = false}) async {
+    if (id.isEmpty || streamUrl.isEmpty) return;
+    try {
+      final expireMatch = RegExp(r'expire=(\d+)').firstMatch(streamUrl);
+      final expiresAt = expireMatch != null
+          ? DateTime.fromMillisecondsSinceEpoch(int.parse(expireMatch.group(1)!) * 1000).toUtc().toIso8601String()
+          : DateTime.now().add(const Duration(hours: 6)).toUtc().toIso8601String();
+
+      final path = isMix ? 'songs/mixes/$id/stream-url' : 'songs/$id/stream-url';
+      final uri = Uri.parse('$_base/$path');
+      await _client.post(uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'streamUrl': streamUrl, 'expiresAt': expiresAt}),
+      ).timeout(const Duration(seconds: 5));
+      print('[MusicServer] pushed stream URL for ${isMix ? "mix" : "song"} $id, expires $expiresAt');
+    } catch (e) {
+      print('[MusicServer] pushStreamUrl error: $e');
+    }
   }
 
   Future<List<Song>> generatePlaylist(String id, {int limit = 30, String? search}) async {
@@ -180,14 +217,18 @@ class MusicServerService {
   // ── Songs ──────────────────────────────────────────────────────────────────
 
   List<Song> _mapSongs(List songs) => songs.map((s) => Song(
-    id: s['youtubeId'] as String,
+    id: (s['youtubeId'] ?? s['videoId']) as String,
     serverId: s['id'] as String? ?? '',
     title: s['title'] as String,
-    artist: s['artistName'] as String,
+    artist: s['artistName'] as String? ?? '',
     album: s['album'] as String? ?? '',
     imageUrl: s['thumbnailUrl'] as String? ?? '',
     audioUrl: '',
     duration: Duration(seconds: (s['duration'] as num?)?.toInt() ?? 0),
     genres: List<String>.from(s['genres'] ?? s['tags'] ?? []),
+    streamUrl: s['streamUrl'] as String?,
+    streamUrlExpiresAt: s['streamUrlExpiresAt'] != null
+        ? DateTime.tryParse(s['streamUrlExpiresAt'] as String)
+        : null,
   )).toList();
 }
