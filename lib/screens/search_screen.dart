@@ -266,6 +266,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _songTile(Song s, Set<String> loadingIds) => SongListTile(
     song: s, isLoading: loadingIds.contains(s.id),
+    showDownload: false,
     onTap: () => context.read<MusicPlayerProvider>().playSong(s, searchQuery: _currentQuery),
   );
 

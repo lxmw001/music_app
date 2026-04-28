@@ -10,8 +10,9 @@ class SongListTile extends StatefulWidget {
   final VoidCallback? onRemove;
   final List<Song>? queue;
   final VoidCallback? onTap;
+  final bool showDownload;
 
-  const SongListTile({super.key, required this.song, this.isLoading = false, this.onRemove, this.queue, this.onTap});
+  const SongListTile({super.key, required this.song, this.isLoading = false, this.onRemove, this.queue, this.onTap, this.showDownload = true});
 
   @override
   State<SongListTile> createState() => _SongListTileState();
@@ -87,7 +88,7 @@ class _SongListTileState extends State<SongListTile> with SingleTickerProviderSt
               if (_isDownloading)
                 const SizedBox(width: 20, height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              else
+              else if (widget.showDownload)
                 IconButton(
                   icon: Icon(_isDownloaded ? Icons.download_done : Icons.download,
                       size: 20, color: _isDownloaded ? Colors.green : Colors.grey),
