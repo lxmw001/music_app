@@ -551,12 +551,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   @override
   void nextSong() {
     if (!_isInitialized) return;
-    
-      print('[MusicPlayerProvider] too many consecutive skips, stopping');
-      
-      return;
-    }
-    
     if (_queue.isNotEmpty && _currentIndex < _queue.length - 1) {
       _currentIndex++;
       playSong(_queue[_currentIndex], fromQueue: true);
@@ -568,9 +562,9 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       _currentIndex = _queue.length - 1;
       playSong(next, fromQueue: true);
     } else if (_currentSong != null) {
-       // no song to play, release lock
       _fetchAndPlaySuggestion();
-    } else {
+    }
+  }
       
     }
   }
