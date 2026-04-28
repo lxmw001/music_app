@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/music_models.dart';
 import '../providers/music_player_provider.dart';
+import '../screens/player_screen.dart';
 import '../services/download_service.dart';
 
 class SongListTile extends StatefulWidget {
@@ -102,7 +103,14 @@ class _SongListTileState extends State<SongListTile> with SingleTickerProviderSt
                 ),
             ],
           ),
-          onTap: widget.onTap ?? () => context.read<MusicPlayerProvider>().playSong(widget.song),
+          onTap: widget.onTap ?? () {
+            final provider = context.read<MusicPlayerProvider>();
+            if (provider.currentSong?.id == widget.song.id) {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => PlayerScreen()));
+            } else {
+              provider.playSong(widget.song);
+            }
+          },
         );
       },
     );
