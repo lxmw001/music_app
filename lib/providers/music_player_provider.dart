@@ -294,8 +294,8 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     }
     // Don't restart if same song is already playing (but allow if queue is being set)
     if (_currentSong?.id == song.id && isPlaying && queue == null) return;
-    // Prevent concurrent playSong calls
-    if (_isSwitchingSong) return;
+    // Block concurrent auto-advances (fromQueue), but always allow user taps
+    if (_isSwitchingSong && fromQueue) return;
     _isSwitchingSong = true;
 
     // Snapshot position before it resets, then record play for previous song
