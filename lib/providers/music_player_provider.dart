@@ -293,6 +293,10 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     _currentSong = song;
     // Only skip generatePlaylist when navigating within existing queue (next/prev)
     if (fromQueue) {
+      // If an explicit queue is provided (e.g. playing from saved playlist), set it
+      if (queue != null) {
+        _queue = queue;
+      }
       _currentIndex = _queue.indexWhere((s) => s.id == song.id);
       if (_currentIndex < 0) _currentIndex = 0;
     } else {

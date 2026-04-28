@@ -72,7 +72,7 @@ class RecentPlaylistsGrid extends StatelessWidget {
                   ElevatedButton.icon(
                     onPressed: () {
                       Navigator.pop(context);
-                      context.read<MusicPlayerProvider>().playSong(playlist.songs.first, queue: playlist.songs);
+                      context.read<MusicPlayerProvider>().playSong(playlist.songs.first, queue: playlist.songs, fromQueue: true);
                     },
                     icon: const Icon(Icons.play_arrow, size: 18),
                     label: const Text('Play'),
@@ -97,7 +97,7 @@ class RecentPlaylistsGrid extends StatelessWidget {
                     subtitle: Text(song.artist, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Colors.grey)),
                     onTap: () {
                       Navigator.pop(context);
-                      context.read<MusicPlayerProvider>().playSong(song, queue: playlist.songs);
+                      context.read<MusicPlayerProvider>().playSong(song, queue: playlist.songs, fromQueue: true);
                     },
                   );
                 },
