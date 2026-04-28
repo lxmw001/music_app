@@ -114,8 +114,9 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       config: AudioServiceConfig(
         androidNotificationChannelId: 'com.lxmw.musicapp.channel.audio',
         androidNotificationChannelName: 'Music Player',
+        androidNotificationOngoing: true,
         androidShowNotificationBadge: true,
-        androidStopForegroundOnPause: false,
+        androidStopForegroundOnPause: true,
       ),
     );
     print('[MusicPlayerProvider] AudioService.init complete');
@@ -282,6 +283,9 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     }
     // Don't restart if same song is already playing (but allow if queue is being set)
     if (_currentSong?.id == song.id && isPlaying && queue == null) return;
+    // Prevent concurrent playSong calls
+    if (_isSwitchingSong) return;
+    _isSwitchingSong = true;
 
     // Snapshot position before it resets, then record play for previous song
     final previousSong = _currentSong;
@@ -350,13 +354,14 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     }
     if (audioUrl.isEmpty) {
       print('[MusicPlayerProvider] Could not get audio file for \\${song.title}, skipping');
+      _isSwitchingSong = false;
       return;
     }
     final mediaItem = MediaItem(
       id: song.id,
       title: song.title,
       artist: song.artist,
-      artUri: Uri.parse(song.imageUrl),
+      artUri: song.imageUrl.isNotEmpty ? Uri.tryParse(song.imageUrl) : null,
       duration: song.duration,
     );
     try {
@@ -380,11 +385,13 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       } catch (e2) {
         print('[MusicPlayerProvider] retry failed: $e2 — skipping to next');
         _loadingAudioIds.remove(song.id);
+        _isSwitchingSong = false;
         notifyListeners();
         nextSong();
         return;
       }
     }
+    _isSwitchingSong = false;
     _historyService.savePosition(song, 0);
     _historyService.saveQueue(_queue, _currentIndex);
     _startPositionSaveTimer(song);
@@ -408,6 +415,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     }
   }
   bool _isSeeding = false;
+  bool _isSwitchingSong = false;
 
   /// Fetch suggestions for the seed song and append to queue in background
   void _seedQueueWithSuggestions(Song seedSong) {
@@ -698,6 +706,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   @override
   void dispose() {
     _positionSaveTimer?.cancel();
+    _stallTimer?.cancel();
     if (_isInitialized) {
       if (_currentSong != null) {
         _historyService.savePosition(_currentSong!, currentPosition.inSeconds);
