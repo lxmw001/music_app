@@ -150,13 +150,15 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       }
     }
     
+    AudioProcessingState? _lastProcessingState;
+    bool? _lastPlaying;
+
     _audioHandler.playbackState.listen((state) {
       if (state.processingState == AudioProcessingState.completed && !_isFetchingSuggestions && !_isSwitchingSong) {
         print('[MusicPlayerProvider] song completed, calling nextSong');
         if (_currentSong != null) {
           _historyService.recordPlay(_currentSong!, _currentSong!.duration.inSeconds);
         }
-        // Use Future.microtask to avoid calling nextSong synchronously inside a stream listener
         Future.microtask(() => nextSong());
       }
 
@@ -168,13 +170,22 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         _stallTimer = null;
       }
 
-      notifyListeners();
+      // Only notify on meaningful state changes, not every position tick
+      if (state.processingState != _lastProcessingState || state.playing != _lastPlaying) {
+        _lastProcessingState = state.processingState;
+        _lastPlaying = state.playing;
+        notifyListeners();
+      }
     });
     _audioHandler.mediaItem.listen((_) {
+      notifyListeners(); // song metadata changed — rebuild needed
+    });
+
+    _audioHandler.durationStream.listen((_) {
+      // Duration changes are rare — only notify when it actually changes
       notifyListeners();
     });
-    
-    // Listen for when a song is about to end and fetch suggestions
+
     _audioHandler.positionStream.listen((position) {
       if (_currentSong != null && _autoAddSuggestions) {
         final duration = totalDuration;
@@ -185,8 +196,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
           _fetchSuggestionsInBackground();
         }
       }
-      // Do NOT call notifyListeners here — position updates fire multiple times/sec
-      // and cause excessive rebuilds. UI reads position directly from audioHandler.
     });
 
     _audioHandler.durationStream.listen((_) => notifyListeners());
