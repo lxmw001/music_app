@@ -7,8 +7,9 @@ class AudioPlayerHandler extends BaseAudioHandler {
   final AudioPlayer _player;
   final VoidCallback? onSkipToNext;
   final VoidCallback? onSkipToPrevious;
+  final VoidCallback? onPlay;
 
-  AudioPlayerHandler({AudioPlayer? player, this.onSkipToNext, this.onSkipToPrevious})
+  AudioPlayerHandler({AudioPlayer? player, this.onSkipToNext, this.onSkipToPrevious, this.onPlay})
       : _player = player ?? AudioPlayer() {
     _init();
   }
@@ -57,7 +58,14 @@ class AudioPlayerHandler extends BaseAudioHandler {
   }
 
   @override
-  Future<void> play() => _player.play();
+  Future<void> play() async {
+    if (_player.processingState == ProcessingState.idle) {
+      // Nothing loaded — delegate to provider to resume last song
+      onPlay?.call();
+    } else {
+      await _player.play();
+    }
+  }
 
   @override
   Future<void> pause() => _player.pause();

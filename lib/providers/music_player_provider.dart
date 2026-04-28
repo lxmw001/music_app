@@ -110,6 +110,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       builder: () => AudioPlayerHandler(
         onSkipToNext: () => nextSong(),
         onSkipToPrevious: () => previousSong(),
+        onPlay: () => resume(),
       ),
       config: AudioServiceConfig(
         androidNotificationChannelId: 'com.lxmw.musicapp.channel.audio',
