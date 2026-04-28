@@ -28,8 +28,8 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
   // Rotation animation
   late final AnimationController _rotationController;
 
-  // Lyrics
-  String? _lyrics;
+  // Cover style: 0=rotating disc, 1=vinyl disc, 2=static square
+  int _coverStyle = 0;
   bool _lyricsLoading = false;
   bool _showLyrics = false;
   String? _lastLyricsKey;
@@ -221,13 +221,88 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
     );
   }
 
+  Widget _buildCover(song, bool isLoading) {
+    final image = Image.network(
+      song.imageUrl, fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => Container(color: Colors.grey[800], child: const Icon(Icons.music_note, size: 80)),
+    );
+    final shadow = BoxShadow(color: _dominantColor.withValues(alpha: 0.6), blurRadius: 30, spreadRadius: 5);
+
+    switch (_coverStyle) {
+      // Style 0: rotating circle
+      case 0:
+        return AnimatedBuilder(
+          animation: _rotationController,
+          builder: (_, child) => Transform.rotate(
+            angle: _rotationController.value * 2 * 3.14159,
+            child: child,
+          ),
+          child: Container(
+            width: 280, height: 280,
+            decoration: BoxDecoration(shape: BoxShape.circle, boxShadow: [shadow]),
+            child: ClipOval(child: Stack(alignment: Alignment.center, children: [
+              image,
+              if (isLoading) Container(color: Colors.black54, child: const CircularProgressIndicator(color: Colors.white)),
+            ])),
+          ),
+        );
+
+      // Style 1: vinyl disc
+      case 1:
+        return AnimatedBuilder(
+          animation: _rotationController,
+          builder: (_, child) => Transform.rotate(
+            angle: _rotationController.value * 2 * 3.14159,
+            child: child,
+          ),
+          child: Container(
+            width: 280, height: 280,
+            decoration: BoxDecoration(shape: BoxShape.circle, boxShadow: [shadow]),
+            child: CustomPaint(
+              painter: _VinylPainter(song.imageUrl),
+              child: ClipOval(
+                child: Center(
+                  child: ClipOval(
+                    child: SizedBox(
+                      width: 100, height: 100,
+                      child: Stack(alignment: Alignment.center, children: [
+                        image,
+                        if (isLoading) Container(color: Colors.black54, child: const CircularProgressIndicator(color: Colors.white)),
+                      ]),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+
+      // Style 2: static square
+      default:
+        return Container(
+          width: 280, height: 280,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [shadow],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Stack(alignment: Alignment.center, children: [
+              image,
+              if (isLoading) Container(color: Colors.black54, child: const CircularProgressIndicator(color: Colors.white)),
+            ]),
+          ),
+        );
+    }
+  }
+
   Widget _buildPlayerView(BuildContext context, MusicPlayerProvider player, song, bool isLoading) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
         children: [
           const SizedBox(height: 16),
-          // Rotating album art with swipe
+          // Album art — tap to cycle styles
           Expanded(
             flex: 3,
             child: GestureDetector(
@@ -236,30 +311,8 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
                 if (details.primaryVelocity! < -300) player.nextSong();
                 if (details.primaryVelocity! > 300) player.previousSong();
               },
-              child: AnimatedBuilder(
-                animation: _rotationController,
-                builder: (_, child) => Transform.rotate(
-                  angle: _rotationController.value * 2 * 3.14159,
-                  child: child,
-                ),
-                child: Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    boxShadow: [BoxShadow(color: _dominantColor.withValues(alpha: 0.5), blurRadius: 30, spreadRadius: 5)],
-                  ),
-                  child: ClipOval(
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Image.network(song.imageUrl, fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(color: Colors.grey[800], child: const Icon(Icons.music_note, size: 80))),
-                        if (isLoading)
-                          Container(color: Colors.black54, child: const CircularProgressIndicator(color: Colors.white)),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
+              onTap: () => setState(() => _coverStyle = (_coverStyle + 1) % 3),
+              child: Center(child: _buildCover(song, isLoading)),
             ),
           ),
           const SizedBox(height: 24),
@@ -415,4 +468,36 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
     String p(int n) => n.toString().padLeft(2, '0');
     return '${p(d.inMinutes.remainder(60))}:${p(d.inSeconds.remainder(60))}';
   }
+}
+
+class _VinylPainter extends CustomPainter {
+  final String imageUrl;
+  _VinylPainter(this.imageUrl);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2;
+
+    // Outer vinyl black disc
+    canvas.drawCircle(center, radius, Paint()..color = const Color(0xFF1a1a1a));
+
+    // Vinyl grooves
+    final groovePaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.04)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    for (double r = radius * 0.42; r < radius * 0.95; r += 6) {
+      canvas.drawCircle(center, r, groovePaint);
+    }
+
+    // Label ring
+    canvas.drawCircle(center, radius * 0.38, Paint()..color = const Color(0xFF2a2a2a));
+
+    // Center hole
+    canvas.drawCircle(center, radius * 0.04, Paint()..color = Colors.black);
+  }
+
+  @override
+  bool shouldRepaint(_VinylPainter old) => old.imageUrl != imageUrl;
 }
