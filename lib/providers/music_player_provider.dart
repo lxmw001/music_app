@@ -154,15 +154,13 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     bool? _lastPlaying;
 
     _audioHandler.playbackState.listen((state) {
-      if (state.processingState == AudioProcessingState.completed && !_isFetchingSuggestions && !_isSwitchingSong) {
-        print('[MusicPlayerProvider] song completed, calling nextSong');
+      if (state.processingState == AudioProcessingState.completed && !_isFetchingSuggestions ) {
         if (_currentSong != null) {
           _historyService.recordPlay(_currentSong!, _currentSong!.duration.inSeconds);
         }
         Future.microtask(() => nextSong());
       }
 
-      // Stall detection: if buffering for >8s, re-fetch URL and retry
       if (state.processingState == AudioProcessingState.buffering && state.playing) {
         _stallTimer ??= Timer(const Duration(seconds: 8), _handleStall);
       } else {
@@ -170,21 +168,14 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         _stallTimer = null;
       }
 
-      // Only notify on meaningful state changes, not every position tick
       if (state.processingState != _lastProcessingState || state.playing != _lastPlaying) {
         _lastProcessingState = state.processingState;
         _lastPlaying = state.playing;
         notifyListeners();
       }
     });
-    _audioHandler.mediaItem.listen((_) {
-      notifyListeners(); // song metadata changed — rebuild needed
-    });
 
-    _audioHandler.durationStream.listen((_) {
-      // Duration changes are rare — only notify when it actually changes
-      notifyListeners();
-    });
+    _audioHandler.mediaItem.listen((_) => notifyListeners());
 
     _audioHandler.positionStream.listen((position) {
       if (_currentSong != null && _autoAddSuggestions) {
@@ -197,8 +188,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         }
       }
     });
-
-    _audioHandler.durationStream.listen((_) => notifyListeners());
     
     notifyListeners();
     
@@ -295,8 +284,8 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     // Don't restart if same song is already playing (but allow if queue is being set)
     if (_currentSong?.id == song.id && isPlaying && queue == null) return;
     // Block concurrent auto-advances (fromQueue), but always allow user taps
-    if (_isSwitchingSong && fromQueue) return;
-    _isSwitchingSong = true;
+    
+    
 
     // Snapshot position before it resets, then record play for previous song
     final previousSong = _currentSong;
@@ -365,7 +354,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     }
     if (audioUrl.isEmpty) {
       print('[MusicPlayerProvider] Could not get audio file for \\${song.title}, skipping');
-      _isSwitchingSong = false;
+      
       return;
     }
     final mediaItem = MediaItem(
@@ -396,7 +385,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       } catch (e2) {
         print('[MusicPlayerProvider] retry failed: $e2 — skipping to next');
         _loadingAudioIds.remove(song.id);
-        _isSwitchingSong = false;
+        
         notifyListeners();
         // Remove failed song from queue to prevent infinite skip loop
         _queue.removeWhere((s) => s.id == song.id);
@@ -405,8 +394,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         return;
       }
     }
-    _isSwitchingSong = false;
-    _consecutiveSkips = 0;
+    
     _historyService.savePosition(song, 0);
     _historyService.saveQueue(_queue, _currentIndex);
     _startPositionSaveTimer(song);
@@ -430,9 +418,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     }
   }
   bool _isSeeding = false;
-  bool _isSwitchingSong = false;
-  int _consecutiveSkips = 0;
-  static const _maxConsecutiveSkips = 5;
+  bool 
 
   /// Fetch suggestions for the seed song and append to queue in background
   void _seedQueueWithSuggestions(Song seedSong) {
@@ -565,15 +551,12 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   @override
   void nextSong() {
     if (!_isInitialized) return;
-    if (_isSwitchingSong) return;
-    _consecutiveSkips++;
-    if (_consecutiveSkips > _maxConsecutiveSkips) {
+    
       print('[MusicPlayerProvider] too many consecutive skips, stopping');
-      _consecutiveSkips = 0;
-      _isSwitchingSong = false;
+      
       return;
     }
-    _isSwitchingSong = true;
+    
     if (_queue.isNotEmpty && _currentIndex < _queue.length - 1) {
       _currentIndex++;
       playSong(_queue[_currentIndex], fromQueue: true);
@@ -585,10 +568,10 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       _currentIndex = _queue.length - 1;
       playSong(next, fromQueue: true);
     } else if (_currentSong != null) {
-      _isSwitchingSong = false; // no song to play, release lock
+       // no song to play, release lock
       _fetchAndPlaySuggestion();
     } else {
-      _isSwitchingSong = false;
+      
     }
   }
 
