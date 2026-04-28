@@ -44,6 +44,7 @@ void main() {
 
   group('AudioPlayerHandler.play', () {
     test('delegates to AudioPlayer.play()', () async {
+      when(mockPlayer.processingState).thenReturn(ProcessingState.ready);
       when(mockPlayer.play()).thenAnswer((_) async {});
       await handler.play();
       verify(mockPlayer.play()).called(1);

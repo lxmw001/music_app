@@ -110,6 +110,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       builder: () => AudioPlayerHandler(
         onSkipToNext: () => nextSong(),
         onSkipToPrevious: () => previousSong(),
+        onPlay: () => resume(),
       ),
       config: AudioServiceConfig(
         androidNotificationChannelId: 'com.lxmw.musicapp.channel.audio',
@@ -150,7 +151,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     }
     
     _audioHandler.playbackState.listen((state) {
-      if (state.processingState == AudioProcessingState.completed && !_isFetchingSuggestions) {
+      if (state.processingState == AudioProcessingState.completed && !_isFetchingSuggestions && !_isSwitchingSong) {
         print('[MusicPlayerProvider] song completed, calling nextSong');
         if (_currentSong != null) {
           _historyService.recordPlay(_currentSong!, _currentSong!.duration.inSeconds);
@@ -387,6 +388,9 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         _loadingAudioIds.remove(song.id);
         _isSwitchingSong = false;
         notifyListeners();
+        // Remove failed song from queue to prevent infinite skip loop
+        _queue.removeWhere((s) => s.id == song.id);
+        if (_currentIndex >= _queue.length) _currentIndex = _queue.length - 1;
         nextSong();
         return;
       }
