@@ -175,14 +175,15 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     _audioHandler.positionStream.listen((position) {
       if (_currentSong != null && _autoAddSuggestions) {
         final duration = totalDuration;
-        if (duration.inSeconds > 0 && 
-            (duration - position).inSeconds <= 10 && 
+        if (duration.inSeconds > 0 &&
+            (duration - position).inSeconds <= 10 &&
             !_isFetchingSuggestions &&
             _suggestedSongs.isEmpty) {
           _fetchSuggestionsInBackground();
         }
       }
-      notifyListeners();
+      // Do NOT call notifyListeners here — position updates fire multiple times/sec
+      // and cause excessive rebuilds. UI reads position directly from audioHandler.
     });
 
     _audioHandler.durationStream.listen((_) => notifyListeners());
@@ -358,11 +359,19 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       artUri: Uri.parse(song.imageUrl),
       duration: song.duration,
     );
-    await _audioHandler.setAudioSource(audioUrl, mediaItem);
-    if (seekTo != null && seekTo > Duration.zero) {
-      await _audioHandler.seek(seekTo);
+    try {
+      await _audioHandler.setAudioSource(audioUrl, mediaItem);
+      if (seekTo != null && seekTo > Duration.zero) {
+        await _audioHandler.seek(seekTo);
+      }
+      await _audioHandler.play();
+    } catch (e) {
+      print('[MusicPlayerProvider] setAudioSource/play error: $e — skipping to next');
+      _loadingAudioIds.remove(song.id);
+      notifyListeners();
+      nextSong();
+      return;
     }
-    await _audioHandler.play();
     _historyService.savePosition(song, 0);
     _historyService.saveQueue(_queue, _currentIndex);
     _startPositionSaveTimer(song);
