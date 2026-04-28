@@ -156,7 +156,8 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         if (_currentSong != null) {
           _historyService.recordPlay(_currentSong!, _currentSong!.duration.inSeconds);
         }
-        nextSong();
+        // Use Future.microtask to avoid calling nextSong synchronously inside a stream listener
+        Future.microtask(() => nextSong());
       }
 
       // Stall detection: if buffering for >8s, re-fetch URL and retry
@@ -552,6 +553,8 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   @override
   void nextSong() {
     if (!_isInitialized) return;
+    if (_isSwitchingSong) return;
+    _isSwitchingSong = true;
     if (_queue.isNotEmpty && _currentIndex < _queue.length - 1) {
       _currentIndex++;
       playSong(_queue[_currentIndex], fromQueue: true);
@@ -563,7 +566,10 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       _currentIndex = _queue.length - 1;
       playSong(next, fromQueue: true);
     } else if (_currentSong != null) {
+      _isSwitchingSong = false; // no song to play, release lock
       _fetchAndPlaySuggestion();
+    } else {
+      _isSwitchingSong = false;
     }
   }
 
