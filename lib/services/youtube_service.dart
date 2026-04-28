@@ -18,7 +18,7 @@ abstract class YoutubeGateway {
 }
 
 class YoutubeExplodeGateway implements YoutubeGateway {
-  final YoutubeExplode _yt;
+  YoutubeExplode _yt;
   YoutubeExplodeGateway({YoutubeExplode? yt}) : _yt = yt ?? YoutubeExplode();
 
   @override
@@ -49,8 +49,12 @@ class YoutubeExplodeGateway implements YoutubeGateway {
         }
       } catch (e) {
         print('[YoutubeGateway] $client failed: $e');
-        // Stop on rate limit — further requests will also fail
-        if (e.toString().contains('RequestLimitExceeded')) break;
+        if (e.toString().contains('RequestLimitExceeded')) {
+          // Refresh the YT instance to get a new session
+          _yt.close();
+          _yt = YoutubeExplode();
+          break;
+        }
         continue;
       }
     }
@@ -192,8 +196,8 @@ class YouTubeService {
 
   Future<MusicSearchResult> searchSongs(String query) =>
       safeCall(() async {
-        final serverSongs = await _server.searchSongs(query);
-        if (serverSongs.isNotEmpty) return MusicSearchResult(songs: serverSongs);
+        final result = await _server.searchSongs(query);
+        if (!result.isEmpty) return result;
 
         print('[YouTubeService] server empty, using YouTube fallback');
         final songs = await _youtubeSearch(query);
@@ -365,23 +369,46 @@ class YouTubeService {
     return await _audioCache.downloadAndCacheAudio(videoId, yt);
   }
 
-  /// Returns a local file path to the cached audio if available, otherwise fetches the online URL.
-  Future<String> getPlayableAudioPath(String videoId) async {
-    // 1. Permanent downloads (documents/downloads/) — highest priority
+  Future<String> getPlayableAudioPath(String videoId, {String serverId = '', Song? song}) async {
+    // 1. Permanent downloads
     final downloadedPath = await _downloadService.getDownloadedPathById(videoId);
     if (downloadedPath != null) {
-      print('[YouTubeService] Using downloaded file for $videoId: $downloadedPath');
+      print('[YouTubeService] Using downloaded file for $videoId');
       return downloadedPath;
     }
-    // 2. Temp audio cache
+    // 2. Server-cached stream URL already on the song object (no HTTP call needed)
+    if (song != null && song.hasValidStreamUrl) {
+      print('[YouTubeService] Using cached stream URL for $videoId');
+      return song.streamUrl!;
+    }
+    // 3. Fetch from server (for songs not yet in memory with a valid URL)
+    final serverUrl = await _server.getStreamUrl(videoId);
+    if (serverUrl.isNotEmpty) {
+      print('[YouTubeService] Using server stream URL for $videoId');
+      return serverUrl;
+    }
+    // 4. Temp audio cache
     final cachedPath = await _audioCache.getCachedAudioPath(videoId);
     if (cachedPath != null) {
-      print('[YouTubeService] Using cached audio for $videoId: $cachedPath');
+      print('[YouTubeService] Using cached audio for $videoId');
       return cachedPath;
     }
+    // 5. Resolve from YouTube and push to server
     final url = await getAudioUrl(videoId);
     print('[YouTubeService] Using online audio URL for $videoId: $url');
+    if (url.isNotEmpty) {
+      final isMix = song != null && song.serverId.isEmpty;
+      _server.pushStreamUrl(isMix ? videoId : serverId, url, isMix: isMix);
+      song?.streamUrl = url;
+      song?.streamUrlExpiresAt = _extractExpiry(url);
+    }
     return url;
+  }
+
+  DateTime _extractExpiry(String url) {
+    final expire = Uri.parse(url).queryParameters['expire'];
+    if (expire != null) return DateTime.fromMillisecondsSinceEpoch(int.parse(expire) * 1000);
+    return DateTime.now().add(const Duration(hours: 6));
   }
 
   void dispose() {}

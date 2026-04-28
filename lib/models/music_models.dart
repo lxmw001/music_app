@@ -8,6 +8,8 @@ class Song {
   String audioUrl;
   final Duration duration;
   final List<String> genres; // genre tags from server
+  String? streamUrl;
+  DateTime? streamUrlExpiresAt;
 
   Song({
     required this.id,
@@ -19,7 +21,14 @@ class Song {
     required this.audioUrl,
     required this.duration,
     this.genres = const [],
+    this.streamUrl,
+    this.streamUrlExpiresAt,
   });
+
+  bool get hasValidStreamUrl =>
+      streamUrl != null &&
+      streamUrl!.isNotEmpty &&
+      (streamUrlExpiresAt == null || streamUrlExpiresAt!.isAfter(DateTime.now()));
 
   factory Song.fromJson(Map<String, dynamic> json) {
     return Song(
@@ -32,6 +41,10 @@ class Song {
       audioUrl: json['audioUrl'] ?? '',
       duration: Duration(seconds: json['duration'] ?? 0),
       genres: List<String>.from(json['genres'] ?? []),
+      streamUrl: json['streamUrl'] as String?,
+      streamUrlExpiresAt: json['streamUrlExpiresAt'] != null
+          ? DateTime.tryParse(json['streamUrlExpiresAt'])
+          : null,
     );
   }
 
@@ -39,6 +52,8 @@ class Song {
     'id': id, 'serverId': serverId, 'title': title, 'artist': artist, 'album': album,
     'imageUrl': imageUrl, 'audioUrl': audioUrl,
     'duration': duration.inSeconds, 'genres': genres,
+    if (streamUrl != null) 'streamUrl': streamUrl,
+    if (streamUrlExpiresAt != null) 'streamUrlExpiresAt': streamUrlExpiresAt!.toIso8601String(),
   };
 }
 
@@ -46,8 +61,16 @@ class MusicSearchResult {
   final List<Song> songs;
   final List<Song> mixes;
   final List<Song> videos;
-  const MusicSearchResult({this.songs = const [], this.mixes = const [], this.videos = const []});
-  bool get isEmpty => songs.isEmpty && mixes.isEmpty && videos.isEmpty;
+  final List<String> artists; // artist names for now, expand later
+  final bool hasMoreSongs;
+  const MusicSearchResult({
+    this.songs = const [],
+    this.mixes = const [],
+    this.videos = const [],
+    this.artists = const [],
+    this.hasMoreSongs = false,
+  });
+  bool get isEmpty => songs.isEmpty && mixes.isEmpty && videos.isEmpty && artists.isEmpty;
 }
 
 class Playlist {

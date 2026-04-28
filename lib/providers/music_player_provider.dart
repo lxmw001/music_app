@@ -334,7 +334,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       notifyListeners();
       try {
         // Prefer cached file, otherwise play online
-        audioUrl = await _youtubeService.getPlayableAudioPath(song.id);
+        audioUrl = await _youtubeService.getPlayableAudioPath(song.id, serverId: song.serverId, song: song);
         print('[MusicPlayerProvider] Playable audio for \\${song.title}: \\${audioUrl.isEmpty ? "EMPTY" : audioUrl}');
         song.audioUrl = audioUrl;
       } finally {
