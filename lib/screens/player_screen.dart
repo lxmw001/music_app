@@ -30,6 +30,12 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
 
   // Cover style: 0=rotating disc, 1=vinyl disc, 2=static square
   int _coverStyle = 0;
+
+  // Lyrics
+  String? _lyrics;
+  bool _lyricsLoading = false;
+  bool _showLyrics = false;
+  String? _lastLyricsKey;
   bool _lyricsLoading = false;
   bool _showLyrics = false;
   String? _lastLyricsKey;
