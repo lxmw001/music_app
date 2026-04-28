@@ -397,6 +397,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       }
     }
     _isSwitchingSong = false;
+    _consecutiveSkips = 0;
     _historyService.savePosition(song, 0);
     _historyService.saveQueue(_queue, _currentIndex);
     _startPositionSaveTimer(song);
@@ -421,6 +422,8 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   }
   bool _isSeeding = false;
   bool _isSwitchingSong = false;
+  int _consecutiveSkips = 0;
+  static const _maxConsecutiveSkips = 5;
 
   /// Fetch suggestions for the seed song and append to queue in background
   void _seedQueueWithSuggestions(Song seedSong) {
@@ -554,6 +557,13 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   void nextSong() {
     if (!_isInitialized) return;
     if (_isSwitchingSong) return;
+    _consecutiveSkips++;
+    if (_consecutiveSkips > _maxConsecutiveSkips) {
+      print('[MusicPlayerProvider] too many consecutive skips, stopping');
+      _consecutiveSkips = 0;
+      _isSwitchingSong = false;
+      return;
+    }
     _isSwitchingSong = true;
     if (_queue.isNotEmpty && _currentIndex < _queue.length - 1) {
       _currentIndex++;
