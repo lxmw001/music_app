@@ -7,6 +7,7 @@ import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:music_app/services/youtube_service.dart';
 import 'package:music_app/services/music_server_service.dart';
 import 'package:music_app/services/gemini_service.dart';
+import 'package:music_app/models/music_models.dart';
 
 import 'youtube_service_test.mocks.dart';
 
