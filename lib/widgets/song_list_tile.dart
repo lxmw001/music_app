@@ -108,7 +108,7 @@ class _SongListTileState extends State<SongListTile> with SingleTickerProviderSt
             if (provider.currentSong?.id == widget.song.id) {
               Navigator.push(context, MaterialPageRoute(builder: (_) => PlayerScreen()));
             } else {
-              provider.playSong(widget.song);
+              provider.playSong(widget.song, queue: widget.queue);
             }
           },
         );

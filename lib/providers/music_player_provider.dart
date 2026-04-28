@@ -24,6 +24,7 @@ abstract class MusicPlayerProvider extends ChangeNotifier {
   bool get isPlaying;
   Duration get currentPosition;
   Duration get totalDuration;
+  Stream<Duration> get positionStream;
 
   Future<void> playSong(Song song, {List<Song>? queue, Duration? seekTo, bool fromQueue = false, String? searchQuery});
   Future<void> pause();
@@ -98,6 +99,8 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   Duration get currentPosition => _isInitialized ? _audioHandler.currentPosition : Duration.zero;
   @override
   Duration get totalDuration => _isInitialized ? _audioHandler.duration : Duration.zero;
+  @override
+  Stream<Duration> get positionStream => _isInitialized ? _audioHandler.positionStream : const Stream.empty();
 
   MusicPlayerProviderImpl() {
     _init();

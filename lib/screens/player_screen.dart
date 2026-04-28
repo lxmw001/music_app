@@ -345,23 +345,34 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
             ],
           ),
           const SizedBox(height: 16),
-          // Seek bar
-          Slider(
-            value: player.currentPosition.inSeconds.toDouble().clamp(0.0, player.totalDuration.inSeconds.toDouble().clamp(1.0, double.infinity)),
-            max: player.totalDuration.inSeconds.toDouble().clamp(1.0, double.infinity),
-            onChanged: (v) => player.seekTo(Duration(seconds: v.toInt())),
-            activeColor: Colors.white,
-            inactiveColor: Colors.white24,
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(_fmt(player.currentPosition), style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                Text(_fmt(player.totalDuration), style: const TextStyle(color: Colors.white70, fontSize: 12)),
-              ],
-            ),
+          // Seek bar — uses StreamBuilder so it updates every second without full rebuild
+          StreamBuilder<Duration>(
+            stream: player.positionStream,
+            builder: (context, snap) {
+              final position = snap.data ?? player.currentPosition;
+              final total = player.totalDuration.inSeconds.clamp(1, double.infinity).toDouble();
+              return Column(
+                children: [
+                  Slider(
+                    value: position.inSeconds.toDouble().clamp(0.0, total),
+                    max: total,
+                    onChanged: (v) => player.seekTo(Duration(seconds: v.toInt())),
+                    activeColor: Colors.white,
+                    inactiveColor: Colors.white24,
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(_fmt(position), style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                        Text(_fmt(player.totalDuration), style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 16),
           // Controls

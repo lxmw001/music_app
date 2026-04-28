@@ -64,6 +64,7 @@ class FakeMusicPlayerProvider extends ChangeNotifier implements MusicPlayerProvi
   @override int get currentIndex => 0;
   @override Duration get currentPosition => Duration.zero;
   @override Duration get totalDuration => const Duration(seconds: 200);
+  @override Stream<Duration> get positionStream => const Stream.empty();
 
   @override
   Future<void> playSong(Song song, {List<Song>? queue, Duration? seekTo, bool fromQueue = false, String? searchQuery}) async {
