@@ -36,9 +36,6 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
   bool _lyricsLoading = false;
   bool _showLyrics = false;
   String? _lastLyricsKey;
-  bool _lyricsLoading = false;
-  bool _showLyrics = false;
-  String? _lastLyricsKey;
 
   @override
   void initState() {
