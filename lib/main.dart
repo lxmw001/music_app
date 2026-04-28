@@ -50,7 +50,8 @@ class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
   late final List<Widget> _screens;
   String? _updateUrl;
-  double? _downloadProgress; // null = not downloading, 0.0-1.0 = progress
+  double? _downloadProgress;
+  DateTime? _lastBackPress;
 
   @override
   void initState() {
@@ -65,9 +66,34 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
+  Future<bool> _onWillPop() async {
+    // If not on home tab, go to home tab first
+    if (_currentIndex != 0) {
+      setState(() => _currentIndex = 0);
+      return false;
+    }
+    // On home tab: require double-back within 2 seconds to exit
+    final now = DateTime.now();
+    if (_lastBackPress == null || now.difference(_lastBackPress!) > const Duration(seconds: 2)) {
+      _lastBackPress = now;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Press back again to exit'), duration: Duration(seconds: 2)),
+      );
+      return false;
+    }
+    return true;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        final shouldPop = await _onWillPop();
+        if (shouldPop && context.mounted) Navigator.of(context).pop();
+      },
+      child: Scaffold(
       body: Column(
         children: [
           if (_updateUrl != null)
@@ -193,6 +219,7 @@ class _MainScreenState extends State<MainScreen> {
           BottomNavigationBarItem(icon: Icon(Icons.library_music), label: 'Library'),
         ],
       ),
-    );
+    ), // Scaffold
+    ); // PopScope
   }
 }
