@@ -564,9 +564,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       _fetchAndPlaySuggestion();
     }
   }
-      
-    }
-  }
 
   Future<void> _fetchAndPlaySuggestion() async {
     if (_currentSong == null || _isSeeding) return;
