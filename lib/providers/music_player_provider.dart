@@ -114,8 +114,9 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       config: AudioServiceConfig(
         androidNotificationChannelId: 'com.lxmw.musicapp.channel.audio',
         androidNotificationChannelName: 'Music Player',
+        androidNotificationOngoing: true,
         androidShowNotificationBadge: true,
-        androidStopForegroundOnPause: false,
+        androidStopForegroundOnPause: true,
       ),
     );
     print('[MusicPlayerProvider] AudioService.init complete');
