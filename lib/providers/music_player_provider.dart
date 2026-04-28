@@ -366,11 +366,24 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       }
       await _audioHandler.play();
     } catch (e) {
-      print('[MusicPlayerProvider] setAudioSource/play error: $e — skipping to next');
-      _loadingAudioIds.remove(song.id);
-      notifyListeners();
-      nextSong();
-      return;
+      print('[MusicPlayerProvider] setAudioSource error: $e — retrying with fresh URL');
+      try {
+        song.audioUrl = '';
+        final freshUrl = await _youtubeService.getPlayableAudioPath(song.id);
+        if (freshUrl.isEmpty) throw Exception('empty URL on retry');
+        song.audioUrl = freshUrl;
+        await _audioHandler.setAudioSource(freshUrl, mediaItem);
+        if (seekTo != null && seekTo > Duration.zero) {
+          await _audioHandler.seek(seekTo);
+        }
+        await _audioHandler.play();
+      } catch (e2) {
+        print('[MusicPlayerProvider] retry failed: $e2 — skipping to next');
+        _loadingAudioIds.remove(song.id);
+        notifyListeners();
+        nextSong();
+        return;
+      }
     }
     _historyService.savePosition(song, 0);
     _historyService.saveQueue(_queue, _currentIndex);
