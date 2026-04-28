@@ -418,7 +418,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     }
   }
   bool _isSeeding = false;
-  bool 
 
   /// Fetch suggestions for the seed song and append to queue in background
   void _seedQueueWithSuggestions(Song seedSong) {
