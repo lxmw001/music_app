@@ -151,6 +151,32 @@ class PlayHistoryService {
   }
 
   static const _playlistsKey = 'saved_playlists';
+  static const _trendingCacheKey = 'cached_trending';
+  static const _suggestedCacheKey = 'cached_suggested';
+
+  Future<void> cacheTrending(List<Song> songs) async {
+    final p = await _prefs;
+    await p.setString(_trendingCacheKey, jsonEncode(songs.map(_songToMap).toList()));
+  }
+
+  Future<List<Song>> loadCachedTrending() async {
+    final p = await _prefs;
+    final raw = p.getString(_trendingCacheKey);
+    if (raw == null) return [];
+    return (jsonDecode(raw) as List).map((e) => Song.fromJson(e)).toList();
+  }
+
+  Future<void> cacheSuggested(List<Song> songs) async {
+    final p = await _prefs;
+    await p.setString(_suggestedCacheKey, jsonEncode(songs.map(_songToMap).toList()));
+  }
+
+  Future<List<Song>> loadCachedSuggested() async {
+    final p = await _prefs;
+    final raw = p.getString(_suggestedCacheKey);
+    if (raw == null) return [];
+    return (jsonDecode(raw) as List).map((e) => Song.fromJson(e)).toList();
+  }
 
   Future<void> savePlaylist(String name, List<Song> songs) async {
     if (songs.isEmpty) return;

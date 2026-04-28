@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/music_player_provider.dart';
 import '../models/music_models.dart';
 import '../services/youtube_service.dart';
+import '../services/play_history_service.dart';
 import '../widgets/song_card_list.dart';
 import '../widgets/recent_songs_grid.dart';
 
@@ -17,6 +18,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late final YouTubeService _youtubeService;
+  final _history = PlayHistoryService();
   List<Song> trendingSongs = [];
   List<Song> suggestedSongs = [];
   List<Playlist> recentPlaylists = [];
@@ -26,33 +28,47 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _youtubeService = widget.youtubeService ?? YouTubeService();
-    _loadTrendingMusic();
+    _loadWithCache();
   }
 
-  Future<void> _loadTrendingMusic() async {
-    final songs = await _youtubeService.getTrendingMusic();
-    final provider = context.read<MusicPlayerProvider>();
-    final playlists = await provider.loadPlaylists();
-    setState(() {
-      trendingSongs = songs;
-      recentPlaylists = playlists;
-      isLoading = false;
-    });
+  Future<void> _loadWithCache() async {
+    // 1. Show cached data immediately
+    final cached = await _history.loadCachedTrending();
+    final cachedSuggested = await _history.loadCachedSuggested();
+    final playlists = await context.read<MusicPlayerProvider>().loadPlaylists();
+    if (mounted) {
+      setState(() {
+        if (cached.isNotEmpty) trendingSongs = cached;
+        if (cachedSuggested.isNotEmpty) suggestedSongs = cachedSuggested;
+        recentPlaylists = playlists;
+        isLoading = cached.isEmpty; // only show spinner if no cache
+      });
+    }
+
+    // 2. Fetch fresh data in background
+    final fresh = await _youtubeService.getTrendingMusic();
+    if (fresh.isNotEmpty) {
+      await _history.cacheTrending(fresh);
+      if (mounted) setState(() { trendingSongs = fresh; isLoading = false; });
+    } else if (mounted) {
+      setState(() => isLoading = false);
+    }
+
     _loadSuggestions();
   }
 
   Future<void> _loadSuggestions() async {
     final provider = context.read<MusicPlayerProvider>();
     final likedSongs = await provider.getMostLikedFromHistory();
-    print('[HomeScreen] liked songs from history: ${likedSongs.map((s) => s.title).toList()}');
     final seedSongs = likedSongs.isNotEmpty
         ? likedSongs.take(3).toList()
         : trendingSongs.take(2).toList();
-    print('[HomeScreen] seed songs for suggestions: ${seedSongs.map((s) => s.title).toList()}');
     if (seedSongs.isEmpty) return;
     final suggestions = await _youtubeService.getSuggestionsFromHistory(seedSongs);
-    print('[HomeScreen] suggestions loaded: ${suggestions.length}');
-    if (mounted) setState(() => suggestedSongs = suggestions);
+    if (suggestions.isNotEmpty) {
+      await _history.cacheSuggested(suggestions);
+      if (mounted) setState(() => suggestedSongs = suggestions);
+    }
   }
 
   @override
