@@ -57,6 +57,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   final LastFmService _lastFmService = LastFmService();
   Timer? _positionSaveTimer;
   Timer? _stallTimer;
+  bool _isRecoveringFromStall = false;
   Duration _lastRestoredPosition = Duration.zero;
   Song? _currentSong;
   List<Song> _queue = [];
@@ -164,7 +165,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         Future.microtask(() => nextSong());
       }
 
-      if (state.processingState == AudioProcessingState.buffering && state.playing) {
+      if (state.processingState == AudioProcessingState.buffering && state.playing && !_isRecoveringFromStall) {
         _stallTimer ??= Timer(const Duration(seconds: 8), _handleStall);
       } else {
         _stallTimer?.cancel();
@@ -211,29 +212,32 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
 
   Future<void> _handleStall() async {
     final song = _currentSong;
-    if (song == null) return;
+    if (song == null || _isRecoveringFromStall) return;
+    _isRecoveringFromStall = true;
+    _stallTimer?.cancel();
+    _stallTimer = null;
     print('[MusicPlayerProvider] stall detected for "${song.title}"');
 
-    // Check connectivity
-    final connectivity = await Connectivity().checkConnectivity();
-    final hasInternet = connectivity.any((c) =>
-        c == ConnectivityResult.wifi || c == ConnectivityResult.mobile);
-
-    if (!hasInternet) {
-      print('[MusicPlayerProvider] no internet — switching to offline queue');
-      await _playOfflineByGenre(song);
-      return;
-    }
-
-    // Has internet — re-fetch URL and retry from current position
-    print('[MusicPlayerProvider] has internet — re-fetching URL...');
-    final position = currentPosition;
-    song.audioUrl = '';
     try {
+      final connectivity = await Connectivity().checkConnectivity();
+      final hasInternet = connectivity.any((c) =>
+          c == ConnectivityResult.wifi || c == ConnectivityResult.mobile);
+
+      if (!hasInternet) {
+        print('[MusicPlayerProvider] no internet — switching to offline queue');
+        await _playOfflineByGenre(song);
+        return;
+      }
+
+      print('[MusicPlayerProvider] has internet — re-fetching URL...');
+      final position = currentPosition;
+      song.audioUrl = '';
       await playSong(song, seekTo: position);
       print('[MusicPlayerProvider] stall recovery succeeded');
     } catch (e) {
       print('[MusicPlayerProvider] stall recovery failed: $e');
+    } finally {
+      _isRecoveringFromStall = false;
     }
   }
 
@@ -308,31 +312,39 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       _currentIndex = _queue.indexWhere((s) => s.id == song.id);
       if (_currentIndex < 0) _currentIndex = 0;
     } else {
-      // User tapped a song — always reset queue and generate fresh playlist
-      _queue = [song];
-      _currentIndex = 0;
-      _isSeeding = false;
-      _pendingSeedQueries = [];
-      _usedSeedQueries.clear();
+      // User tapped a song — use explicit queue if provided, otherwise generate
+      if (queue != null) {
+        // Explicit queue passed (e.g. from saved playlist) — use it directly
+        _queue = queue;
+        _currentIndex = queue.indexOf(song);
+        if (_currentIndex < 0) _currentIndex = 0;
+        _historyService.saveQueue(_queue, _currentIndex);
+      } else {
+        // No queue — reset and generate from server
+        _queue = [song];
+        _currentIndex = 0;
+        _isSeeding = false;
+        _pendingSeedQueries = [];
+        _usedSeedQueries.clear();
 
-      _youtubeService.generatePlaylist(song, search: searchQuery).then((playlist) {
-        if (playlist.isEmpty) {
-          print('[MusicPlayerProvider] generate-playlist returned empty for ${song.id}');
-          return;
-        }
-        if (_currentSong?.id == song.id) {
-          _queue = [song, ...playlist];
-          _currentIndex = 0;
-          print('[MusicPlayerProvider] queue updated: ${_queue.length} songs');
-          _historyService.saveQueue(_queue, _currentIndex);
-          // Save as named playlist using the seed song as the name
-          final playlistName = searchQuery?.isNotEmpty == true
-              ? searchQuery!
-              : '${song.title} Radio';
-          _historyService.savePlaylist(playlistName, _queue);
-          notifyListeners();
-        }
-      });
+        _youtubeService.generatePlaylist(song, search: searchQuery).then((playlist) {
+          if (playlist.isEmpty) {
+            print('[MusicPlayerProvider] generate-playlist returned empty for ${song.id}');
+            return;
+          }
+          if (_currentSong?.id == song.id) {
+            _queue = [song, ...playlist];
+            _currentIndex = 0;
+            print('[MusicPlayerProvider] queue updated: ${_queue.length} songs');
+            _historyService.saveQueue(_queue, _currentIndex);
+            final playlistName = searchQuery?.isNotEmpty == true
+                ? searchQuery!
+                : '${song.title} Radio';
+            _historyService.savePlaylist(playlistName, _queue);
+            notifyListeners();
+          }
+        });
+      }
     }
     notifyListeners();
 

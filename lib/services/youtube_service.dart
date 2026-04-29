@@ -8,6 +8,7 @@ import '../utils/safe_call.dart';
 import 'audio_cache_service.dart';
 import 'download_service.dart';
 import 'music_server_service.dart';
+import 'stream_url_cache.dart';
 
 /// Thin abstraction over YoutubeExplode to allow testing without real network calls.
 abstract class YoutubeGateway {
@@ -183,6 +184,7 @@ class YouTubeService {
   final AudioCacheService _audioCache = AudioCacheService();
   final LastFmService _lastFm;
   final MusicServerService _server;
+  final StreamUrlCache _streamUrlCache = StreamUrlCache();
   late final DownloadService _downloadService;
 
   YouTubeService({YoutubeGateway? gateway, http.Client? httpClient, GeminiService? gemini, LastFmService? lastFm, DownloadService? downloadService, MusicServerService? server})
@@ -376,39 +378,52 @@ class YouTubeService {
       print('[YouTubeService] Using downloaded file for $videoId');
       return downloadedPath;
     }
-    // 2. Server-cached stream URL already on the song object (no HTTP call needed)
+    // 2. In-memory stream URL on song object (set this session)
     if (song != null && song.hasValidStreamUrl) {
-      print('[YouTubeService] Using cached stream URL for $videoId');
+      print('[YouTubeService] Using in-memory stream URL for $videoId');
       return song.streamUrl!;
     }
-    // 3. Fetch from server (for songs not yet in memory with a valid URL)
+    // 3. Persisted stream URL cache (survives restarts)
+    final cachedUrl = await _streamUrlCache.get(videoId);
+    if (cachedUrl != null) {
+      print('[YouTubeService] Using persisted stream URL for $videoId');
+      song?.streamUrl = cachedUrl;
+      return cachedUrl;
+    }
+    // 4. Server-cached stream URL
     final serverUrl = await _server.getStreamUrl(videoId);
     if (serverUrl.isNotEmpty) {
       print('[YouTubeService] Using server stream URL for $videoId');
+      final expiry = _extractExpiry(serverUrl);
+      await _streamUrlCache.put(videoId, serverUrl, expiry);
+      song?.streamUrl = serverUrl;
+      song?.streamUrlExpiresAt = expiry;
       return serverUrl;
     }
-    // 4. Temp audio cache
+    // 5. Temp audio cache
     final cachedPath = await _audioCache.getCachedAudioPath(videoId);
     if (cachedPath != null) {
       print('[YouTubeService] Using cached audio for $videoId');
       return cachedPath;
     }
-    // 5. Resolve from YouTube and push to server
+    // 6. Resolve from YouTube, persist locally and push to server
     final url = await getAudioUrl(videoId);
     print('[YouTubeService] Using online audio URL for $videoId: $url');
     if (url.isNotEmpty) {
+      final expiry = _extractExpiry(url);
+      await _streamUrlCache.put(videoId, url, expiry);
+      song?.streamUrl = url;
+      song?.streamUrlExpiresAt = expiry;
       final isMix = song != null && song.serverId.isEmpty;
       _server.pushStreamUrl(isMix ? videoId : serverId, url, isMix: isMix);
-      song?.streamUrl = url;
-      song?.streamUrlExpiresAt = _extractExpiry(url);
     }
     return url;
   }
 
   DateTime _extractExpiry(String url) {
     final expire = Uri.parse(url).queryParameters['expire'];
-    if (expire != null) return DateTime.fromMillisecondsSinceEpoch(int.parse(expire) * 1000);
-    return DateTime.now().add(const Duration(hours: 6));
+    if (expire != null) return DateTime.fromMillisecondsSinceEpoch(int.parse(expire) * 1000, isUtc: true);
+    return DateTime.now().toUtc().add(const Duration(hours: 6));
   }
 
   void dispose() {}
