@@ -93,7 +93,7 @@ class AudioPlayerHandler extends BaseAudioHandler {
     this.mediaItem.add(item);
     final isLocal = url.startsWith('/') || url.startsWith('file://');
     final uri = isLocal ? Uri.file(url) : Uri.parse(url);
-    final headers = isLocal ? null : _headersForUrl(url);
+    final headers = isLocal ? null : (_isWebm(url) ? null : _headersForUrl(url));
     await _player.setAudioSource(AudioSource.uri(uri,
       tag: item,
       headers: (headers == null || headers.isEmpty) ? null : headers,
@@ -134,6 +134,9 @@ class AudioPlayerHandler extends BaseAudioHandler {
       'Referer': 'https://www.youtube.com/',
     };
   }
+
+  /// Check if URL is a WebM/Opus stream
+  bool _isWebm(String url) => url.contains('mime=audio%2Fwebm') || url.contains('mime=audio/webm');
 
   Future<void> setQueue(List<Song> songs) async {
     final audioSources = songs.map((song) => AudioSource.uri(
