@@ -169,8 +169,8 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         }
       }
 
-      if (state.processingState == AudioProcessingState.buffering && state.playing && !_isRecoveringFromStall) {
-        _stallTimer ??= Timer(const Duration(seconds: 8), _handleStall);
+      if (state.processingState == AudioProcessingState.buffering && state.playing && !_isRecoveringFromStall && _loadingAudioIds.isEmpty) {
+        _stallTimer ??= Timer(const Duration(seconds: 15), _handleStall);
       } else {
         _stallTimer?.cancel();
         _stallTimer = null;

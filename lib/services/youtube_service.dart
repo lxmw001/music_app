@@ -41,7 +41,7 @@ class YoutubeExplodeGateway implements YoutubeGateway {
       try {
         final manifest = await _yt.videos.streamsClient
             .getManifest(videoId, ytClients: [client])
-            .timeout(const Duration(seconds: 8));
+            .timeout(const Duration(seconds: 5));
         final streams = manifest.audioOnly.toList();
         if (streams.isEmpty) continue;
         // Prefer AAC (mp4a) over Opus (webm) — Opus causes decoder crashes on some devices
@@ -71,7 +71,7 @@ class YoutubeExplodeGateway implements YoutubeGateway {
       try {
         final manifest = await _yt.videos.streamsClient
             .getManifest(videoId, ytClients: [client])
-            .timeout(const Duration(seconds: 8));
+            .timeout(const Duration(seconds: 5));
         final streams = manifest.audioOnly.toList();
         if (streams.isEmpty) continue;
         streams.sort((a, b) => b.bitrate.compareTo(a.bitrate));
