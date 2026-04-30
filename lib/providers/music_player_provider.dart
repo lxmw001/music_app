@@ -158,11 +158,15 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     bool? _lastPlaying;
 
     _audioHandler.playbackState.listen((state) {
-      if (state.processingState == AudioProcessingState.completed && !_isFetchingSuggestions ) {
-        if (_currentSong != null) {
+      if (state.processingState == AudioProcessingState.completed && !_isFetchingSuggestions) {
+        final completedSongId = _currentSong?.id;
+        if (completedSongId != null) {
           _historyService.recordPlay(_currentSong!, _currentSong!.duration.inSeconds);
+          // Delay to ensure _currentSong hasn't already changed (e.g. user tapped next)
+          Future.delayed(const Duration(milliseconds: 300), () {
+            if (_currentSong?.id == completedSongId) nextSong();
+          });
         }
-        Future.microtask(() => nextSong());
       }
 
       if (state.processingState == AudioProcessingState.buffering && state.playing && !_isRecoveringFromStall) {
@@ -369,7 +373,9 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     }
     if (audioUrl.isEmpty) {
       print('[MusicPlayerProvider] Could not get audio file for \\${song.title}, skipping');
-      
+      _queue.removeWhere((s) => s.id == song.id);
+      if (_currentIndex >= _queue.length) _currentIndex = (_queue.length - 1).clamp(0, double.infinity.toInt());
+      Future.microtask(() => nextSong());
       return;
     }
     final mediaItem = MediaItem(
@@ -410,6 +416,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       }
     }
     
+    _consecutiveSkips = 0;
     _historyService.savePosition(song, 0);
     _historyService.saveQueue(_queue, _currentIndex);
     _startPositionSaveTimer(song);
@@ -433,6 +440,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     }
   }
   bool _isSeeding = false;
+  int _consecutiveSkips = 0;
 
   /// Fetch suggestions for the seed song and append to queue in background
   void _seedQueueWithSuggestions(Song seedSong) {
@@ -565,6 +573,12 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   @override
   void nextSong() {
     if (!_isInitialized) return;
+    _consecutiveSkips++;
+    if (_consecutiveSkips > 5) {
+      print('[MusicPlayerProvider] too many consecutive skips, stopping');
+      _consecutiveSkips = 0;
+      return;
+    }
     if (_queue.isNotEmpty && _currentIndex < _queue.length - 1) {
       _currentIndex++;
       playSong(_queue[_currentIndex], fromQueue: true);
