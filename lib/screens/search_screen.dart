@@ -44,12 +44,14 @@ class _SearchScreenState extends State<SearchScreen> {
     super.dispose();
   }
 
+  FocusNode? _autoFocusNode; // set by fieldViewBuilder
+
   Future<void> _performSearch(String query) async {
     if (query.isEmpty) {
       setState(() { _result = const MusicSearchResult(); _activeFilter = null; });
       return;
     }
-    _focusNode.unfocus();
+    _autoFocusNode?.unfocus();
     setState(() { isLoading = true; _activeFilter = null; });
     final result = await _youtubeService.searchSongs(query);
     setState(() { _result = result; isLoading = false; _currentQuery = query; _activeFilter = 'songs'; });
@@ -74,7 +76,15 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      // When results are showing, back clears results instead of popping the screen
+      canPop: !_hasResults,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _hasResults) {
+          setState(() { _result = const MusicSearchResult(); _activeFilter = null; });
+        }
+      },
+      child: Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -87,12 +97,13 @@ class _SearchScreenState extends State<SearchScreen> {
         title: Autocomplete<String>(
           optionsBuilder: (v) => _matchingSuggestions(v.text),
           onSelected: (s) { _searchController.text = s; _performSearch(s); },
-          fieldViewBuilder: (ctx, controller, focusNode, onSubmit) {
+          fieldViewBuilder: (ctx, controller, autoFocusNode, onSubmit) {
+            _autoFocusNode = autoFocusNode;
             controller.text = _searchController.text;
             controller.addListener(() => _searchController.text = controller.text);
             return TextField(
               controller: controller,
-              focusNode: _focusNode,
+              focusNode: autoFocusNode,
               decoration: InputDecoration(
                 hintText: 'Songs, artists, mixes...',
                 border: InputBorder.none,
@@ -103,6 +114,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         onPressed: () {
                           controller.clear();
                           _searchController.clear();
+                          autoFocusNode.unfocus();
                           setState(() { _result = const MusicSearchResult(); _currentQuery = ''; _activeFilter = null; });
                         },
                       )
@@ -134,7 +146,8 @@ class _SearchScreenState extends State<SearchScreen> {
       body: isLoading
           ? const Center(child: CircularProgressIndicator(color: Colors.green))
           : _hasResults ? _buildResults() : _buildEmptyState(),
-    );
+    ), // Scaffold
+    ); // PopScope
   }
 
   // ─── Results ─────────────────────────────────────────────────────────────
@@ -307,7 +320,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 backgroundColor: Colors.grey[850],
                 onPressed: () {
                   _searchController.text = s;
-                  _focusNode.unfocus();
+                  _autoFocusNode?.unfocus();
                   _performSearch(s);
                 },
               )).toList(),

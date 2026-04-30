@@ -42,22 +42,42 @@ class YoutubeExplodeGateway implements YoutubeGateway {
         final manifest = await _yt.videos.streamsClient
             .getManifest(videoId, ytClients: [client])
             .timeout(const Duration(seconds: 8));
-        final streams = manifest.audioOnly.toList()
-          ..sort((a, b) => b.bitrate.compareTo(a.bitrate));
-        if (streams.isNotEmpty) {
-          print('[YoutubeGateway] $client succeeded for $videoId');
-          return streams.first.url.toString();
+        final streams = manifest.audioOnly.toList();
+        if (streams.isEmpty) continue;
+        // Prefer AAC (mp4a) over Opus (webm) — Opus causes decoder crashes on some devices
+        final aac = streams.where((s) =>
+            s.codec.mimeType.contains('mp4a') || s.container.name == 'mp4').toList();
+        if (aac.isEmpty) {
+          // No AAC from this client — try next client before falling back to Opus
+          print('[YoutubeGateway] $client only has Opus/WebM for $videoId, trying next client');
+          continue;
         }
+        aac.sort((a, b) => b.bitrate.compareTo(a.bitrate));
+        print('[YoutubeGateway] $client succeeded for $videoId (${aac.first.codec.mimeType})');
+        return aac.first.url.toString();
       } catch (e) {
         print('[YoutubeGateway] $client failed: $e');
         if (e.toString().contains('RequestLimitExceeded')) {
-          // Refresh the YT instance to get a new session
           _yt.close();
           _yt = YoutubeExplode();
           break;
         }
         continue;
       }
+    }
+    // Second pass: accept Opus/WebM if no AAC was found from any client
+    print('[YoutubeGateway] No AAC found, retrying with Opus fallback for $videoId');
+    for (final client in clients) {
+      try {
+        final manifest = await _yt.videos.streamsClient
+            .getManifest(videoId, ytClients: [client])
+            .timeout(const Duration(seconds: 8));
+        final streams = manifest.audioOnly.toList();
+        if (streams.isEmpty) continue;
+        streams.sort((a, b) => b.bitrate.compareTo(a.bitrate));
+        print('[YoutubeGateway] $client Opus fallback succeeded for $videoId');
+        return streams.first.url.toString();
+      } catch (_) { continue; }
     }
     throw Exception('All YouTube clients failed for $videoId');
   }
