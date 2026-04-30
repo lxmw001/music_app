@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'providers/music_player_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/search_screen.dart';
@@ -10,6 +11,7 @@ import 'services/update_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  JustAudioMediaKit.ensureInitialized(android: true);
   runApp(
     MultiProvider(
       providers: [
