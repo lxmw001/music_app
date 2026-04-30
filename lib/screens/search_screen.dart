@@ -120,7 +120,7 @@ class _SearchScreenState extends State<SearchScreen> {
                       )
                     : null,
               ),
-              onSubmitted: (_) { onSubmit(); _performSearch(controller.text); },
+              onSubmitted: (text) { _performSearch(text); },
             );
           },
           optionsViewBuilder: (ctx, onSelected, options) => Align(
