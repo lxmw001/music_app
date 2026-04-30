@@ -59,6 +59,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   Timer? _stallTimer;
   bool _isRecoveringFromStall = false;
   Duration _lastRestoredPosition = Duration.zero;
+  Duration _lastPosition = Duration.zero;
   Song? _currentSong;
   List<Song> _queue = [];
   int _currentIndex = 0;
@@ -156,8 +157,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     
     AudioProcessingState? _lastProcessingState;
     bool? _lastPlaying;
-
-    Duration _lastPosition = Duration.zero;
     _audioHandler.positionStream.listen((position) {
       if (position > Duration.zero) _lastPosition = position;
       if (_currentSong != null && _autoAddSuggestions) {
@@ -391,6 +390,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       duration: song.duration,
     );
     try {
+      _lastPosition = Duration.zero; // reset so false completed events are ignored
       await _audioHandler.setAudioSource(audioUrl, mediaItem);
       if (seekTo != null && seekTo > Duration.zero) {
         await _audioHandler.seek(seekTo);
