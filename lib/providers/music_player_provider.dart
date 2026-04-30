@@ -157,16 +157,29 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     AudioProcessingState? _lastProcessingState;
     bool? _lastPlaying;
 
+    Duration _lastPosition = Duration.zero;
+    _audioHandler.positionStream.listen((position) {
+      if (position > Duration.zero) _lastPosition = position;
+      if (_currentSong != null && _autoAddSuggestions) {
+        final duration = totalDuration;
+        if (duration.inSeconds > 0 &&
+            (duration - position).inSeconds <= 10 &&
+            !_isFetchingSuggestions &&
+            _suggestedSongs.isEmpty) {
+          _fetchSuggestionsInBackground();
+        }
+      }
+    });
+
     _audioHandler.playbackState.listen((state) {
       if (state.processingState == AudioProcessingState.completed && !_isFetchingSuggestions) {
         final completedSongId = _currentSong?.id;
         final duration = totalDuration;
-        final position = currentPosition;
-        // Only advance if we're actually near the end (>80% played or duration unknown)
-        final nearEnd = duration.inSeconds <= 0 ||
-            position.inSeconds >= (duration.inSeconds * 0.8).floor();
-        if (completedSongId != null && nearEnd) {
-          _historyService.recordPlay(_currentSong!, _currentSong!.duration.inSeconds);
+        // Real completion: last known position was >50% of duration, or duration unknown
+        final wasPlaying = duration.inSeconds <= 0 ||
+            _lastPosition.inSeconds >= (duration.inSeconds * 0.5).floor();
+        if (completedSongId != null && wasPlaying) {
+          _historyService.recordPlay(_currentSong!, _lastPosition.inSeconds);
           Future.delayed(const Duration(milliseconds: 300), () {
             if (_currentSong?.id == completedSongId) nextSong();
           });
@@ -189,18 +202,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
 
     _audioHandler.mediaItem.listen((_) => notifyListeners());
 
-    _audioHandler.positionStream.listen((position) {
-      if (_currentSong != null && _autoAddSuggestions) {
-        final duration = totalDuration;
-        if (duration.inSeconds > 0 &&
-            (duration - position).inSeconds <= 10 &&
-            !_isFetchingSuggestions &&
-            _suggestedSongs.isEmpty) {
-          _fetchSuggestionsInBackground();
-        }
-      }
-    });
-    
     notifyListeners();
     
     // If there was a pending playSong call, process it now
