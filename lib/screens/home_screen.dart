@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import '../providers/music_player_provider.dart';
 import '../models/music_models.dart';
 import '../services/youtube_service.dart';
@@ -75,22 +76,23 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Good evening'),
+        title: Text(AppLocalizations.of(context)!.homeGreeting),
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
           IconButton(
             icon: const Icon(Icons.wifi_tethering),
-            tooltip: 'Test YouTube Connectivity',
+            tooltip: AppLocalizations.of(context)!.connectivityTest,
             onPressed: () async {
               final result = await _youtubeService.testYouTubeConnectivity();
               if (!mounted) return;
+              final l = AppLocalizations.of(context)!;
               showDialog(
                 context: context,
                 builder: (context) => AlertDialog(
-                  title: const Text('YouTube Connectivity Test'),
-                  content: Text(result ? 'SUCCESS: Device can reach YouTube.' : 'FAILED: Device cannot reach YouTube.'),
-                  actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('OK'))],
+                  title: Text(l.connectivityTest),
+                  content: Text(result ? l.connectivitySuccess : l.connectivityFail),
+                  actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(l.ok))],
                 ),
               );
             },
@@ -102,30 +104,29 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Recently Played', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            Text(AppLocalizations.of(context)!.homeRecentlyPlayed, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
             if (recentPlaylists.isEmpty)
               Column(
-                children: const [
-                  SizedBox(height: 16),
-                  Icon(Icons.queue_music, size: 48, color: Colors.grey),
-                  SizedBox(height: 8),
-                  Text('No playlists yet', style: TextStyle(color: Colors.grey, fontSize: 15)),
-                  Text('Search for a song to generate one', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                  SizedBox(height: 16),
+                children: [
+                  const SizedBox(height: 16),
+                  const Icon(Icons.queue_music, size: 48, color: Colors.grey),
+                  const SizedBox(height: 8),
+                  Text(AppLocalizations.of(context)!.homeNoPlaylists, style: const TextStyle(color: Colors.grey, fontSize: 13), textAlign: TextAlign.center),
+                  const SizedBox(height: 16),
                 ],
               )
             else
               RecentPlaylistsGrid(playlists: recentPlaylists),
             const SizedBox(height: 32),
-            const Text('Trending Music', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            Text(AppLocalizations.of(context)!.homeTrending, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
             isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : SongCardList(songs: trendingSongs),
             if (suggestedSongs.isNotEmpty) ...[
               const SizedBox(height: 32),
-              const Text('Suggested for You', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+              Text(AppLocalizations.of(context)!.homeSuggested, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
               SongCardList(songs: suggestedSongs),
             ],

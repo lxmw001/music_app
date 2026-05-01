@@ -1,0 +1,49 @@
+{
+  "@@locale": "en",
+  "appTitle": "Music",
+  "navHome": "Home",
+  "navSearch": "Search",
+  "navLibrary": "Library",
+  "homeGreeting": "Good evening",
+  "homeRecentlyPlayed": "Recently Played",
+  "homeTrending": "Trending Music",
+  "homeSuggested": "Suggested for You",
+  "homeNoPlaylists": "No playlists yet. Search for a song to generate one.",
+  "searchHint": "Songs, artists, mixes...",
+  "searchTabSongs": "Songs",
+  "searchTabMixes": "Mixes",
+  "searchTabArtists": "Artists",
+  "searchPopular": "Popular searches",
+  "searchBrowseGenre": "Browse by genre",
+  "libraryTitle": "Your Library",
+  "libraryLikedSongs": "Liked Songs",
+  "libraryDownloaded": "Downloaded",
+  "libraryPlaylists": "Playlists",
+  "libraryNoLiked": "No liked songs yet.",
+  "libraryNoDownloads": "No downloaded songs yet.\nTap ↓ on any song to download.",
+  "libraryPlayAll": "Play All",
+  "playerNowPlaying": "Now Playing",
+  "playerQueue": "Up Next",
+  "playerLyrics": "Lyrics",
+  "playerNoLyrics": "No lyrics found.",
+  "updateAvailable": "A new version is available!",
+  "updateButton": "UPDATE",
+  "updateDismiss": "DISMISS",
+  "updateDownloading": "Downloading update... {percent}%",
+  "@updateDownloading": {
+    "placeholders": {
+      "percent": { "type": "int" }
+    }
+  },
+  "exitConfirm": "Press back again to exit",
+  "connectivityTest": "Test YouTube Connectivity",
+  "connectivitySuccess": "SUCCESS: Device can reach YouTube.",
+  "connectivityFail": "FAILED: Device cannot reach YouTube.",
+  "ok": "OK",
+  "songs": "{count} songs",
+  "@songs": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  }
+}

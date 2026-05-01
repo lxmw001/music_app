@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:palette_generator/palette_generator.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import '../providers/music_player_provider.dart';
 import '../services/download_service.dart';
 
@@ -210,7 +211,7 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
                         if (_showLyrics) _fetchLyrics(song.title, song.artist);
                       },
                       icon: Icon(_showLyrics ? Icons.music_note : Icons.lyrics_outlined, size: 16),
-                      label: Text(_showLyrics ? 'Player' : 'Lyrics'),
+                      label: Text(AppLocalizations.of(context)!.playerLyrics),
                       style: TextButton.styleFrom(foregroundColor: Colors.white70),
                     ),
                     const SizedBox(height: 8),
@@ -417,7 +418,7 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
                     ? SingleChildScrollView(
                         child: Text(_lyrics!, style: const TextStyle(fontSize: 15, height: 1.8, color: Colors.white)),
                       )
-                    : const Center(child: Text('Lyrics not found', style: TextStyle(color: Colors.white54))),
+                    : Center(child: Text(AppLocalizations.of(context)!.playerNoLyrics, style: const TextStyle(color: Colors.white54))),
           ),
         ],
       ),
@@ -443,7 +444,7 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                   child: Row(children: [
-                    const Text('Up Next', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                    Text(AppLocalizations.of(context)!.playerQueue, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                     const Spacer(),
                     Text('${player.queue.length} songs', style: const TextStyle(color: Colors.grey)),
                   ]),

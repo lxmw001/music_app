@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import '../models/music_models.dart';
 import '../providers/music_player_provider.dart';
 import '../services/download_service.dart';
@@ -40,9 +41,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    String title = 'Your Library';
-    if (_showing == 'liked') title = 'Liked Songs';
-    if (_showing == 'downloaded') title = 'Downloaded';
+    String title = AppLocalizations.of(context)!.libraryTitle;
+    if (_showing == 'liked') title = AppLocalizations.of(context)!.libraryLikedSongs;
+    if (_showing == 'downloaded') title = AppLocalizations.of(context)!.libraryDownloaded;
     if (_showing == 'playlist') title = _activePlaylist?.name ?? 'Playlist';
 
     return Scaffold(
@@ -81,8 +82,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
             ),
             child: const Icon(Icons.favorite, color: Colors.white),
           ),
-          title: const Text('Liked Songs'),
-          subtitle: Text('${_likedSongs.length} songs'),
+          title: Text(AppLocalizations.of(context)!.libraryLikedSongs),
+          subtitle: Text(AppLocalizations.of(context)!.songs(_likedSongs.length)),
           trailing: const Icon(Icons.chevron_right),
           onTap: () => setState(() => _showing = 'liked'),
         ),
@@ -95,8 +96,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
             ),
             child: const Icon(Icons.download_done, color: Colors.white),
           ),
-          title: const Text('Downloaded'),
-          subtitle: Text('${_downloadedSongs.length} songs'),
+          title: Text(AppLocalizations.of(context)!.libraryDownloaded),
+          subtitle: Text(AppLocalizations.of(context)!.songs(_downloadedSongs.length)),
           trailing: const Icon(Icons.chevron_right),
           onTap: () async {
             await _loadAll();
@@ -104,9 +105,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
           },
         ),
         if (_playlists.isNotEmpty) ...[
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Text('Playlists', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Text(AppLocalizations.of(context)!.libraryPlaylists, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           ),
           ..._playlists.map((pl) => Dismissible(
             key: Key(pl.id),
@@ -129,7 +130,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                     : _playlistIcon(),
               ),
               title: Text(pl.name, overflow: TextOverflow.ellipsis),
-              subtitle: Text('${pl.songs.length} songs'),
+              subtitle: Text(AppLocalizations.of(context)!.songs(pl.songs.length)),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => setState(() { _activePlaylist = pl; _showing = 'playlist'; }),
             ),
@@ -149,7 +150,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
   Widget _buildPlaylistDetail(Playlist playlist) {
     final songs = playlist.songs;
-    if (songs.isEmpty) return const Center(child: Text('No songs', style: TextStyle(color: Colors.grey)));
+    if (songs.isEmpty) return Center(child: Text(AppLocalizations.of(context)!.libraryNoLiked, style: const TextStyle(color: Colors.grey)));
     return Column(
       children: [
         Padding(
@@ -161,7 +162,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                   onPressed: () => context.read<MusicPlayerProvider>()
                       .playSong(songs.first, queue: songs),
                   icon: const Icon(Icons.play_arrow),
-                  label: const Text('Play All'),
+                  label: Text(AppLocalizations.of(context)!.libraryPlayAll),
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
                 ),
               ),

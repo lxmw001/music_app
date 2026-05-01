@@ -1,4 +1,6 @@
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import '../services/youtube_service.dart';
 import '../services/music_server_service.dart';
 import '../models/music_models.dart';
@@ -105,7 +107,7 @@ class _SearchScreenState extends State<SearchScreen> {
               controller: controller,
               focusNode: autoFocusNode,
               decoration: InputDecoration(
-                hintText: 'Songs, artists, mixes...',
+                hintText: AppLocalizations.of(ctx)!.searchHint,
                 border: InputBorder.none,
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: controller.text.isNotEmpty
@@ -311,7 +313,7 @@ class _SearchScreenState extends State<SearchScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (_suggestions.isNotEmpty) ...[
-            const Text('Popular searches', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(AppLocalizations.of(context)!.searchPopular, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8, runSpacing: 8,
@@ -327,7 +329,7 @@ class _SearchScreenState extends State<SearchScreen> {
             ),
             const SizedBox(height: 24),
           ],
-          const Text('Browse by genre', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          Text(AppLocalizations.of(context)!.searchBrowseGenre, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 12),
           GridView.builder(
             shrinkWrap: true,
