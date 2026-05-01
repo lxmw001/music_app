@@ -1,0 +1,49 @@
+{
+  "@@locale": "es",
+  "appTitle": "Música",
+  "navHome": "Inicio",
+  "navSearch": "Buscar",
+  "navLibrary": "Biblioteca",
+  "homeGreeting": "Buenas noches",
+  "homeRecentlyPlayed": "Reproducido recientemente",
+  "homeTrending": "Música en tendencia",
+  "homeSuggested": "Sugerido para ti",
+  "homeNoPlaylists": "Sin listas aún. Busca una canción para generar una.",
+  "searchHint": "Canciones, artistas, mezclas...",
+  "searchTabSongs": "Canciones",
+  "searchTabMixes": "Mezclas",
+  "searchTabArtists": "Artistas",
+  "searchPopular": "Búsquedas populares",
+  "searchBrowseGenre": "Explorar por género",
+  "libraryTitle": "Tu biblioteca",
+  "libraryLikedSongs": "Canciones que te gustan",
+  "libraryDownloaded": "Descargadas",
+  "libraryPlaylists": "Listas de reproducción",
+  "libraryNoLiked": "Aún no tienes canciones favoritas.",
+  "libraryNoDownloads": "Sin canciones descargadas.\nToca ↓ en cualquier canción para descargar.",
+  "libraryPlayAll": "Reproducir todo",
+  "playerNowPlaying": "Reproduciendo",
+  "playerQueue": "A continuación",
+  "playerLyrics": "Letra",
+  "playerNoLyrics": "No se encontró la letra.",
+  "updateAvailable": "¡Hay una nueva versión disponible!",
+  "updateButton": "ACTUALIZAR",
+  "updateDismiss": "IGNORAR",
+  "updateDownloading": "Descargando actualización... {percent}%",
+  "@updateDownloading": {
+    "placeholders": {
+      "percent": { "type": "int" }
+    }
+  },
+  "exitConfirm": "Presiona atrás de nuevo para salir",
+  "connectivityTest": "Probar conectividad con YouTube",
+  "connectivitySuccess": "ÉXITO: El dispositivo puede acceder a YouTube.",
+  "connectivityFail": "FALLO: El dispositivo no puede acceder a YouTube.",
+  "ok": "OK",
+  "songs": "{count} canciones",
+  "@songs": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  }
+}

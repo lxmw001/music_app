@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'providers/music_player_provider.dart';
 import 'screens/home_screen.dart';
@@ -29,6 +31,16 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Music App',
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('en'),
+        Locale('es'),
+      ],
       theme: ThemeData(
         primarySwatch: Colors.green,
         brightness: Brightness.dark,
@@ -79,7 +91,7 @@ class _MainScreenState extends State<MainScreen> {
     if (_lastBackPress == null || now.difference(_lastBackPress!) > const Duration(seconds: 2)) {
       _lastBackPress = now;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Press back again to exit'), duration: Duration(seconds: 2)),
+        SnackBar(content: Text(AppLocalizations.of(context)!.exitConfirm), duration: const Duration(seconds: 2)),
       );
       return false;
     }
@@ -104,12 +116,12 @@ class _MainScreenState extends State<MainScreen> {
                   ? Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Downloading update... ${(_downloadProgress! * 100).toInt()}%'),
+                        Text(AppLocalizations.of(context)!.updateDownloading((_downloadProgress! * 100).toInt())),
                         const SizedBox(height: 6),
                         LinearProgressIndicator(value: _downloadProgress),
                       ],
                     )
-                  : const Text('A new version is available!'),
+                  : Text(AppLocalizations.of(context)!.updateAvailable),
               actions: _downloadProgress != null
                   ? [const SizedBox.shrink()]
                   : [
@@ -122,11 +134,11 @@ class _MainScreenState extends State<MainScreen> {
                           );
                           setState(() { _updateUrl = null; _downloadProgress = null; });
                         },
-                        child: const Text('UPDATE'),
+                        child: Text(AppLocalizations.of(context)!.updateButton),
                       ),
                       TextButton(
                         onPressed: () => setState(() => _updateUrl = null),
-                        child: const Text('DISMISS'),
+                        child: Text(AppLocalizations.of(context)!.updateDismiss),
                       ),
                     ],
             ),
@@ -215,10 +227,10 @@ class _MainScreenState extends State<MainScreen> {
         backgroundColor: Colors.black,
         selectedItemColor: Colors.green,
         unselectedItemColor: Colors.grey,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Search'),
-          BottomNavigationBarItem(icon: Icon(Icons.library_music), label: 'Library'),
+        items: [
+          BottomNavigationBarItem(icon: const Icon(Icons.home), label: AppLocalizations.of(context)!.navHome),
+          BottomNavigationBarItem(icon: const Icon(Icons.search), label: AppLocalizations.of(context)!.navSearch),
+          BottomNavigationBarItem(icon: const Icon(Icons.library_music), label: AppLocalizations.of(context)!.navLibrary),
         ],
       ),
     ), // Scaffold
