@@ -23,9 +23,12 @@ jobs:
         with:
           flutter-version: '3.32.0'
           channel: stable
-          cache: true
+          cache: false
 
       - run: flutter pub get
+
+      - name: Clean Gradle cache
+        run: cd android && ./gradlew clean
 
       - name: Decode keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | tr -d ' \n\r' | base64 -d > android/app/music_app.jks
