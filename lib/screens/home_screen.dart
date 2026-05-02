@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/music_player_provider.dart';
+import '../providers/auth_provider.dart';
 import '../models/music_models.dart';
 import '../services/youtube_service.dart';
 import '../services/play_history_service.dart';
 import '../widgets/song_card_list.dart';
 import '../widgets/recent_songs_grid.dart';
+import 'login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final YouTubeService? youtubeService;
@@ -80,22 +83,29 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.wifi_tethering),
-            tooltip: AppLocalizations.of(context)!.connectivityTest,
-            onPressed: () async {
-              final result = await _youtubeService.testYouTubeConnectivity();
-              if (!mounted) return;
-              final l = AppLocalizations.of(context)!;
-              showDialog(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: Text(l.connectivityTest),
-                  content: Text(result ? l.connectivitySuccess : l.connectivityFail),
-                  actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(l.ok))],
-                ),
-              );
-            },
+          Consumer<AuthProvider>(
+            builder: (context, auth, _) => auth.isSignedIn
+                ? GestureDetector(
+                    onTap: () => _showProfileMenu(context, auth),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      child: CircleAvatar(
+                        radius: 16,
+                        backgroundImage: auth.user?.photoURL != null
+                            ? NetworkImage(auth.user!.photoURL!)
+                            : null,
+                        child: auth.user?.photoURL == null
+                            ? const Icon(Icons.person, size: 18)
+                            : null,
+                      ),
+                    ),
+                  )
+                : IconButton(
+                    icon: const Icon(Icons.account_circle_outlined),
+                    tooltip: 'Sign in',
+                    onPressed: () => Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const LoginScreen())),
+                  ),
           ),
         ],
       ),
@@ -130,6 +140,36 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 16),
               SongCardList(songs: suggestedSongs),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showProfileMenu(BuildContext context, AuthProvider auth) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.grey[900],
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircleAvatar(
+              radius: 32,
+              backgroundImage: auth.user?.photoURL != null ? NetworkImage(auth.user!.photoURL!) : null,
+              child: auth.user?.photoURL == null ? const Icon(Icons.person, size: 32) : null,
+            ),
+            const SizedBox(height: 12),
+            Text(auth.user?.displayName ?? '', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(auth.user?.email ?? '', style: const TextStyle(color: Colors.grey)),
+            const SizedBox(height: 24),
+            ListTile(
+              leading: const Icon(Icons.logout, color: Colors.red),
+              title: const Text('Sign out', style: TextStyle(color: Colors.red)),
+              onTap: () { Navigator.pop(context); auth.signOut(); },
+            ),
           ],
         ),
       ),
