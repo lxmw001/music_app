@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:palette_generator/palette_generator.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import '../l10n/app_localizations.dart';
 import '../providers/music_player_provider.dart';
 import '../services/download_service.dart';
 

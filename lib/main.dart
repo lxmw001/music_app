@@ -1,23 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'l10n/app_localizations.dart';
 import 'package:just_audio_media_kit/just_audio_media_kit.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'providers/music_player_provider.dart';
+import 'providers/auth_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/library_screen.dart';
 import 'screens/player_screen.dart';
+import 'screens/login_screen.dart';
 import 'services/youtube_service.dart';
 import 'services/update_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   JustAudioMediaKit.ensureInitialized(android: true);
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider<MusicPlayerProvider>(create: (_) => MusicPlayerProviderImpl()),
+        ChangeNotifierProvider<AuthProvider>(create: (_) => AuthProvider()),
       ],
       child: const MyApp(),
     ),
