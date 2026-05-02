@@ -377,7 +377,8 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       print('[MusicPlayerProvider] Could not get audio file for \\${song.title}, skipping');
       _queue.removeWhere((s) => s.id == song.id);
       if (_currentIndex >= _queue.length) _currentIndex = (_queue.length - 1).clamp(0, double.infinity.toInt());
-      Future.microtask(() => nextSong());
+      // Delay before next attempt to avoid triggering YouTube rate limiting
+      Future.delayed(const Duration(seconds: 10), () => nextSong());
       return;
     }
     final mediaItem = MediaItem(
@@ -409,12 +410,10 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       } catch (e2) {
         print('[MusicPlayerProvider] retry failed: $e2 — skipping to next');
         _loadingAudioIds.remove(song.id);
-        
         notifyListeners();
-        // Remove failed song from queue to prevent infinite skip loop
         _queue.removeWhere((s) => s.id == song.id);
         if (_currentIndex >= _queue.length) _currentIndex = _queue.length - 1;
-        nextSong();
+        Future.delayed(const Duration(seconds: 10), () => nextSong());
         return;
       }
     }
@@ -575,11 +574,18 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
 
   @override
   void nextSong() {
+    _nextSongAsync();
+  }
+
+  Future<void> _nextSongAsync() async {
     if (!_isInitialized) return;
     _consecutiveSkips++;
     if (_consecutiveSkips > 5) {
-      print('[MusicPlayerProvider] too many consecutive skips, stopping');
+      print('[MusicPlayerProvider] too many consecutive skips, resetting counter');
       _consecutiveSkips = 0;
+      // Seek current song back to start so user isn't stuck at end
+      await _audioHandler.seek(Duration.zero);
+      notifyListeners();
       return;
     }
     if (_queue.isNotEmpty && _currentIndex < _queue.length - 1) {
@@ -621,9 +627,16 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         _queue.add(suggestions.first);
         _currentIndex = _queue.length - 1;
         playSong(suggestions.first);
+      } else {
+        // Nothing to play — seek current song back to start
+        await _audioHandler.seek(Duration.zero);
+        notifyListeners();
       }
     } catch (e) {
       print('Error fetching suggestion: $e');
+      // Seek to start so user isn't stuck at end
+      await _audioHandler.seek(Duration.zero);
+      notifyListeners();
     }
   }
 
