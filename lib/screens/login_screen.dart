@@ -23,6 +23,14 @@ class LoginScreen extends StatelessWidget {
               const SizedBox(height: 48),
               if (auth.loading)
                 const CircularProgressIndicator(color: Colors.green)
+              else if (auth.isSignedIn)
+                // Auto-pop after sign-in
+                Builder(builder: (ctx) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (Navigator.canPop(ctx)) Navigator.pop(ctx);
+                  });
+                  return const CircularProgressIndicator(color: Colors.green);
+                })
               else
                 OutlinedButton.icon(
                   onPressed: () => auth.signInWithGoogle(),

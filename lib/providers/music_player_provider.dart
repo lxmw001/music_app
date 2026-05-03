@@ -8,6 +8,7 @@ import '../services/youtube_service.dart';
 import '../services/play_history_service.dart';
 import '../services/lastfm_service.dart';
 import '../services/download_service.dart';
+import 'auth_provider.dart';
 
 abstract class MusicPlayerProvider extends ChangeNotifier {
   Song? get currentSong;
@@ -55,6 +56,8 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   final PlayHistoryService _historyService = PlayHistoryService();
   final DownloadService _downloadService = DownloadService();
   final LastFmService _lastFmService = LastFmService();
+  AuthProvider? _authProvider;
+  void setAuthProvider(AuthProvider auth) => _authProvider = auth;
   Timer? _positionSaveTimer;
   Timer? _stallTimer;
   bool _isRecoveringFromStall = false;
@@ -721,6 +724,10 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   @override
   Future<void> toggleLike(Song song) async {
     await _historyService.toggleLike(song);
+    final liked = await _historyService.isLiked(song.id);
+    // Sync to server fire-and-forget
+    final auth = _authProvider;
+    if (auth != null) auth.syncLike(song.serverId, liked);
     notifyListeners();
   }
 
