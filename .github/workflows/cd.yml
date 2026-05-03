@@ -28,7 +28,9 @@ jobs:
       - run: flutter pub get
 
       - name: Clean Gradle cache
-        run: cd android && ./gradlew clean
+        run: ./gradlew clean
+        working-directory: android
+        working-directory: ${{ github.workspace }}
 
       - name: Decode keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | tr -d ' \n\r' | base64 -d > android/app/music_app.jks
