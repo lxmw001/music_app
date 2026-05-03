@@ -12,6 +12,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: prod
     steps:
+      - name: Clean workspace
+        run: rm -rf $GITHUB_WORKSPACE/*
+
       - uses: actions/checkout@v4
         with:
           clean: true
