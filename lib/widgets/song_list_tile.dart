@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/music_models.dart';
 import '../providers/music_player_provider.dart';
+import '../providers/auth_provider.dart';
 import '../screens/player_screen.dart';
 import '../services/download_service.dart';
 
@@ -89,7 +90,7 @@ class _SongListTileState extends State<SongListTile> with SingleTickerProviderSt
               if (_isDownloading)
                 const SizedBox(width: 20, height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              else if (widget.showDownload)
+              else if (widget.showDownload && context.watch<AuthProvider>().canDownload)
                 IconButton(
                   icon: Icon(_isDownloaded ? Icons.download_done : Icons.download,
                       size: 20, color: _isDownloaded ? Colors.green : Colors.grey),

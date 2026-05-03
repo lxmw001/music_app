@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../l10n/app_localizations.dart';
 import '../providers/music_player_provider.dart';
+import '../providers/auth_provider.dart';
 import '../services/download_service.dart';
 
 class PlayerScreen extends StatefulWidget {
@@ -183,7 +184,7 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
                               child: SizedBox(width: 20, height: 20,
                                 child: CircularProgressIndicator(value: _downloadProgress > 0 ? _downloadProgress : null, strokeWidth: 2, color: Colors.white)),
                             )
-                          else
+                          else if (context.watch<AuthProvider>().canDownload)
                             IconButton(
                               icon: Icon(_downloadedPath != null ? Icons.download_done : Icons.download,
                                   color: _downloadedPath != null ? Colors.green : null),
