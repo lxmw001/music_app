@@ -23,7 +23,14 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider<MusicPlayerProvider>(create: (_) => MusicPlayerProviderImpl()),
-        ChangeNotifierProvider<AuthProvider>(create: (_) => AuthProvider()),
+        ChangeNotifierProxyProvider<MusicPlayerProvider, AuthProvider>(
+          create: (_) => AuthProvider(),
+          update: (_, musicPlayer, auth) {
+            final a = auth ?? AuthProvider();
+            (musicPlayer as MusicPlayerProviderImpl).setAuthProvider(a);
+            return a;
+          },
+        ),
       ],
       child: const MyApp(),
     ),
