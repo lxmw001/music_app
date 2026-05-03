@@ -29,6 +29,13 @@ jobs:
 
       - run: flutter pub get
 
+      - name: Debug - show gradle files
+        run: |
+          echo "=== build.gradle.kts ===" && cat android/build.gradle.kts
+          echo "=== settings.gradle.kts ===" && cat android/settings.gradle.kts
+          echo "=== app/build.gradle.kts ===" && cat android/app/build.gradle.kts
+          echo "=== grep google-services ===" && grep -r "google-services" android/ || echo "NOT FOUND"
+
       - name: Decode keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | tr -d ' \n\r' | base64 -d > android/app/music_app.jks
 
