@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 
 // TODO: Replace with FirebaseAuth.instance.currentUser?.getIdToken() once Firebase is set up
@@ -27,14 +28,26 @@ class AuthProvider extends ChangeNotifier {
     });
   }
 
+  static const _permsCacheKey = 'cached_permissions';
+
   Future<void> _refreshPermissions() async {
+    // Load from cache first so permissions are available immediately
+    final prefs = await SharedPreferences.getInstance();
+    final cached = prefs.getStringList(_permsCacheKey);
+    if (cached != null) {
+      _permissions = cached.toSet();
+      notifyListeners();
+    }
+    // Then try to refresh from server
     try {
       final result = await user?.getIdTokenResult(true);
       final perms = result?.claims?['permissions'] as List<dynamic>? ?? [];
       _permissions = perms.map((e) => e.toString()).toSet();
-      print('[Auth] permissions: $_permissions');
+      await prefs.setStringList(_permsCacheKey, _permissions.toList());
+      print('[Auth] permissions refreshed: $_permissions');
+      notifyListeners();
     } catch (e) {
-      print('[Auth] failed to refresh permissions: $e');
+      print('[Auth] using cached permissions: $_permissions');
     }
   }
 
@@ -65,6 +78,8 @@ class AuthProvider extends ChangeNotifier {
     await _googleSignIn.signOut();
     await _auth.signOut();
     _permissions = {};
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_permsCacheKey);
     notifyListeners();
   }
 
