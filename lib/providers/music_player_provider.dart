@@ -378,7 +378,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       // Only remove from queue if it's not a downloaded song (downloaded songs may fail transiently)
       if (song.audioUrl.isEmpty) {
         _queue.removeWhere((s) => s.id == song.id);
-        if (_currentIndex >= _queue.length) _currentIndex = (_queue.length - 1).clamp(0, double.infinity.toInt());
+        if (_currentIndex >= _queue.length) _currentIndex = (_queue.length - 1).clamp(0, 999999);
       }
       _stallTimer?.cancel();
       _stallTimer = null;
