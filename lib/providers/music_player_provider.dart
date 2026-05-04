@@ -375,10 +375,19 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     }
     if (audioUrl.isEmpty) {
       print('[MusicPlayerProvider] Could not get audio file for \\${song.title}, skipping');
-      _queue.removeWhere((s) => s.id == song.id);
-      if (_currentIndex >= _queue.length) _currentIndex = (_queue.length - 1).clamp(0, double.infinity.toInt());
-      // Delay before next attempt to avoid triggering YouTube rate limiting
-      Future.delayed(const Duration(seconds: 10), () => nextSong());
+      // Only remove from queue if it's not a downloaded song (downloaded songs may fail transiently)
+      if (song.audioUrl.isEmpty) {
+        _queue.removeWhere((s) => s.id == song.id);
+        if (_currentIndex >= _queue.length) _currentIndex = (_queue.length - 1).clamp(0, double.infinity.toInt());
+      }
+      _stallTimer?.cancel();
+      _stallTimer = null;
+      _consecutiveSkips++;
+      if (_consecutiveSkips <= 5) {
+        Future.delayed(const Duration(seconds: 3), () => nextSong());
+      } else {
+        _consecutiveSkips = 0;
+      }
       return;
     }
     final mediaItem = MediaItem(
@@ -413,7 +422,14 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         notifyListeners();
         _queue.removeWhere((s) => s.id == song.id);
         if (_currentIndex >= _queue.length) _currentIndex = _queue.length - 1;
-        Future.delayed(const Duration(seconds: 10), () => nextSong());
+        _stallTimer?.cancel();
+        _stallTimer = null;
+        _consecutiveSkips++;
+        if (_consecutiveSkips <= 5) {
+          Future.delayed(const Duration(seconds: 3), () => nextSong());
+        } else {
+          _consecutiveSkips = 0;
+        }
         return;
       }
     }
@@ -579,20 +595,13 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
 
   Future<void> _nextSongAsync() async {
     if (!_isInitialized) return;
-    _consecutiveSkips++;
-    if (_consecutiveSkips > 5) {
-      print('[MusicPlayerProvider] too many consecutive skips, resetting counter');
-      _consecutiveSkips = 0;
-      // Seek current song back to start so user isn't stuck at end
-      await _audioHandler.seek(Duration.zero);
-      notifyListeners();
-      return;
-    }
     if (_queue.isNotEmpty && _currentIndex < _queue.length - 1) {
+      _consecutiveSkips = 0; // successful advance resets counter
       _currentIndex++;
       playSong(_queue[_currentIndex], fromQueue: true);
       _historyService.saveQueue(_queue, _currentIndex);
     } else if (_suggestedSongs.isNotEmpty) {
+      _consecutiveSkips = 0;
       final next = _suggestedSongs.first;
       _suggestedSongs = [];
       _queue.add(next);
