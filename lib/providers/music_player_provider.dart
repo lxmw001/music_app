@@ -152,8 +152,11 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       if (_currentSong != null) {
         notifyListeners();
         final song = _currentSong!;
-        _youtubeService.getAudioUrl(song.id).then((url) => song.audioUrl = url);
-        // If queue has only 1 song (no suggestions yet), seed in background
+        // Prefetch URL via getPlayableAudioPath — checks downloads/cache before YouTube
+        if (song.audioUrl.isEmpty) {
+          _youtubeService.getPlayableAudioPath(song.id, serverId: song.serverId, song: song)
+              .then((url) { if (url.isNotEmpty) song.audioUrl = url; });
+        }
         if (_queue.length <= 1) _seedQueueWithSuggestions(song);
       }
     }
@@ -164,10 +167,13 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       if (position > Duration.zero) _lastPosition = position;
       if (_currentSong != null && _autoAddSuggestions) {
         final duration = totalDuration;
+        // Only fetch suggestions if we're near the end AND queue is almost exhausted
+        final queueHasMore = _currentIndex < _queue.length - 1;
         if (duration.inSeconds > 0 &&
             (duration - position).inSeconds <= 10 &&
             !_isFetchingSuggestions &&
-            _suggestedSongs.isEmpty) {
+            _suggestedSongs.isEmpty &&
+            !queueHasMore) {
           _fetchSuggestionsInBackground();
         }
       }
@@ -317,8 +323,9 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       notifyListeners();
       return;
     }
-    // Don't restart if same song is already playing (but allow if queue is being set)
-    if (_currentSong?.id == song.id && isPlaying && queue == null) return;
+    // Don't restart if same song is already playing (but allow if completed or queue is being set)
+    final isCompleted = _audioHandler.playbackState.value.processingState == AudioProcessingState.completed;
+    if (_currentSong?.id == song.id && isPlaying && !isCompleted && queue == null) return;
     // Block concurrent auto-advances (fromQueue), but always allow user taps
     
     
@@ -466,21 +473,14 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     _startPositionSaveTimer(song);
     notifyListeners();
 
-    // Pre-fetch next song's URL in background to reduce lag on next tap
+    // Pre-fetch next song's URL — skip if it's a downloaded song
     if (_queue.isNotEmpty && _currentIndex < _queue.length - 1) {
-      final nextSong = _queue[_currentIndex + 1];
-      if (nextSong.audioUrl.isEmpty) {
-        _youtubeService.getAudioUrl(nextSong.id).then((url) => nextSong.audioUrl = url);
+      final next = _queue[_currentIndex + 1];
+      if (next.audioUrl.isEmpty) {
+        // Check downloads first before hitting YouTube
+        _youtubeService.getPlayableAudioPath(next.id, serverId: next.serverId, song: next)
+            .then((url) { if (url.isNotEmpty) next.audioUrl = url; });
       }
-    } else {
-      // At end of queue — pre-fetch a suggestion + its audio URL
-      _youtubeService.getSuggestedSongs(song.id, maxResults: 1).then((suggestions) {
-        if (suggestions.isNotEmpty) {
-          _suggestedSongs = suggestions;
-          final suggested = suggestions.first;
-          _youtubeService.getAudioUrl(suggested.id).then((url) => suggested.audioUrl = url);
-        }
-      });
     }
   }
   bool _isSeeding = false;

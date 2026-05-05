@@ -30,56 +30,35 @@ class YoutubeExplodeGateway implements YoutubeGateway {
 
   @override
   Future<String> getAudioUrl(String videoId) async {
-    // Sequential — parallel requests trigger YouTube rate limiting
     final clients = [
       YoutubeApiClient.ios,
       YoutubeApiClient.tv,
       YoutubeApiClient.androidVr,
       YoutubeApiClient.safari,
     ];
-    for (final client in clients) {
-      try {
-        final manifest = await _yt.videos.streamsClient
-            .getManifest(videoId, ytClients: [client])
-            .timeout(const Duration(seconds: 5));
-        final streams = manifest.audioOnly.toList();
-        if (streams.isEmpty) continue;
-        // Prefer AAC (mp4a) over Opus (webm) — Opus causes decoder crashes on some devices
-        final aac = streams.where((s) =>
-            s.codec.mimeType.contains('mp4a') || s.container.name == 'mp4').toList();
-        if (aac.isEmpty) {
-          // No AAC from this client — try next client before falling back to Opus
-          print('[YoutubeGateway] $client only has Opus/WebM for $videoId, trying next client');
-          continue;
-        }
-        aac.sort((a, b) => b.bitrate.compareTo(a.bitrate));
-        print('[YoutubeGateway] $client succeeded for $videoId (${aac.first.codec.mimeType})');
-        return aac.first.url.toString();
-      } catch (e) {
-        print('[YoutubeGateway] $client failed: $e');
-        if (e.toString().contains('RequestLimitExceeded')) {
-          _yt.close();
-          _yt = YoutubeExplode();
-          break;
-        }
-        continue;
+    try {
+      final manifest = await _yt.videos.streamsClient
+          .getManifest(videoId, ytClients: clients)
+          .timeout(const Duration(seconds: 15));
+      final streams = manifest.audioOnly.toList();
+      if (streams.isEmpty) throw Exception('No audio streams for $videoId');
+
+      // Prefer AAC, fall back to Opus
+      final aac = streams.where((s) =>
+          s.codec.mimeType.contains('mp4a') || s.container.name == 'mp4').toList();
+      final best = aac.isNotEmpty
+          ? (aac..sort((a, b) => b.bitrate.compareTo(a.bitrate))).first
+          : (streams..sort((a, b) => b.bitrate.compareTo(a.bitrate))).first;
+      print('[YoutubeGateway] succeeded for $videoId (${best.codec.mimeType})');
+      return best.url.toString();
+    } catch (e) {
+      print('[YoutubeGateway] failed for $videoId: $e');
+      if (e.toString().contains('RequestLimitExceeded')) {
+        _yt.close();
+        _yt = YoutubeExplode();
       }
+      throw Exception('All YouTube clients failed for $videoId');
     }
-    // Second pass: accept Opus/WebM if no AAC was found from any client
-    print('[YoutubeGateway] No AAC found, retrying with Opus fallback for $videoId');
-    for (final client in clients) {
-      try {
-        final manifest = await _yt.videos.streamsClient
-            .getManifest(videoId, ytClients: [client])
-            .timeout(const Duration(seconds: 5));
-        final streams = manifest.audioOnly.toList();
-        if (streams.isEmpty) continue;
-        streams.sort((a, b) => b.bitrate.compareTo(a.bitrate));
-        print('[YoutubeGateway] $client Opus fallback succeeded for $videoId');
-        return streams.first.url.toString();
-      } catch (_) { continue; }
-    }
-    throw Exception('All YouTube clients failed for $videoId');
   }
 
   @override
