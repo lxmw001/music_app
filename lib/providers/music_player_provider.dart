@@ -152,9 +152,10 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       if (_currentSong != null) {
         notifyListeners();
         final song = _currentSong!;
-        // Only prefetch URL if song doesn't already have a local file
-        if (song.audioUrl.isEmpty || (!song.audioUrl.startsWith('/') && !song.audioUrl.startsWith('file://'))) {
-          _youtubeService.getAudioUrl(song.id).then((url) => song.audioUrl = url);
+        // Prefetch URL via getPlayableAudioPath — checks downloads/cache before YouTube
+        if (song.audioUrl.isEmpty) {
+          _youtubeService.getPlayableAudioPath(song.id, serverId: song.serverId, song: song)
+              .then((url) { if (url.isNotEmpty) song.audioUrl = url; });
         }
         if (_queue.length <= 1) _seedQueueWithSuggestions(song);
       }
