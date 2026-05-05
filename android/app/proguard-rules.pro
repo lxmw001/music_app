@@ -13,9 +13,13 @@
 -dontwarn com.google.android.play.core.tasks.OnSuccessListener
 -dontwarn com.google.android.play.core.tasks.Task
 
-# just_audio / ExoPlayer
+# just_audio / ExoPlayer / media3
 -keep class com.google.android.exoplayer2.** { *; }
 -keep class androidx.media3.** { *; }
+-keep class androidx.media3.exoplayer.** { *; }
+-keep class androidx.media3.datasource.** { *; }
+-keep class androidx.media3.extractor.** { *; }
+-keep class androidx.media3.decoder.** { *; }
 -dontwarn com.google.android.exoplayer2.**
 -dontwarn androidx.media3.**
 
