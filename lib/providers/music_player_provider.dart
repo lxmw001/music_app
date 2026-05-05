@@ -421,7 +421,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       _stallTimer?.cancel();
       _stallTimer = null;
       _consecutiveSkips++;
-      if (_consecutiveSkips <= 5) {
+      if (_consecutiveSkips <= 2) {
         Future.delayed(const Duration(seconds: 3), () => nextSong());
       } else {
         // Too many failures — wait longer then try once more
@@ -468,7 +468,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         _stallTimer?.cancel();
         _stallTimer = null;
         _consecutiveSkips++;
-        if (_consecutiveSkips <= 5) {
+        if (_consecutiveSkips <= 2) {
           Future.delayed(const Duration(seconds: 3), () => nextSong());
         } else {
           _consecutiveSkips = 0;
