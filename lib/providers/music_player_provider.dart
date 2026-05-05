@@ -240,7 +240,10 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
 
       print('[MusicPlayerProvider] has internet — re-fetching URL...');
       final position = currentPosition;
-      song.audioUrl = '';
+      // Only clear network URLs — don't wipe local file paths for downloaded songs
+      if (!song.audioUrl.startsWith('/') && !song.audioUrl.startsWith('file://')) {
+        song.audioUrl = '';
+      }
       await playSong(song, seekTo: position);
       print('[MusicPlayerProvider] stall recovery succeeded');
     } catch (e) {
@@ -386,7 +389,9 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       if (_consecutiveSkips <= 5) {
         Future.delayed(const Duration(seconds: 3), () => nextSong());
       } else {
+        // Too many failures — wait longer then try once more
         _consecutiveSkips = 0;
+        Future.delayed(const Duration(seconds: 15), () => nextSong());
       }
       return;
     }
@@ -407,7 +412,10 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     } catch (e) {
       print('[MusicPlayerProvider] setAudioSource error: $e — retrying with fresh URL');
       try {
-        song.audioUrl = '';
+        // Only clear network URLs — preserve local file paths for downloaded songs
+        if (!song.audioUrl.startsWith('/') && !song.audioUrl.startsWith('file://')) {
+          song.audioUrl = '';
+        }
         final freshUrl = await _youtubeService.getPlayableAudioPath(song.id);
         if (freshUrl.isEmpty) throw Exception('empty URL on retry');
         song.audioUrl = freshUrl;
@@ -429,6 +437,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
           Future.delayed(const Duration(seconds: 3), () => nextSong());
         } else {
           _consecutiveSkips = 0;
+          Future.delayed(const Duration(seconds: 15), () => nextSong());
         }
         return;
       }
