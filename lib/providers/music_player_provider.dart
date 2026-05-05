@@ -173,14 +173,26 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       }
     });
 
+    // Update mediaItem duration when audio loads — fixes Bluetooth/notification display
+    _audioHandler.durationStream.listen((duration) {
+      if (duration != null && duration > Duration.zero && _currentSong != null) {
+        final current = _audioHandler.mediaItem.value;
+        if (current != null && (current.duration == null || current.duration == Duration.zero)) {
+          _audioHandler.mediaItem.add(current.copyWith(duration: duration));
+        }
+        notifyListeners();
+      }
+    });
+
     _audioHandler.playbackState.listen((state) {
       if (state.processingState == AudioProcessingState.completed && !_isFetchingSuggestions) {
         final completedSongId = _currentSong?.id;
         final duration = totalDuration;
-        // Real completion: played at least 5s AND position is near the end (within 15s)
+        // Real completion: played at least 5s
         final wasPlaying = _lastPosition.inSeconds >= 5;
-        final nearEnd = duration.inSeconds == 0 ||
-            _lastPosition.inSeconds >= (duration.inSeconds - 15);
+        // Near end: within last 20s, OR duration unknown (0)
+        final nearEnd = duration.inSeconds <= 0 ||
+            _lastPosition.inSeconds >= (duration.inSeconds - 20);
         if (completedSongId != null && wasPlaying && nearEnd) {
           _historyService.recordPlay(_currentSong!, _lastPosition.inSeconds);
           Future.delayed(const Duration(milliseconds: 300), () {
