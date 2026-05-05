@@ -31,10 +31,8 @@ class YoutubeExplodeGateway implements YoutubeGateway {
   @override
   Future<String> getAudioUrl(String videoId) async {
     final clients = [
-      YoutubeApiClient.ios,
-      YoutubeApiClient.tv,
-      YoutubeApiClient.androidVr,
-      YoutubeApiClient.safari,
+      YoutubeApiClient.ios,   // best for AAC, no signature deciphering needed
+      YoutubeApiClient.tv,    // good fallback
     ];
 
     final completer = Completer<String>();
