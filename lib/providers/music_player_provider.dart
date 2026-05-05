@@ -8,6 +8,7 @@ import '../services/youtube_service.dart';
 import '../services/play_history_service.dart';
 import '../services/lastfm_service.dart';
 import '../services/download_service.dart';
+import '../services/youtube_service.dart' show YouTubeService, YouTubeRateLimitException;
 import 'auth_provider.dart';
 
 abstract class MusicPlayerProvider extends ChangeNotifier {
@@ -58,6 +59,8 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   final LastFmService _lastFmService = LastFmService();
   AuthProvider? _authProvider;
   void setAuthProvider(AuthProvider auth) => _authProvider = auth;
+  VoidCallback? _onRateLimit;
+  void setOnRateLimit(VoidCallback cb) => _onRateLimit = cb;
   Timer? _positionSaveTimer;
   Timer? _stallTimer;
   bool _isRecoveringFromStall = false;
@@ -394,6 +397,14 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         audioUrl = await _youtubeService.getPlayableAudioPath(song.id, serverId: song.serverId, song: song);
         print('[MusicPlayerProvider] Playable audio for \\${song.title}: \\${audioUrl.isEmpty ? "EMPTY" : audioUrl}');
         song.audioUrl = audioUrl;
+      } on YouTubeRateLimitException {
+        print('[MusicPlayerProvider] Rate limited — switching to offline');
+        _onRateLimit?.call();
+        _loadingAudioIds.remove(song.id);
+        _audioHandler.nextEnabled = true;
+        notifyListeners();
+        await _playOfflineByGenre(song);
+        return;
       } finally {
         _loadingAudioIds.remove(song.id);
         _audioHandler.nextEnabled = true;

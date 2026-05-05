@@ -1,5 +1,11 @@
 import 'dart:async';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
+
+class YouTubeRateLimitException implements Exception {
+  const YouTubeRateLimitException();
+  @override
+  String toString() => 'YouTubeRateLimitException';
+}
 import 'package:http/http.dart' as http;
 import '../models/music_models.dart';
 import 'gemini_service.dart';
@@ -75,6 +81,10 @@ class YoutubeExplodeGateway implements YoutubeGateway {
             print('[YoutubeGateway] $client failed: $e');
             if (e.toString().contains('RequestLimitExceeded')) {
               _yt.close(); _yt = YoutubeExplode();
+              if (!completer.isCompleted) {
+                completer.completeError(const YouTubeRateLimitException());
+              }
+              return null;
             }
             onDone();
             return null;
@@ -280,7 +290,16 @@ class YouTubeService {
   }
 
   Future<String> getAudioUrl(String videoId) =>
-      safeCall(() => _gateway.getAudioUrl(videoId), '', tag: 'YouTubeService.getAudioUrl');
+  Future<String> getAudioUrl(String videoId) async {
+    try {
+      return await _gateway.getAudioUrl(videoId);
+    } on YouTubeRateLimitException {
+      rethrow; // let provider handle rate limit specially
+    } catch (e) {
+      print('[YouTubeService.getAudioUrl] Error: $e');
+      return '';
+    }
+  }
 
   Future<List<Song>> generatePlaylist(Song song, {String? search}) =>
       safeCall(() => _server.generatePlaylist(
