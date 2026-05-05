@@ -61,7 +61,7 @@ class YoutubeExplodeGateway implements YoutubeGateway {
     for (final client in clients) {
       _yt.videos.streamsClient
           .getManifest(videoId, ytClients: [client])
-          .timeout(const Duration(seconds: 8))
+          .timeout(const Duration(seconds: 20))
           .then((manifest) {
             if (completer.isCompleted) return;
             final streams = manifest.audioOnly.toList();
