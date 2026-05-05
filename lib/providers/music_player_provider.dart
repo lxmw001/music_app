@@ -166,10 +166,13 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       if (position > Duration.zero) _lastPosition = position;
       if (_currentSong != null && _autoAddSuggestions) {
         final duration = totalDuration;
+        // Only fetch suggestions if we're near the end AND queue is almost exhausted
+        final queueHasMore = _currentIndex < _queue.length - 1;
         if (duration.inSeconds > 0 &&
             (duration - position).inSeconds <= 10 &&
             !_isFetchingSuggestions &&
-            _suggestedSongs.isEmpty) {
+            _suggestedSongs.isEmpty &&
+            !queueHasMore) {
           _fetchSuggestionsInBackground();
         }
       }
@@ -319,8 +322,9 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       notifyListeners();
       return;
     }
-    // Don't restart if same song is already playing (but allow if queue is being set)
-    if (_currentSong?.id == song.id && isPlaying && queue == null) return;
+    // Don't restart if same song is already playing (but allow if completed or queue is being set)
+    final isCompleted = _audioHandler.playbackState.value.processingState == AudioProcessingState.completed;
+    if (_currentSong?.id == song.id && isPlaying && !isCompleted && queue == null) return;
     // Block concurrent auto-advances (fromQueue), but always allow user taps
     
     
