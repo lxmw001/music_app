@@ -37,8 +37,9 @@ class YoutubeExplodeGateway implements YoutubeGateway {
   @override
   Future<String> getAudioUrl(String videoId) async {
     final clients = [
-      YoutubeApiClient.ios,   // best for AAC, no signature deciphering needed
-      YoutubeApiClient.tv,    // good fallback
+      YoutubeApiClient.ios,
+      YoutubeApiClient.tv,
+      YoutubeApiClient.androidVr,
     ];
 
     final completer = Completer<String>();
@@ -60,7 +61,7 @@ class YoutubeExplodeGateway implements YoutubeGateway {
     for (final client in clients) {
       _yt.videos.streamsClient
           .getManifest(videoId, ytClients: [client])
-          .timeout(const Duration(seconds: 12))
+          .timeout(const Duration(seconds: 8))
           .then((manifest) {
             if (completer.isCompleted) return;
             final streams = manifest.audioOnly.toList();
