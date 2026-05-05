@@ -472,25 +472,16 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     _startPositionSaveTimer(song);
     notifyListeners();
 
-    // Pre-fetch next song's URL in background to reduce lag on next tap
+    // Pre-fetch next song's URL — skip if it's a downloaded song
     if (_queue.isNotEmpty && _currentIndex < _queue.length - 1) {
-      final nextSong = _queue[_currentIndex + 1];
-      final isLocal = nextSong.audioUrl.startsWith('/') || nextSong.audioUrl.startsWith('file://');
-      if (nextSong.audioUrl.isEmpty && !isLocal) {
-        _youtubeService.getAudioUrl(nextSong.id).then((url) => nextSong.audioUrl = url);
+      final next = _queue[_currentIndex + 1];
+      if (next.audioUrl.isEmpty) {
+        // Check downloads first before hitting YouTube
+        _youtubeService.getPlayableAudioPath(next.id, serverId: next.serverId, song: next)
+            .then((url) { if (url.isNotEmpty) next.audioUrl = url; });
       }
-    } else {
-      // At end of queue — pre-fetch a suggestion + its audio URL
-      _youtubeService.getSuggestedSongs(song.id, maxResults: 1).then((suggestions) {
-        if (suggestions.isNotEmpty) {
-          _suggestedSongs = suggestions;
-          final suggested = suggestions.first;
-          _youtubeService.getAudioUrl(suggested.id).then((url) => suggested.audioUrl = url);
-        }
-      });
     }
   }
-  bool _isSeeding = false;
   int _consecutiveSkips = 0;
 
   /// Fetch suggestions for the seed song and append to queue in background
