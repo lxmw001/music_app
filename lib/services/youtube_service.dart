@@ -36,42 +36,29 @@ class YoutubeExplodeGateway implements YoutubeGateway {
       YoutubeApiClient.androidVr,
       YoutubeApiClient.safari,
     ];
-    String? opusFallback; // best Opus URL found if no AAC available
+    try {
+      final manifest = await _yt.videos.streamsClient
+          .getManifest(videoId, ytClients: clients)
+          .timeout(const Duration(seconds: 15));
+      final streams = manifest.audioOnly.toList();
+      if (streams.isEmpty) throw Exception('No audio streams for $videoId');
 
-    for (final client in clients) {
-      try {
-        final manifest = await _yt.videos.streamsClient
-            .getManifest(videoId, ytClients: [client])
-            .timeout(const Duration(seconds: 5));
-        final streams = manifest.audioOnly.toList();
-        if (streams.isEmpty) continue;
-
-        final aac = streams.where((s) =>
-            s.codec.mimeType.contains('mp4a') || s.container.name == 'mp4').toList();
-        if (aac.isNotEmpty) {
-          aac.sort((a, b) => b.bitrate.compareTo(a.bitrate));
-          print('[YoutubeGateway] $client AAC succeeded for $videoId');
-          return aac.first.url.toString();
-        }
-        // No AAC — save as Opus fallback and try next client
-        if (opusFallback == null) {
-          streams.sort((a, b) => b.bitrate.compareTo(a.bitrate));
-          opusFallback = streams.first.url.toString();
-        }
-      } catch (e) {
-        print('[YoutubeGateway] $client failed: $e');
-        if (e.toString().contains('RequestLimitExceeded')) {
-          _yt.close();
-          _yt = YoutubeExplode();
-          break;
-        }
+      // Prefer AAC, fall back to Opus
+      final aac = streams.where((s) =>
+          s.codec.mimeType.contains('mp4a') || s.container.name == 'mp4').toList();
+      final best = aac.isNotEmpty
+          ? (aac..sort((a, b) => b.bitrate.compareTo(a.bitrate))).first
+          : (streams..sort((a, b) => b.bitrate.compareTo(a.bitrate))).first;
+      print('[YoutubeGateway] succeeded for $videoId (${best.codec.mimeType})');
+      return best.url.toString();
+    } catch (e) {
+      print('[YoutubeGateway] failed for $videoId: $e');
+      if (e.toString().contains('RequestLimitExceeded')) {
+        _yt.close();
+        _yt = YoutubeExplode();
       }
+      throw Exception('All YouTube clients failed for $videoId');
     }
-    if (opusFallback != null) {
-      print('[YoutubeGateway] using Opus fallback for $videoId');
-      return opusFallback;
-    }
-    throw Exception('All YouTube clients failed for $videoId');
   }
 
   @override
