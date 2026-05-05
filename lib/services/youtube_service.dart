@@ -39,6 +39,7 @@ class YoutubeExplodeGateway implements YoutubeGateway {
     final clients = [
       YoutubeApiClient.ios,
       YoutubeApiClient.tv,
+      YoutubeApiClient.safari,
       YoutubeApiClient.androidVr,
     ];
 
@@ -64,7 +65,9 @@ class YoutubeExplodeGateway implements YoutubeGateway {
           .timeout(const Duration(seconds: 20))
           .then((manifest) {
             if (completer.isCompleted) return;
-            final streams = manifest.audioOnly.toList();
+            final streams = manifest.audioOnly.toList()
+                .where((s) => s.codec.mimeType.startsWith('audio/'))
+                .toList();
             if (streams.isEmpty) { onDone(); return; }
             final aac = streams.where((s) =>
                 s.codec.mimeType.contains('mp4a') || s.container.name == 'mp4').toList();
