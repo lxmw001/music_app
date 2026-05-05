@@ -424,9 +424,10 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       if (_consecutiveSkips <= 2) {
         Future.delayed(const Duration(seconds: 3), () => nextSong());
       } else {
-        // Too many failures — wait longer then try once more
         _consecutiveSkips = 0;
-        Future.delayed(const Duration(seconds: 15), () => nextSong());
+        print('[MusicPlayerProvider] too many failures — switching to offline');
+        _onRateLimit?.call();
+        await _playOfflineByGenre(song);
       }
       return;
     }
@@ -472,7 +473,9 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
           Future.delayed(const Duration(seconds: 3), () => nextSong());
         } else {
           _consecutiveSkips = 0;
-          Future.delayed(const Duration(seconds: 15), () => nextSong());
+          print('[MusicPlayerProvider] too many failures — switching to offline');
+          _onRateLimit?.call();
+          await _playOfflineByGenre(song);
         }
         return;
       }
