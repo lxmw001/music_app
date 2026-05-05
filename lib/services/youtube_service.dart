@@ -1,11 +1,5 @@
 import 'dart:async';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
-
-class YouTubeRateLimitException implements Exception {
-  const YouTubeRateLimitException();
-  @override
-  String toString() => 'YouTubeRateLimitException';
-}
 import 'package:http/http.dart' as http;
 import '../models/music_models.dart';
 import 'gemini_service.dart';
@@ -15,6 +9,12 @@ import 'audio_cache_service.dart';
 import 'download_service.dart';
 import 'music_server_service.dart';
 import 'stream_url_cache.dart';
+
+class YouTubeRateLimitException implements Exception {
+  const YouTubeRateLimitException();
+  @override
+  String toString() => 'YouTubeRateLimitException';
+}
 
 /// Thin abstraction over YoutubeExplode to allow testing without real network calls.
 abstract class YoutubeGateway {
@@ -289,12 +289,11 @@ class YouTubeService {
     return wordsA.intersection(wordsB).length >= 2;
   }
 
-  Future<String> getAudioUrl(String videoId) =>
   Future<String> getAudioUrl(String videoId) async {
     try {
       return await _gateway.getAudioUrl(videoId);
     } on YouTubeRateLimitException {
-      rethrow; // let provider handle rate limit specially
+      rethrow;
     } catch (e) {
       print('[YouTubeService.getAudioUrl] Error: $e');
       return '';

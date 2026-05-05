@@ -33,6 +33,7 @@ android {
 
     defaultConfig {
         applicationId = "com.lxmw.musicapp"
+//        minSdk = flutter.minSdkVersion
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
