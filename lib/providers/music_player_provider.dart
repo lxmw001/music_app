@@ -152,8 +152,10 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       if (_currentSong != null) {
         notifyListeners();
         final song = _currentSong!;
-        _youtubeService.getAudioUrl(song.id).then((url) => song.audioUrl = url);
-        // If queue has only 1 song (no suggestions yet), seed in background
+        // Only prefetch URL if song doesn't already have a local file
+        if (song.audioUrl.isEmpty || (!song.audioUrl.startsWith('/') && !song.audioUrl.startsWith('file://'))) {
+          _youtubeService.getAudioUrl(song.id).then((url) => song.audioUrl = url);
+        }
         if (_queue.length <= 1) _seedQueueWithSuggestions(song);
       }
     }
@@ -469,7 +471,8 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     // Pre-fetch next song's URL in background to reduce lag on next tap
     if (_queue.isNotEmpty && _currentIndex < _queue.length - 1) {
       final nextSong = _queue[_currentIndex + 1];
-      if (nextSong.audioUrl.isEmpty) {
+      final isLocal = nextSong.audioUrl.startsWith('/') || nextSong.audioUrl.startsWith('file://');
+      if (nextSong.audioUrl.isEmpty && !isLocal) {
         _youtubeService.getAudioUrl(nextSong.id).then((url) => nextSong.audioUrl = url);
       }
     } else {
