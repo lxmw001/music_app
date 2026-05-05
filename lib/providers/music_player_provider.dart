@@ -176,13 +176,18 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     _audioHandler.playbackState.listen((state) {
       if (state.processingState == AudioProcessingState.completed && !_isFetchingSuggestions) {
         final completedSongId = _currentSong?.id;
-        // Real completion: played at least 5s (filters out false completed from setAudioSource)
+        final duration = totalDuration;
+        // Real completion: played at least 5s AND position is near the end (within 15s)
         final wasPlaying = _lastPosition.inSeconds >= 5;
-        if (completedSongId != null && wasPlaying) {
+        final nearEnd = duration.inSeconds == 0 ||
+            _lastPosition.inSeconds >= (duration.inSeconds - 15);
+        if (completedSongId != null && wasPlaying && nearEnd) {
           _historyService.recordPlay(_currentSong!, _lastPosition.inSeconds);
           Future.delayed(const Duration(milliseconds: 300), () {
             if (_currentSong?.id == completedSongId) nextSong();
           });
+        } else if (completedSongId != null && wasPlaying && !nearEnd) {
+          print('[MusicPlayerProvider] ignoring early completed at ${_lastPosition.inSeconds}s / ${duration.inSeconds}s');
         }
       }
 
