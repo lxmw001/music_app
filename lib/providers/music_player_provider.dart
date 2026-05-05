@@ -482,6 +482,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       }
     }
   }
+  bool _isSeeding = false;
   int _consecutiveSkips = 0;
 
   /// Fetch suggestions for the seed song and append to queue in background
