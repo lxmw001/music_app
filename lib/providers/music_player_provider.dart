@@ -638,9 +638,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   }
 
   @override
-  void nextSong() {
-    _nextSongAsync();
-  }
+  void nextSong() => Future.microtask(_nextSongAsync);
 
   Future<void> _nextSongAsync() async {
     if (!_isInitialized) return;
