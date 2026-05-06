@@ -213,7 +213,16 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       }
 
       if (state.processingState == AudioProcessingState.buffering && state.playing && !_isRecoveringFromStall && _loadingAudioIds.isEmpty) {
-        _stallTimer ??= Timer(const Duration(seconds: 15), _handleStall);
+        // Only start stall timer if position is genuinely stuck (not just buffering ahead)
+        _stallTimer ??= Timer(const Duration(seconds: 30), () {
+          // Double-check position hasn't advanced before declaring a stall
+          final posNow = currentPosition.inSeconds;
+          if (posNow <= _lastPosition.inSeconds + 2) {
+            _handleStall();
+          } else {
+            _stallTimer = null;
+          }
+        });
       } else {
         _stallTimer?.cancel();
         _stallTimer = null;
