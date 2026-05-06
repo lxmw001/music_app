@@ -9,6 +9,7 @@ import '../services/play_history_service.dart';
 import '../services/lastfm_service.dart';
 import '../services/download_service.dart';
 import '../services/youtube_service.dart' show YouTubeService, YouTubeRateLimitException;
+import '../utils/logger.dart';
 import 'auth_provider.dart';
 
 abstract class MusicPlayerProvider extends ChangeNotifier {
@@ -116,7 +117,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
 
   Future<void> _init() async {
     try {
-      print('[MusicPlayerProvider] starting AudioService.init');
+      rlog('[MusicPlayerProvider] starting AudioService.init');
       _audioHandler = await AudioService.init(
       builder: () => AudioPlayerHandler(
         onSkipToNext: () => nextSong(),
@@ -131,7 +132,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         androidStopForegroundOnPause: true,
       ),
     );
-    print('[MusicPlayerProvider] AudioService.init complete');
+    rlog('[MusicPlayerProvider] AudioService.init complete');
 
     // Restore last queue and song on startup BEFORE marking initialized
     final savedQueue = await _historyService.loadQueue();
@@ -144,13 +145,13 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         _currentIndex = savedQueue.currentIndex;
         _currentSong = _queue[_currentIndex];
         _lastRestoredPosition = Duration(seconds: lastSongData?.lastPositionSeconds ?? 0);
-        print('[MusicPlayerProvider] restored queue: ${_queue.length} songs, index=$_currentIndex');
+        rlog('[MusicPlayerProvider] restored queue: ${_queue.length} songs, index=$_currentIndex');
       } else if (lastSongData != null) {
         _currentSong = lastSongData.song;
         _queue = [lastSongData.song];
         _currentIndex = 0;
         _lastRestoredPosition = Duration(seconds: lastSongData.lastPositionSeconds);
-        print('[MusicPlayerProvider] restored last song: ${lastSongData.song.title}');
+        rlog('[MusicPlayerProvider] restored last song: ${lastSongData.song.title}');
       }
       if (_currentSong != null) {
         notifyListeners();
@@ -208,7 +209,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
             if (_currentSong?.id == completedSongId) nextSong();
           });
         } else if (completedSongId != null && wasPlaying && !nearEnd) {
-          print('[MusicPlayerProvider] ignoring early completed at ${_lastPosition.inSeconds}s / ${duration.inSeconds}s');
+          rlog('[MusicPlayerProvider] ignoring early completed at ${_lastPosition.inSeconds}s / ${duration.inSeconds}s');
         }
       }
 
@@ -246,11 +247,11 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       _pendingSong = null;
       _pendingQueue = null;
       _loadingAudioIds.remove(song!.id); // clear pending spinner before re-playing
-    print('[MusicPlayerProvider] _init complete, processing pending song: ${song.id}');
+    rlog('[MusicPlayerProvider] _init complete, processing pending song: ${song.id}');
       await playSong(song, queue: queue);
     }
     } catch (e, st) {
-    print('[MusicPlayerProvider] _init ERROR: $e\n$st');
+    rlog('[MusicPlayerProvider] _init ERROR: $e\n$st');
   }
   }
 
@@ -260,7 +261,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     _isRecoveringFromStall = true;
     _stallTimer?.cancel();
     _stallTimer = null;
-    print('[MusicPlayerProvider] stall detected for "${song.title}"');
+    rlog('[MusicPlayerProvider] stall detected for "${song.title}"');
 
     try {
       final connectivity = await Connectivity().checkConnectivity();
@@ -268,21 +269,21 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
           c == ConnectivityResult.wifi || c == ConnectivityResult.mobile);
 
       if (!hasInternet) {
-        print('[MusicPlayerProvider] no internet — switching to offline queue');
+        rlog('[MusicPlayerProvider] no internet — switching to offline queue');
         await _playOfflineByGenre(song);
         return;
       }
 
-      print('[MusicPlayerProvider] has internet — re-fetching URL...');
+      rlog('[MusicPlayerProvider] has internet — re-fetching URL...');
       final position = currentPosition;
       // Only clear network URLs — don't wipe local file paths for downloaded songs
       if (!song.audioUrl.startsWith('/') && !song.audioUrl.startsWith('file://')) {
         song.audioUrl = '';
       }
       await playSong(song, seekTo: position);
-      print('[MusicPlayerProvider] stall recovery succeeded');
+      rlog('[MusicPlayerProvider] stall recovery succeeded');
     } catch (e) {
-      print('[MusicPlayerProvider] stall recovery failed: $e');
+      rlog('[MusicPlayerProvider] stall recovery failed: $e');
     } finally {
       _isRecoveringFromStall = false;
     }
@@ -291,12 +292,12 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   Future<void> _playOfflineByGenre(Song stalledSong) async {
     final downloaded = await _downloadService.getDownloadedSongs();
     if (downloaded.isEmpty) {
-      print('[MusicPlayerProvider] no downloaded songs available offline');
+      rlog('[MusicPlayerProvider] no downloaded songs available offline');
       return;
     }
 
     final stalledTags = stalledSong.genres.map((t) => t.toLowerCase()).toSet();
-    print('[MusicPlayerProvider] offline genre match using tags: $stalledTags');
+    rlog('[MusicPlayerProvider] offline genre match using tags: $stalledTags');
 
     List<Song> offlineQueue;
     if (stalledTags.isNotEmpty) {
@@ -316,14 +317,14 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
 
     if (offlineQueue.isEmpty) offlineQueue = downloaded;
 
-    print('[MusicPlayerProvider] offline queue: ${offlineQueue.length} songs, first: ${offlineQueue.first.title}');
+    rlog('[MusicPlayerProvider] offline queue: ${offlineQueue.length} songs, first: ${offlineQueue.first.title}');
     await playSong(offlineQueue.first, queue: offlineQueue);
   }
 
   @override
   Future<void> playSong(Song song, {List<Song>? queue, Duration? seekTo, bool fromQueue = false, String? searchQuery}) async {
     if (!_isInitialized) {
-      print('[MusicPlayerProvider] not initialized yet, queuing: ${song.title}');
+      rlog('[MusicPlayerProvider] not initialized yet, queuing: ${song.title}');
       _pendingSong = song;
       _pendingQueue = queue;
       _loadingAudioIds.add(song.id);
@@ -346,7 +347,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     final previousSong = _currentSong;
     final previousPosition = currentPosition.inSeconds;
     if (previousSong != null && previousPosition > 0) {
-      print('[MusicPlayerProvider] recording play: ${previousSong.title}, position=${previousPosition}s, duration=${previousSong.duration.inSeconds}s');
+      rlog('[MusicPlayerProvider] recording play: ${previousSong.title}, position=${previousPosition}s, duration=${previousSong.duration.inSeconds}s');
       _historyService.recordPlay(previousSong, previousPosition);
     }
     // Show song immediately in UI while audio URL is being fetched
@@ -374,13 +375,13 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
 
         _youtubeService.generatePlaylist(song, search: searchQuery).then((playlist) {
           if (playlist.isEmpty) {
-            print('[MusicPlayerProvider] generate-playlist returned empty for ${song.id}');
+            rlog('[MusicPlayerProvider] generate-playlist returned empty for ${song.id}');
             return;
           }
           if (_currentSong?.id == song.id) {
             _queue = [song, ...playlist];
             _currentIndex = 0;
-            print('[MusicPlayerProvider] queue updated: ${_queue.length} songs');
+            rlog('[MusicPlayerProvider] queue updated: ${_queue.length} songs');
             _historyService.saveQueue(_queue, _currentIndex);
             final playlistName = searchQuery?.isNotEmpty == true
                 ? searchQuery!
@@ -396,7 +397,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     // Clear suggestions when starting a new song
     _suggestedSongs = [];
     String audioUrl = song.audioUrl;
-    print('[MusicPlayerProvider] playSong: \\${song.title}, audioUrl empty=\\${audioUrl.isEmpty}, loadingIds=\\$_loadingAudioIds');
+    rlog('[MusicPlayerProvider] playSong: \\${song.title}, audioUrl empty=\\${audioUrl.isEmpty}, loadingIds=\\$_loadingAudioIds');
     if (audioUrl.isEmpty) {
       _loadingAudioIds.add(song.id);
       _audioHandler.nextEnabled = false;
@@ -404,10 +405,10 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       try {
         // Prefer cached file, otherwise play online
         audioUrl = await _youtubeService.getPlayableAudioPath(song.id, serverId: song.serverId, song: song);
-        print('[MusicPlayerProvider] Playable audio for \\${song.title}: \\${audioUrl.isEmpty ? "EMPTY" : audioUrl}');
+        rlog('[MusicPlayerProvider] Playable audio for \\${song.title}: \\${audioUrl.isEmpty ? "EMPTY" : audioUrl}');
         song.audioUrl = audioUrl;
       } on YouTubeRateLimitException {
-        print('[MusicPlayerProvider] Rate limited — switching to offline');
+        rlog('[MusicPlayerProvider] Rate limited — switching to offline');
         _onRateLimit?.call();
         _loadingAudioIds.remove(song.id);
         _audioHandler.nextEnabled = true;
@@ -421,7 +422,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       }
     }
     if (audioUrl.isEmpty) {
-      print('[MusicPlayerProvider] Could not get audio file for \\${song.title}, skipping');
+      rlog('[MusicPlayerProvider] Could not get audio file for \\${song.title}, skipping');
       // Only remove from queue if it's not a downloaded song (downloaded songs may fail transiently)
       if (song.audioUrl.isEmpty) {
         _queue.removeWhere((s) => s.id == song.id);
@@ -434,7 +435,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         Future.delayed(const Duration(seconds: 3), () => nextSong());
       } else {
         _consecutiveSkips = 0;
-        print('[MusicPlayerProvider] too many failures — switching to offline');
+        rlog('[MusicPlayerProvider] too many failures — switching to offline');
         _onRateLimit?.call();
         await _playOfflineByGenre(song);
       }
@@ -455,7 +456,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       }
       await _audioHandler.play();
     } catch (e) {
-      print('[MusicPlayerProvider] setAudioSource error: $e — retrying with fresh URL');
+      rlog('[MusicPlayerProvider] setAudioSource error: $e — retrying with fresh URL');
       try {
         // Only clear network URLs — preserve local file paths for downloaded songs
         if (!song.audioUrl.startsWith('/') && !song.audioUrl.startsWith('file://')) {
@@ -470,7 +471,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         }
         await _audioHandler.play();
       } catch (e2) {
-        print('[MusicPlayerProvider] retry failed: $e2 — skipping to next');
+        rlog('[MusicPlayerProvider] retry failed: $e2 — skipping to next');
         _loadingAudioIds.remove(song.id);
         notifyListeners();
         _queue.removeWhere((s) => s.id == song.id);
@@ -482,7 +483,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
           Future.delayed(const Duration(seconds: 3), () => nextSong());
         } else {
           _consecutiveSkips = 0;
-          print('[MusicPlayerProvider] too many failures — switching to offline');
+          rlog('[MusicPlayerProvider] too many failures — switching to offline');
           _onRateLimit?.call();
           await _playOfflineByGenre(song);
         }
@@ -512,7 +513,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   /// Fetch suggestions for the seed song and append to queue in background
   void _seedQueueWithSuggestions(Song seedSong) {
     if (_isSeeding) {
-      print('[MusicPlayerProvider] already seeding, skipped for: ${seedSong.title}');
+      rlog('[MusicPlayerProvider] already seeding, skipped for: ${seedSong.title}');
       return;
     }
     _isSeeding = true;
@@ -520,7 +521,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   }
 
   Future<void> _doSeed(Song seedSong) async {
-    print('[MusicPlayerProvider] _seedQueueWithSuggestions started for: ${seedSong.title}');
+    rlog('[MusicPlayerProvider] _seedQueueWithSuggestions started for: ${seedSong.title}');
     try {
       final metadata = await _youtubeService.getMetadata(seedSong.title);
 
@@ -532,7 +533,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         // 1. Last.fm top tracks (most accurate artist songs)
         final topTracks = await _lastFmService.getArtistTopTracks(artist, limit: 10);
         if (topTracks.isNotEmpty) {
-          print('[MusicPlayerProvider] Last.fm top tracks for $artist: ${topTracks.length}');
+          rlog('[MusicPlayerProvider] Last.fm top tracks for $artist: ${topTracks.length}');
           for (final track in topTracks.take(3)) {
             final songs = await _youtubeService.searchByQuery(track, maxResults: 3);
             _addToQueue(songs, seedSong.id);
@@ -549,7 +550,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         // 3. Similar artists from Last.fm as pending queries
         final similarArtists = await _lastFmService.getSimilarArtists(artist, limit: 5);
         if (similarArtists.isNotEmpty) {
-          print('[MusicPlayerProvider] Last.fm similar artists: $similarArtists');
+          rlog('[MusicPlayerProvider] Last.fm similar artists: $similarArtists');
           _pendingSeedQueries = similarArtists.map((a) => '$a best songs').toList()..shuffle();
         } else {
           _pendingSeedQueries = List.from(metadata.suggestedQueries)..shuffle();
@@ -577,7 +578,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     ).toList();
     if (toAdd.isNotEmpty) {
       _queue.addAll(toAdd);
-      print('[MusicPlayerProvider] added ${toAdd.length} songs to queue, total: ${_queue.length}');
+      rlog('[MusicPlayerProvider] added ${toAdd.length} songs to queue, total: ${_queue.length}');
       if (toAdd.first.audioUrl.isEmpty) {
         _youtubeService.getAudioUrl(toAdd.first.id).then((url) => toAdd.first.audioUrl = url);
       }
@@ -667,7 +668,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         final query = _pendingSeedQueries.removeAt(0);
         if (!_usedSeedQueries.contains(query)) {
           _usedSeedQueries.add(query);
-          print('[MusicPlayerProvider] fetching more from query: $query');
+          rlog('[MusicPlayerProvider] fetching more from query: $query');
           final songs = await _youtubeService.searchByQuery(query, maxResults: 20);
           _addToQueue(songs, _currentSong!.id);
           if (_queue.isNotEmpty && _currentIndex < _queue.length - 1) {
