@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'l10n/app_localizations.dart';
@@ -17,6 +18,13 @@ import 'services/update_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  // Request battery optimization exemption for background playback (Xiaomi/MIUI)
+  if (defaultTargetPlatform == TargetPlatform.android) {
+    try {
+      await const MethodChannel('com.lxmw.musicapp/battery')
+          .invokeMethod('requestIgnoreBatteryOptimizations');
+    } catch (_) {} // ignore if not supported
+  }
   runApp(
     MultiProvider(
       providers: [
