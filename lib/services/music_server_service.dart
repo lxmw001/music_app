@@ -21,10 +21,8 @@ class MusicServerService {
   Future<MusicSearchResult> searchSongs(String query) async {
     final uri = Uri.parse('$_base/songs/search-youtube')
         .replace(queryParameters: {'query': query});
-    print('[MusicServer] GET $uri');
     try {
       final response = await _client.get(uri).timeout(const Duration(seconds: 30));
-      print('[MusicServer] search status: ${response.statusCode}');
 
       if (response.statusCode < 200 || response.statusCode >= 300) return const MusicSearchResult();
 
@@ -36,7 +34,7 @@ class MusicServerService {
         artists: ((data['artists'] as List?) ?? []).map((a) => a.toString()).toList(),
         hasMoreSongs: data['hasMore'] as bool? ?? false,
       );
-      print('[MusicServer] search "$query": ${result.songs.length} songs, ${result.mixes.length} mixes, ${result.videos.length} videos');
+
       return result;
     } catch (e) {
       print('[MusicServer] search error: $e');
@@ -48,18 +46,15 @@ class MusicServerService {
     final params = <String, String>{'limit': '$limit'};
     if (genres.isNotEmpty) params['genres'] = genres.join(',');
     final uri = Uri.parse('$_base/songs/trending').replace(queryParameters: params);
-    print('[MusicServer] GET $uri');
     try {
       final response = await _client.get(uri).timeout(const Duration(seconds: 30));
-      print('[MusicServer] trending status: ${response.statusCode}');
-      print('[MusicServer] trending body: ${response.body.length > 300 ? response.body.substring(0, 300) : response.body}');
 
       if (response.statusCode < 200 || response.statusCode >= 300) return [];
 
       final data = jsonDecode(response.body);
       final List songs = data is List ? data : (data['songs'] as List? ?? []);
       final result = _mapSongs(songs);
-      print('[MusicServer] trending: ${result.length} songs — ${result.take(3).map((s) => "${s.title}/${s.artist}").join(", ")}');
+
       return result;
     } catch (e) {
       print('[MusicServer] trending error: $e');
@@ -119,7 +114,6 @@ class MusicServerService {
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'streamUrl': streamUrl, 'expiresAt': expiresAt}),
       ).timeout(const Duration(seconds: 5));
-      print('[MusicServer] pushed stream URL for ${isMix ? "mix" : "song"} $id, expires $expiresAt');
     } catch (e) {
       print('[MusicServer] pushStreamUrl error: $e');
     }
@@ -130,10 +124,8 @@ class MusicServerService {
     if (search != null && search.isNotEmpty) params['search'] = search;
     final uri = Uri.parse('$_base/songs/$id/generate-playlist')
         .replace(queryParameters: params);
-    print('[MusicServer] GET $uri');
     try {
       final response = await _client.get(uri).timeout(const Duration(seconds: 30));
-      print('[MusicServer] generate-playlist status: ${response.statusCode}');
       if (response.statusCode < 200 || response.statusCode >= 300) return [];
       final data = jsonDecode(response.body);
       final List songs = data is List ? data : (data['songs'] as List? ?? []);
