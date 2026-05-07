@@ -1,6 +1,7 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:just_audio_media_kit/just_audio_media_kit.dart'; // Android media_kit backend
 import '../models/music_models.dart';
 
 class AudioPlayerHandler extends BaseAudioHandler {
