@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
@@ -77,6 +78,22 @@ class AudioCacheService {
       final file = files.removeAt(0);
       totalSize -= file.lengthSync();
       await file.delete();
+    }
+  }
+
+  /// Downloads and caches audio from an already-resolved stream URL (no YouTube API needed).
+  /// Returns the local file path, or null on failure. Safe to call fire-and-forget.
+  Future<String?> cacheFromUrl(String videoId, String url) async {
+    if (await isCached(videoId)) return (await getCachedFile(videoId)).path;
+    try {
+      final file = await getCachedFile(videoId);
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode != 200) return null;
+      await file.writeAsBytes(response.bodyBytes);
+      await _enforceCacheLimit();
+      return file.path;
+    } catch (_) {
+      return null;
     }
   }
 

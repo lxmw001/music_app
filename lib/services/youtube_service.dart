@@ -36,66 +36,30 @@ class YoutubeExplodeGateway implements YoutubeGateway {
 
   @override
   Future<String> getAudioUrl(String videoId) async {
-    final clients = [
-      YoutubeApiClient.ios,
-      YoutubeApiClient.tv,
-      YoutubeApiClient.safari,
-      YoutubeApiClient.androidVr,
-    ];
-
-    final completer = Completer<String>();
-    int done = 0;
-    String? opusFallback;
-
-    void onDone() {
-      done++;
-      if (done == clients.length && !completer.isCompleted) {
-        if (opusFallback != null) {
-          print('[YoutubeGateway] using Opus fallback for $videoId');
-          completer.complete(opusFallback!);
-        } else {
-          completer.completeError(Exception('All YouTube clients failed for $videoId'));
-        }
+    try {
+      final manifest = await _yt.videos.streamsClient
+          .getManifest(videoId, ytClients: [YoutubeApiClient.ios, YoutubeApiClient.androidVr])
+          .timeout(const Duration(seconds: 20));
+      final streams = manifest.audioOnly
+          .where((s) => s.codec.mimeType.startsWith('audio/'))
+          .toList();
+      if (streams.isEmpty) throw Exception('No audio streams for $videoId');
+      final aac = streams
+          .where((s) => s.codec.mimeType.contains('mp4a') || s.container.name == 'mp4')
+          .toList();
+      final picked = aac.isNotEmpty ? (aac..sort((a, b) => b.bitrate.compareTo(a.bitrate))).first
+                                    : (streams..sort((a, b) => b.bitrate.compareTo(a.bitrate))).first;
+      print('[YoutubeGateway] got stream for $videoId (${picked.codec.mimeType})');
+      return picked.url.toString();
+    } catch (e) {
+      print('[YoutubeGateway] failed: $e');
+      if (e.toString().contains('RequestLimitExceeded')) {
+        _yt.close();
+        _yt = YoutubeExplode();
+        throw const YouTubeRateLimitException();
       }
+      rethrow;
     }
-
-    for (final client in clients) {
-      _yt.videos.streamsClient
-          .getManifest(videoId, ytClients: [client])
-          .timeout(const Duration(seconds: 20))
-          .then((manifest) {
-            if (completer.isCompleted) return;
-            final streams = manifest.audioOnly.toList()
-                .where((s) => s.codec.mimeType.startsWith('audio/'))
-                .toList();
-            if (streams.isEmpty) { onDone(); return; }
-            final aac = streams.where((s) =>
-                s.codec.mimeType.contains('mp4a') || s.container.name == 'mp4').toList();
-            if (aac.isNotEmpty) {
-              aac.sort((a, b) => b.bitrate.compareTo(a.bitrate));
-              print('[YoutubeGateway] $client AAC for $videoId');
-              if (!completer.isCompleted) completer.complete(aac.first.url.toString());
-            } else {
-              streams.sort((a, b) => b.bitrate.compareTo(a.bitrate));
-              opusFallback ??= streams.first.url.toString();
-              onDone();
-            }
-          })
-          .catchError((e) {
-            print('[YoutubeGateway] $client failed: $e');
-            if (e.toString().contains('RequestLimitExceeded')) {
-              _yt.close(); _yt = YoutubeExplode();
-              if (!completer.isCompleted) {
-                completer.completeError(const YouTubeRateLimitException());
-              }
-              return null;
-            }
-            onDone();
-            return null;
-          });
-    }
-
-    return completer.future;
   }
 
   @override
@@ -463,6 +427,11 @@ class YouTubeService {
     final expire = Uri.parse(url).queryParameters['expire'];
     if (expire != null) return DateTime.fromMillisecondsSinceEpoch(int.parse(expire) * 1000, isUtc: true);
     return DateTime.now().toUtc().add(const Duration(hours: 6));
+  }
+
+  /// Fire-and-forget: cache audio bytes from an already-resolved stream URL.
+  void cacheAudioInBackground(String videoId, String url) {
+    _audioCache.cacheFromUrl(videoId, url);
   }
 
   void dispose() {}

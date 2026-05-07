@@ -204,9 +204,10 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         final duration = totalDuration;
         // Real completion: played at least 5s
         final wasPlaying = _lastPosition.inSeconds >= 5;
-        // Near end: within last 20s, OR duration unknown (0)
-        final nearEnd = duration.inSeconds <= 0 ||
-            _lastPosition.inSeconds >= (duration.inSeconds - 20);
+        // Near end: within last 20s. If duration unknown, require at least 30s played.
+        final nearEnd = duration.inSeconds > 0
+            ? _lastPosition.inSeconds >= (duration.inSeconds - 20)
+            : _lastPosition.inSeconds >= 30;
         if (completedSongId != null && wasPlaying && nearEnd) {
           _historyService.recordPlay(_currentSong!, _lastPosition.inSeconds);
           Future.delayed(const Duration(milliseconds: 300), () {
@@ -388,22 +389,37 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         _pendingSeedQueries = [];
         _usedSeedQueries.clear();
 
-        _youtubeService.generatePlaylist(song, search: searchQuery).then((playlist) {
-          if (playlist.isEmpty) {
-            rlog('[MusicPlayerProvider] generate-playlist returned empty for ${song.id}');
-            return;
-          }
-          if (_currentSong?.id == song.id) {
-            _queue = [song, ...playlist];
-            _currentIndex = 0;
-            rlog('[MusicPlayerProvider] queue updated: ${_queue.length} songs');
-            _historyService.saveQueue(_queue, _currentIndex);
-            final playlistName = searchQuery?.isNotEmpty == true
-                ? searchQuery!
-                : '${song.title} Radio';
-            _historyService.savePlaylist(playlistName, _queue);
-            notifyListeners();
-          }
+        // Delay to avoid rate limiting when audio URL fetch also hits YouTube
+        Future.delayed(const Duration(seconds: 5), () {
+          _youtubeService.generatePlaylist(song, search: searchQuery).then((playlist) {
+            if (playlist.isEmpty) {
+              rlog('[MusicPlayerProvider] generate-playlist returned empty for ${song.id}');
+              return;
+            }
+            if (_currentSong?.id == song.id) {
+              _queue = [song, ...playlist];
+              _currentIndex = 0;
+              rlog('[MusicPlayerProvider] queue updated: ${_queue.length} songs');
+              _historyService.saveQueue(_queue, _currentIndex);
+              final playlistName = searchQuery?.isNotEmpty == true
+                  ? searchQuery!
+                  : '${song.title} Radio';
+              _historyService.savePlaylist(playlistName, _queue);
+              // Prefetch next song now that queue is populated
+              if (_queue.length > 1) {
+                final next = _queue[1];
+                if (next.audioUrl.isEmpty && !_loadingAudioIds.contains(next.id)) {
+                  _loadingAudioIds.add(next.id);
+                  _youtubeService.getPlayableAudioPath(next.id, serverId: next.serverId, song: next)
+                      .then((url) {
+                        if (url.isNotEmpty) next.audioUrl = url;
+                        _loadingAudioIds.remove(next.id);
+                      });
+                }
+              }
+              notifyListeners();
+            }
+          });
         });
       }
     }
@@ -438,11 +454,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     }
     if (audioUrl.isEmpty) {
       rlog('[MusicPlayerProvider] Could not get audio file for \\${song.title}, skipping');
-      // Only remove from queue if it's not a downloaded song (downloaded songs may fail transiently)
-      if (song.audioUrl.isEmpty) {
-        _queue.removeWhere((s) => s.id == song.id);
-        if (_currentIndex >= _queue.length) _currentIndex = (_queue.length - 1).clamp(0, 999999);
-      }
       _stallTimer?.cancel();
       _stallTimer = null;
       _consecutiveSkips++;
@@ -463,8 +474,8 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       artUri: song.imageUrl.isNotEmpty ? Uri.tryParse(song.imageUrl) : null,
       duration: song.duration,
     );
+    _lastPosition = Duration.zero; // reset before setAudioSource to prevent stale position triggering false completed
     try {
-      _lastPosition = Duration.zero; // reset so false completed events are ignored
       await _audioHandler.setAudioSource(audioUrl, mediaItem);
       if (seekTo != null && seekTo > Duration.zero) {
         await _audioHandler.seek(seekTo);
@@ -512,13 +523,32 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     _startPositionSaveTimer(song);
     notifyListeners();
 
-    // Pre-fetch next song's URL — skip if it's a downloaded song
+    // Cache audio bytes after song finishes streaming to avoid 403 from concurrent requests
+    if (!audioUrl.startsWith('/') && !audioUrl.startsWith('file://')) {
+      final cacheSongId = song.id;
+      final cacheUrl = audioUrl;
+      final delay = song.duration > Duration.zero ? song.duration : const Duration(minutes: 5);
+      Future.delayed(delay, () {
+        if (_currentSong?.id != cacheSongId) { // only cache if song has moved on
+          _youtubeService.cacheAudioInBackground(cacheSongId, cacheUrl);
+        }
+      });
+    }
+
+    // Pre-fetch next song's URL — skip if already loading or cached
     if (_queue.isNotEmpty && _currentIndex < _queue.length - 1) {
       final next = _queue[_currentIndex + 1];
-      if (next.audioUrl.isEmpty) {
-        // Check downloads first before hitting YouTube
+      if (next.audioUrl.isEmpty && !_loadingAudioIds.contains(next.id)) {
+        rlog('[MusicPlayerProvider] prefetching next: ${next.title}');
+        _loadingAudioIds.add(next.id);
         _youtubeService.getPlayableAudioPath(next.id, serverId: next.serverId, song: next)
-            .then((url) { if (url.isNotEmpty) next.audioUrl = url; });
+            .then((url) {
+              if (url.isNotEmpty) next.audioUrl = url;
+              _loadingAudioIds.remove(next.id);
+              rlog('[MusicPlayerProvider] prefetch done: ${next.title}, empty=${url.isEmpty}');
+            });
+      } else {
+        rlog('[MusicPlayerProvider] prefetch skipped for ${next.title}: audioUrl=${next.audioUrl.isNotEmpty}, loading=${_loadingAudioIds.contains(next.id)}');
       }
     }
   }
@@ -761,8 +791,8 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       if (song.id == _currentSong?.id) continue;
       if (song.audioUrl.isEmpty && !_loadingAudioIds.contains(song.id)) {
         _loadingAudioIds.add(song.id);
-        _youtubeService.getAudioUrl(song.id).then((url) {
-          song.audioUrl = url;
+        _youtubeService.getPlayableAudioPath(song.id, serverId: song.serverId, song: song).then((url) {
+          if (url.isNotEmpty) song.audioUrl = url;
           _loadingAudioIds.remove(song.id);
           notifyListeners();
         });

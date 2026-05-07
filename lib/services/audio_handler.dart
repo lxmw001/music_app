@@ -1,7 +1,6 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:just_audio_media_kit/just_audio_media_kit.dart'; // Android media_kit backend
 import '../models/music_models.dart';
 
 class AudioPlayerHandler extends BaseAudioHandler {
@@ -11,7 +10,7 @@ class AudioPlayerHandler extends BaseAudioHandler {
   final VoidCallback? onPlay;
 
   AudioPlayerHandler({AudioPlayer? player, this.onSkipToNext, this.onSkipToPrevious, this.onPlay})
-      : _player = player ?? AudioPlayer() {
+      : _player = player ?? AudioPlayer(androidApplyAudioAttributes: false) {
     _init();
   }
 
