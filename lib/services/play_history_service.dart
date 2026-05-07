@@ -126,13 +126,11 @@ class PlayHistoryService {
     if (songsRaw == null) return [];
     final songsMap = Map<String, dynamic>.from(jsonDecode(songsRaw));
     final data = await _loadHistory();
-    print('[PlayHistoryService] history data: $data');
     final results = songsMap.entries
         .where((e) => (data[e.key]?['likedCount'] as int? ?? 0) > 0)
         .map((e) => (song: Song.fromJson(e.value), likedCount: data[e.key]!['likedCount'] as int))
         .toList()
       ..sort((a, b) => b.likedCount.compareTo(a.likedCount));
-    print('[PlayHistoryService] liked songs: ${results.map((e) => "${e.song.title}(${e.likedCount})").toList()}');
     return results.map((e) => e.song).toList();
   }
 

@@ -237,7 +237,6 @@ class YouTubeService {
         final result = await _server.searchSongs(query);
         if (!result.isEmpty) return result;
 
-        print('[YouTubeService] server empty, using YouTube fallback');
         final songs = await _youtubeSearch(query);
         return MusicSearchResult(songs: songs);
       }, const MusicSearchResult(), tag: 'YouTubeService.searchSongs');
@@ -245,7 +244,6 @@ class YouTubeService {
   Future<List<Song>> _youtubeSearch(String query) async {
     final videos = await _gateway.search(query, limit: 30);
     final ytSongs = _deduplicateSongs(videos.map(_videoToSong).toList());
-    print('[YouTubeService] search "$query": ${videos.length} raw, ${ytSongs.length} after dedup');
 
     final lfmTracks = await _lastFm.searchTracks(query, limit: 50);
     if (lfmTracks.isEmpty) return ytSongs;
@@ -274,7 +272,6 @@ class YouTubeService {
       final key = '${s.title.toLowerCase()}|${s.artist.toLowerCase()}';
       return seen.add(key);
     }).toList();
-    print('[YouTubeService] enriched: ${enriched.length}, final: ${result.length}');
     return result;
   }
 
@@ -342,7 +339,6 @@ class YouTubeService {
         final title = knownTitle ?? (await _gateway.getVideo(videoId)).title;
         final metadata = await _gemini.getSongMetadata(title);
         final query = metadata?.randomQuery() ?? _extractSearchQuery(title, '');
-        print('[YouTubeService] suggestions query: "$query"');
         final videos = await _gateway.search(query, limit: maxResults + 3);
         return videos
             .where((v) => v.id.value != videoId)
@@ -419,7 +415,6 @@ class YouTubeService {
     // 1. Permanent downloads
     final downloadedPath = await _downloadService.getDownloadedPathById(videoId);
     if (downloadedPath != null) {
-      print('[YouTubeService] Using downloaded file for $videoId');
       return downloadedPath;
     }
     // 2. In-memory stream URL on song object (set this session)
