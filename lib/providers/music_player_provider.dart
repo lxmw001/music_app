@@ -318,7 +318,12 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     if (offlineQueue.isEmpty) offlineQueue = downloaded;
 
     rlog('[MusicPlayerProvider] offline queue: ${offlineQueue.length} songs, first: ${offlineQueue.first.title}');
-    await playSong(offlineQueue.first, queue: offlineQueue);
+    // Use microtask to break synchronous call stack and prevent stack overflow in AOT
+    // Future.microtask(() => playSong(offlineQueue.first, queue: offlineQueue));
+    // For now, just stop playback - user can manually play downloaded songs
+    await _audioHandler.stop();
+    _currentSong = null;
+    notifyListeners();
   }
 
   @override
