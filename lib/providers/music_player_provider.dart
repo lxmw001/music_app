@@ -167,6 +167,8 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     
     AudioProcessingState? _lastProcessingState;
     bool? _lastPlaying;
+    bool _isUpdatingMediaItem = false; // Guard against recursive mediaItem updates
+    
     _audioHandler.positionStream.listen((position) {
       if (position > Duration.zero) _lastPosition = position;
       if (_currentSong != null && _autoAddSuggestions) {
@@ -185,10 +187,12 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
 
     // Update mediaItem duration when audio loads — fixes Bluetooth/notification display
     _audioHandler.durationStream.listen((duration) {
-      if (duration != null && duration > Duration.zero && _currentSong != null) {
+      if (duration != null && duration > Duration.zero && _currentSong != null && !_isUpdatingMediaItem) {
         final current = _audioHandler.mediaItem.value;
         if (current != null && (current.duration == null || current.duration == Duration.zero)) {
+          _isUpdatingMediaItem = true;
           _audioHandler.mediaItem.add(current.copyWith(duration: duration));
+          _isUpdatingMediaItem = false;
         }
         notifyListeners();
       }
@@ -236,7 +240,9 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       }
     });
 
-    _audioHandler.mediaItem.listen((_) => notifyListeners());
+    _audioHandler.mediaItem.listen((_) {
+      if (!_isUpdatingMediaItem) notifyListeners();
+    });
 
     notifyListeners();
     
