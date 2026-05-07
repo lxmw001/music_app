@@ -327,7 +327,11 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     // Use microtask to break synchronous call stack and prevent stack overflow in AOT
     // Future.microtask(() => playSong(offlineQueue.first, queue: offlineQueue));
     // For now, just stop playback - user can manually play downloaded songs
-    await _audioHandler.stop();
+    Future.microtask(() async {
+      try {
+        await _audioHandler.stop();
+      } catch (_) {}
+    });
     _currentSong = null;
     notifyListeners();
   }
