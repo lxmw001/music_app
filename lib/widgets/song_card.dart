@@ -29,11 +29,11 @@ class SongCard extends StatelessWidget {
                     song.imageUrl,
                     width: 160, height: 150,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      width: 160, height: 150,
-                      color: Colors.grey[800],
-                      child: const Icon(Icons.music_note),
-                    ),
+                    errorBuilder: (_, __, ___) => _defaultCover(),
+                    loadingBuilder: (_, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return _defaultCover();
+                    },
                   ),
                   if (isLoading)
                     Container(
@@ -57,4 +57,10 @@ class SongCard extends StatelessWidget {
       ),
     );
   }
+
+  Widget _defaultCover() => Container(
+    width: 160, height: 150,
+    color: Colors.grey[800],
+    child: const Icon(Icons.music_note, color: Colors.white54),
+  );
 }

@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'l10n/app_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'firebase_options.dart';
 import 'providers/music_player_provider.dart';
 import 'providers/auth_provider.dart';
@@ -19,6 +20,10 @@ import 'services/update_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  // Use media_kit backend on Android for better codec compatibility
+  if (defaultTargetPlatform == TargetPlatform.android) {
+    JustAudioMediaKit.ensureInitialized(android: true);
+  }
   // Request battery optimization exemption for background playback (Xiaomi/MIUI)
   if (defaultTargetPlatform == TargetPlatform.android) {
     try {

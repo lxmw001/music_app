@@ -65,10 +65,11 @@ class _SongListTileState extends State<SongListTile> with SingleTickerProviderSt
                 Image.network(
                   widget.song.imageUrl,
                   width: 50, height: 50, fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    width: 50, height: 50, color: Colors.grey[800],
-                    child: const Icon(Icons.music_note),
-                  ),
+                  errorBuilder: (_, __, ___) => _defaultCover(),
+                  loadingBuilder: (_, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return _defaultCover();
+                  },
                 ),
                 if (widget.isLoading)
                   Container(width: 50, height: 50, color: Colors.black54,
@@ -116,6 +117,11 @@ class _SongListTileState extends State<SongListTile> with SingleTickerProviderSt
       },
     );
   }
+
+  Widget _defaultCover() => Container(
+    width: 50, height: 50, color: Colors.grey[800],
+    child: const Icon(Icons.music_note, color: Colors.white54),
+  );
 }
 
 class _EqualizerIcon extends StatelessWidget {
