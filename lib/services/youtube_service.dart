@@ -250,10 +250,19 @@ class YouTubeService {
 
   Future<void>? _initFuture;
 
+  Future<void> _awaitInit() async {
+    if (_initFuture != null) {
+      await _initFuture;
+      _initFuture = null;
+    }
+  }
+
   /// Call after user completes YouTube WebView login to rebuild the client with fresh cookies.
   Future<void> reloadAuthCookies() async {
     if (_gateway is YoutubeExplodeGateway) {
-      await (_gateway as YoutubeExplodeGateway).applyAuthCookies();
+      _initFuture = (_gateway as YoutubeExplodeGateway).applyAuthCookies();
+      await _initFuture;
+      _initFuture = null;
     }
   }
 
@@ -316,10 +325,7 @@ class YouTubeService {
   }
 
   Future<String> getAudioUrl(String videoId) async {
-    if (_initFuture != null) {
-      await _initFuture;
-      _initFuture = null;
-    }
+    await _awaitInit();
     try {
       return await _gateway.getAudioUrl(videoId);
     } on YouTubeRateLimitException {
@@ -441,10 +447,7 @@ class YouTubeService {
   }
 
   Future<String> getPlayableAudioPath(String videoId, {String serverId = '', Song? song}) async {
-    if (_initFuture != null) {
-      await _initFuture;
-      _initFuture = null;
-    }
+    await _awaitInit();
     // 1. Permanent downloads
     final downloadedPath = await _downloadService.getDownloadedPathById(videoId);
     if (downloadedPath != null) {

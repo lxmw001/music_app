@@ -13,6 +13,8 @@ class AuthProvider extends ChangeNotifier {
   YouTubeService? _youtubeService;
   void setYouTubeService(YouTubeService s) {
     _youtubeService = s;
+    // Chain cookie reload onto the service's init future
+    s.reloadAuthCookies();
     print('[Auth] YouTubeService set');
   }
 

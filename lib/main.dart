@@ -120,6 +120,14 @@ class _MainScreenState extends State<MainScreen> {
           ),
         ));
       });
+      (context.read<MusicPlayerProvider>() as MusicPlayerProviderImpl)
+          .setOnStreamError((title) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Could not load "$title"'),
+          duration: const Duration(seconds: 3),
+        ));
+      });
     });
   }
 

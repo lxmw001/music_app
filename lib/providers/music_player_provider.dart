@@ -63,6 +63,8 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   void setAuthProvider(AuthProvider auth) => _authProvider = auth;
   VoidCallback? _onRateLimit;
   void setOnRateLimit(VoidCallback cb) => _onRateLimit = cb;
+  void Function(String title)? _onStreamError;
+  void setOnStreamError(void Function(String title) cb) => _onStreamError = cb;
   Timer? _positionSaveTimer;
   Timer? _stallTimer;
   bool _isRecoveringFromStall = false;
@@ -135,9 +137,8 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     );
     rlog('[MusicPlayerProvider] AudioService.init complete');
 
-    // Restore last queue and song on startup BEFORE marking initialized
+    // Restore last queue on startup
     final savedQueue = await _historyService.loadQueue();
-    final lastSongData = await _historyService.loadLastSong();
 
     _isInitialized = true;
     if (_pendingSong == null) {
@@ -145,24 +146,8 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         _queue = savedQueue.queue;
         _currentIndex = savedQueue.currentIndex;
         _currentSong = _queue[_currentIndex];
-        _lastRestoredPosition = Duration(seconds: lastSongData?.lastPositionSeconds ?? 0);
         rlog('[MusicPlayerProvider] restored queue: ${_queue.length} songs, index=$_currentIndex');
-      } else if (lastSongData != null) {
-        _currentSong = lastSongData.song;
-        _queue = [lastSongData.song];
-        _currentIndex = 0;
-        _lastRestoredPosition = Duration(seconds: lastSongData.lastPositionSeconds);
-        rlog('[MusicPlayerProvider] restored last song: ${lastSongData.song.title}');
-      }
-      if (_currentSong != null) {
         notifyListeners();
-        final song = _currentSong!;
-        // Prefetch URL via getPlayableAudioPath — checks downloads/cache before YouTube
-        if (song.audioUrl.isEmpty) {
-          _youtubeService.getPlayableAudioPath(song.id, serverId: song.serverId, song: song)
-              .then((url) { if (url.isNotEmpty) song.audioUrl = url; });
-        }
-        if (_queue.length <= 1) _seedQueueWithSuggestions(song);
       }
     }
     
@@ -454,18 +439,9 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       }
     }
     if (audioUrl.isEmpty) {
-      rlog('[MusicPlayerProvider] Could not get audio file for \\${song.title}, skipping');
-      _stallTimer?.cancel();
-      _stallTimer = null;
-      _consecutiveSkips++;
-      if (_consecutiveSkips <= 2) {
-        Future.delayed(const Duration(seconds: 3), () => nextSong());
-      } else {
-        _consecutiveSkips = 0;
-        rlog('[MusicPlayerProvider] too many failures — switching to offline');
-        _onRateLimit?.call();
-        await _playOfflineByGenre(song);
-      }
+      rlog('[MusicPlayerProvider] Could not get stream URL for \\${song.title}');
+      _onStreamError?.call(song.title);
+      notifyListeners();
       return;
     }
     final mediaItem = MediaItem(
@@ -483,39 +459,11 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       }
       await _audioHandler.play();
     } catch (e) {
-      rlog('[MusicPlayerProvider] setAudioSource error: $e — retrying with fresh URL');
-      try {
-        // Only clear network URLs — preserve local file paths for downloaded songs
-        if (!song.audioUrl.startsWith('/') && !song.audioUrl.startsWith('file://')) {
-          song.audioUrl = '';
-        }
-        final freshUrl = await _youtubeService.getPlayableAudioPath(song.id);
-        if (freshUrl.isEmpty) throw Exception('empty URL on retry');
-        song.audioUrl = freshUrl;
-        await _audioHandler.setAudioSource(freshUrl, mediaItem);
-        if (seekTo != null && seekTo > Duration.zero) {
-          await _audioHandler.seek(seekTo);
-        }
-        await _audioHandler.play();
-      } catch (e2) {
-        rlog('[MusicPlayerProvider] retry failed: $e2 — skipping to next');
-        _loadingAudioIds.remove(song.id);
-        notifyListeners();
-        _queue.removeWhere((s) => s.id == song.id);
-        if (_currentIndex >= _queue.length) _currentIndex = _queue.length - 1;
-        _stallTimer?.cancel();
-        _stallTimer = null;
-        _consecutiveSkips++;
-        if (_consecutiveSkips <= 2) {
-          Future.delayed(const Duration(seconds: 3), () => nextSong());
-        } else {
-          _consecutiveSkips = 0;
-          rlog('[MusicPlayerProvider] too many failures — switching to offline');
-          _onRateLimit?.call();
-          await _playOfflineByGenre(song);
-        }
-        return;
-      }
+      rlog('[MusicPlayerProvider] setAudioSource error: $e');
+      _loadingAudioIds.remove(song.id);
+      _onStreamError?.call(song.title);
+      notifyListeners();
+      return;
     }
     
     _consecutiveSkips = 0;
