@@ -55,6 +55,7 @@ abstract class MusicPlayerProvider extends ChangeNotifier {
 class MusicPlayerProviderImpl extends MusicPlayerProvider {
   late AudioPlayerHandler _audioHandler;
   final YouTubeService _youtubeService = YouTubeService();
+  YouTubeService get youtubeService => _youtubeService;
   final PlayHistoryService _historyService = PlayHistoryService();
   final DownloadService _downloadService = DownloadService();
   final LastFmService _lastFmService = LastFmService();

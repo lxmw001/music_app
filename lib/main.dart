@@ -16,6 +16,7 @@ import 'screens/player_screen.dart';
 import 'screens/login_screen.dart';
 import 'services/youtube_service.dart';
 import 'services/update_service.dart';
+import 'widgets/youtube_login_webview.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -108,12 +109,33 @@ class _MainScreenState extends State<MainScreen> {
       (context.read<MusicPlayerProvider>() as MusicPlayerProviderImpl)
           .setOnRateLimit(() {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('YouTube rate limited — playing downloaded songs'),
-          duration: Duration(seconds: 4),
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: const Text('YouTube rate limited — playing downloaded songs'),
+          duration: const Duration(seconds: 6),
+          action: SnackBarAction(
+            label: 'Sign in',
+            onPressed: () => _openYouTubeLogin(),
+          ),
         ));
       });
     });
+  }
+
+  Future<void> _openYouTubeLogin() async {
+    final loggedIn = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => const YouTubeLoginWebView()),
+    );
+    if (loggedIn == true && mounted) {
+      // Rebuild YoutubeExplode with fresh cookies
+      final player = context.read<MusicPlayerProvider>();
+      if (player is MusicPlayerProviderImpl) {
+        await player.youtubeService.reloadAuthCookies();
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('YouTube signed in — rate limiting bypassed')),
+      );
+    }
   }
 
   Future<bool> _onWillPop() async {

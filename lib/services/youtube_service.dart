@@ -9,6 +9,8 @@ import 'audio_cache_service.dart';
 import 'download_service.dart';
 import 'music_server_service.dart';
 import 'stream_url_cache.dart';
+import 'cookie_http_client.dart';
+import 'youtube_cookie_auth.dart';
 
 class YouTubeRateLimitException implements Exception {
   const YouTubeRateLimitException();
@@ -28,6 +30,17 @@ class YoutubeExplodeGateway implements YoutubeGateway {
   YoutubeExplode _yt;
   YoutubeExplodeGateway({YoutubeExplode? yt}) : _yt = yt ?? YoutubeExplode();
 
+  /// Rebuilds the YoutubeExplode instance with cookies injected.
+  Future<void> applyAuthCookies() async {
+    final cookieHeader = await YoutubeCookieAuth.loadCookieHeader();
+    _yt.close();
+    if (cookieHeader != null) {
+      _yt = YoutubeExplode(httpClient: YoutubeHttpClient(CookieHttpClient(cookieHeader)));
+    } else {
+      _yt = YoutubeExplode();
+    }
+  }
+
   @override
   Future<List<Video>> search(String query, {int limit = 5}) async {
     final results = await _yt.search.search(query);
@@ -40,7 +53,7 @@ class YoutubeExplodeGateway implements YoutubeGateway {
       try {
         final manifest = await _yt.videos.streamsClient
             .getManifest(videoId, ytClients: [YoutubeApiClient.ios, YoutubeApiClient.androidVr])
-            .timeout(const Duration(seconds: 40));
+            .timeout(const Duration(seconds: 80));
         final streams = manifest.audioOnly
             .where((s) => s.codec.mimeType.startsWith('audio/'))
             .toList();
@@ -202,6 +215,17 @@ class YouTubeService {
         _lastFm = lastFm ?? LastFmService(),
         _server = server ?? MusicServerService() {
     _downloadService = downloadService ?? DownloadService();
+    // Apply saved cookies on startup if available
+    if (_gateway is YoutubeExplodeGateway) {
+      (_gateway as YoutubeExplodeGateway).applyAuthCookies();
+    }
+  }
+
+  /// Call after user completes YouTube login to rebuild the client with fresh cookies.
+  Future<void> reloadAuthCookies() async {
+    if (_gateway is YoutubeExplodeGateway) {
+      await (_gateway as YoutubeExplodeGateway).applyAuthCookies();
+    }
   }
 
   Future<MusicSearchResult> searchSongs(String query) =>
