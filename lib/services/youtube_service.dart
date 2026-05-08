@@ -10,6 +10,7 @@ import 'download_service.dart';
 import 'music_server_service.dart';
 import 'stream_url_cache.dart';
 import 'cookie_http_client.dart';
+import 'auth_http_client.dart';
 import 'youtube_cookie_auth.dart';
 
 class YouTubeRateLimitException implements Exception {
@@ -30,15 +31,25 @@ class YoutubeExplodeGateway implements YoutubeGateway {
   YoutubeExplode _yt;
   YoutubeExplodeGateway({YoutubeExplode? yt}) : _yt = yt ?? YoutubeExplode();
 
+  /// Rebuilds YoutubeExplode with a Google OAuth access token.
+  void applyOAuthToken(String accessToken) {
+    final old = _yt;
+    _yt = YoutubeExplode(httpClient: YoutubeHttpClient(AuthHttpClient({
+      'Authorization': 'Bearer $accessToken',
+    })));
+    try { old.close(); } catch (_) {}
+  }
+
   /// Rebuilds the YoutubeExplode instance with cookies injected.
   Future<void> applyAuthCookies() async {
     final cookieHeader = await YoutubeCookieAuth.loadCookieHeader();
-    _yt.close();
+    final old = _yt;
     if (cookieHeader != null) {
       _yt = YoutubeExplode(httpClient: YoutubeHttpClient(CookieHttpClient(cookieHeader)));
     } else {
       _yt = YoutubeExplode();
     }
+    try { old.close(); } catch (_) {}
   }
 
   @override
@@ -68,12 +79,12 @@ class YoutubeExplodeGateway implements YoutubeGateway {
       } catch (e) {
         print('[YoutubeGateway] attempt ${attempt + 1} failed: $e');
         if (e.toString().contains('RequestLimitExceeded')) {
-          _yt.close();
+          try { _yt.close(); } catch (_) {}
           _yt = YoutubeExplode();
           throw const YouTubeRateLimitException();
         }
         if (attempt == 0) {
-          _yt.close();
+          try { _yt.close(); } catch (_) {}
           _yt = YoutubeExplode();
         } else {
           rethrow;
@@ -225,6 +236,13 @@ class YouTubeService {
   Future<void> reloadAuthCookies() async {
     if (_gateway is YoutubeExplodeGateway) {
       await (_gateway as YoutubeExplodeGateway).applyAuthCookies();
+    }
+  }
+
+  /// Call after Google sign-in to authenticate YouTube requests with OAuth token.
+  void applyOAuthToken(String accessToken) {
+    if (_gateway is YoutubeExplodeGateway) {
+      (_gateway as YoutubeExplodeGateway).applyOAuthToken(accessToken);
     }
   }
 

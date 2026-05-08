@@ -40,7 +40,9 @@ void main() async {
           create: (_) => AuthProvider(),
           update: (_, musicPlayer, auth) {
             final a = auth ?? AuthProvider();
-            (musicPlayer as MusicPlayerProviderImpl).setAuthProvider(a);
+            final impl = musicPlayer as MusicPlayerProviderImpl;
+            impl.setAuthProvider(a);
+            a.setYouTubeService(impl.youtubeService);
             return a;
           },
         ),

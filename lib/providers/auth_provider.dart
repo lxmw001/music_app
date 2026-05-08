@@ -3,12 +3,15 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
+import '../services/youtube_service.dart';
 
 // TODO: Replace with FirebaseAuth.instance.currentUser?.getIdToken() once Firebase is set up
 class AuthProvider extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
   final ApiService _api = ApiService();
+  YouTubeService? _youtubeService;
+  void setYouTubeService(YouTubeService s) => _youtubeService = s;
 
   User? get user => _auth.currentUser;
   bool get isSignedIn => user != null;
@@ -38,6 +41,14 @@ class AuthProvider extends ChangeNotifier {
       _permissions = cached.toSet();
       notifyListeners();
     }
+    // Apply OAuth token to YouTubeService if already signed in
+    final currentAccount = await _googleSignIn.signInSilently();
+    if (currentAccount != null) {
+      final auth = await currentAccount.authentication;
+      if (auth.accessToken != null) {
+        _youtubeService?.applyOAuthToken(auth.accessToken!);
+      }
+    }
     // Then try to refresh from server
     try {
       final result = await user?.getIdTokenResult(true);
@@ -64,6 +75,9 @@ class AuthProvider extends ChangeNotifier {
       );
       await _auth.signInWithCredential(credential);
       await _refreshPermissions();
+      if (googleAuth.accessToken != null) {
+        _youtubeService?.applyOAuthToken(googleAuth.accessToken!);
+      }
       return true;
     } catch (e) {
       print('[Auth] signInWithGoogle error: $e');

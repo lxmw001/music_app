@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.PowerManager
 import androidx.core.content.FileProvider
 import com.ryanheise.audioservice.AudioServiceActivity
+import com.pichillilorenzo.flutter_inappwebview_android.InAppWebViewFlutterPlugin
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
@@ -13,6 +14,7 @@ import java.io.File
 class MainActivity : AudioServiceActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        flutterEngine.plugins.add(InAppWebViewFlutterPlugin())
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.lxmw.musicapp/battery")
             .setMethodCallHandler { call, result ->
