@@ -1,13 +1,45 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../services/youtube_cookie_auth.dart';
+import '../widgets/youtube_login_webview.dart';
 
-class LoginScreen extends StatelessWidget {
+class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  bool _busy = false;
+
+  Future<void> _signIn() async {
+    setState(() => _busy = true);
+    final auth = context.read<AuthProvider>();
+    final ok = await auth.signInWithGoogle();
+    if (!ok || !mounted) {
+      setState(() => _busy = false);
+      return;
+    }
+    // Skip YouTube WebView if cookies already saved from a previous login
+    final hasCookies = await YoutubeCookieAuth.hasCookies();
+    if (!hasCookies && mounted) {
+      print('[LoginScreen] Google sign-in OK, opening YouTube WebView');
+      final ytOk = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(builder: (_) => const YouTubeLoginWebView()),
+      );
+      print('[LoginScreen] YouTube WebView result: $ytOk');
+      if (mounted && ytOk == true) {
+        await auth.reloadYouTubeCookies();
+        print('[LoginScreen] YouTube cookies reloaded');
+      }
+    }
+    if (mounted) Navigator.of(context).pop();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final auth = context.watch<AuthProvider>();
     return Scaffold(
       body: Center(
         child: Padding(
@@ -21,19 +53,11 @@ class LoginScreen extends StatelessWidget {
               const SizedBox(height: 8),
               const Text('Sign in to unlock all features', style: TextStyle(color: Colors.grey)),
               const SizedBox(height: 48),
-              if (auth.loading)
+              if (_busy)
                 const CircularProgressIndicator(color: Colors.green)
-              else if (auth.isSignedIn)
-                // Auto-pop after sign-in
-                Builder(builder: (ctx) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (Navigator.canPop(ctx)) Navigator.pop(ctx);
-                  });
-                  return const CircularProgressIndicator(color: Colors.green);
-                })
               else
                 OutlinedButton.icon(
-                  onPressed: () => auth.signInWithGoogle(),
+                  onPressed: _signIn,
                   icon: Image.network(
                     'https://www.google.com/favicon.ico',
                     width: 20, height: 20,

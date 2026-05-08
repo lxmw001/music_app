@@ -111,13 +111,9 @@ class _MainScreenState extends State<MainScreen> {
       (context.read<MusicPlayerProvider>() as MusicPlayerProviderImpl)
           .setOnRateLimit(() {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: const Text('YouTube rate limited — playing downloaded songs'),
-          duration: const Duration(seconds: 6),
-          action: SnackBarAction(
-            label: 'Sign in',
-            onPressed: () => _openYouTubeLogin(),
-          ),
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('YouTube rate limited — playing downloaded songs'),
+          duration: Duration(seconds: 4),
         ));
       });
       (context.read<MusicPlayerProvider>() as MusicPlayerProviderImpl)

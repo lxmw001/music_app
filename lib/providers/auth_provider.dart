@@ -12,8 +12,8 @@ class AuthProvider extends ChangeNotifier {
   final ApiService _api = ApiService();
   YouTubeService? _youtubeService;
   void setYouTubeService(YouTubeService s) {
+    if (_youtubeService == s) return; // already set, don't reload
     _youtubeService = s;
-    // Chain cookie reload onto the service's init future
     s.reloadAuthCookies();
     print('[Auth] YouTubeService set');
   }
@@ -92,6 +92,8 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<String?> getIdToken() async => user?.getIdToken();
+
+  Future<void> reloadYouTubeCookies() => _youtubeService?.reloadAuthCookies() ?? Future.value();
 
   /// Sync a liked song to the server (fire-and-forget, local state is source of truth)
   void syncLike(String serverId, bool liked) {
