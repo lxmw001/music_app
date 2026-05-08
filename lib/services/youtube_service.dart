@@ -36,30 +36,38 @@ class YoutubeExplodeGateway implements YoutubeGateway {
 
   @override
   Future<String> getAudioUrl(String videoId) async {
-    try {
-      final manifest = await _yt.videos.streamsClient
-          .getManifest(videoId, ytClients: [YoutubeApiClient.ios, YoutubeApiClient.androidVr])
-          .timeout(const Duration(seconds: 20));
-      final streams = manifest.audioOnly
-          .where((s) => s.codec.mimeType.startsWith('audio/'))
-          .toList();
-      if (streams.isEmpty) throw Exception('No audio streams for $videoId');
-      final aac = streams
-          .where((s) => s.codec.mimeType.contains('mp4a') || s.container.name == 'mp4')
-          .toList();
-      final picked = aac.isNotEmpty ? (aac..sort((a, b) => b.bitrate.compareTo(a.bitrate))).first
-                                    : (streams..sort((a, b) => b.bitrate.compareTo(a.bitrate))).first;
-      print('[YoutubeGateway] got stream for $videoId (${picked.codec.mimeType})');
-      return picked.url.toString();
-    } catch (e) {
-      print('[YoutubeGateway] failed: $e');
-      if (e.toString().contains('RequestLimitExceeded')) {
-        _yt.close();
-        _yt = YoutubeExplode();
-        throw const YouTubeRateLimitException();
+    for (int attempt = 0; attempt < 2; attempt++) {
+      try {
+        final manifest = await _yt.videos.streamsClient
+            .getManifest(videoId, ytClients: [YoutubeApiClient.ios, YoutubeApiClient.androidVr])
+            .timeout(const Duration(seconds: 40));
+        final streams = manifest.audioOnly
+            .where((s) => s.codec.mimeType.startsWith('audio/'))
+            .toList();
+        if (streams.isEmpty) throw Exception('No audio streams for $videoId');
+        final aac = streams
+            .where((s) => s.codec.mimeType.contains('mp4a') || s.container.name == 'mp4')
+            .toList();
+        final picked = aac.isNotEmpty ? (aac..sort((a, b) => b.bitrate.compareTo(a.bitrate))).first
+                                      : (streams..sort((a, b) => b.bitrate.compareTo(a.bitrate))).first;
+        print('[YoutubeGateway] got stream for $videoId (${picked.codec.mimeType})');
+        return picked.url.toString();
+      } catch (e) {
+        print('[YoutubeGateway] attempt ${attempt + 1} failed: $e');
+        if (e.toString().contains('RequestLimitExceeded')) {
+          _yt.close();
+          _yt = YoutubeExplode();
+          throw const YouTubeRateLimitException();
+        }
+        if (attempt == 0) {
+          _yt.close();
+          _yt = YoutubeExplode();
+        } else {
+          rethrow;
+        }
       }
-      rethrow;
     }
+    throw Exception('getAudioUrl unreachable');
   }
 
   @override
