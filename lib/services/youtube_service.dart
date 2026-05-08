@@ -27,6 +27,20 @@ abstract class YoutubeGateway {
   Future<({String playlistTitle, List<Video> videos})> getPlaylistVideos(String playlistId);
 }
 
+/// A YoutubeHttpClient subclass that injects auth cookies into every request
+/// by overriding the headers getter used in send().
+class _AuthenticatedYoutubeHttpClient extends YoutubeHttpClient {
+  final String cookieHeader;
+
+  _AuthenticatedYoutubeHttpClient(this.cookieHeader, [http.Client? inner]) : super(inner);
+
+  @override
+  Map<String, String> get headers => {
+    ...YoutubeHttpClient.defaultHeaders,
+    'cookie': cookieHeader,
+  };
+}
+
 class YoutubeExplodeGateway implements YoutubeGateway {
   YoutubeExplode _yt;
   YoutubeExplodeGateway({YoutubeExplode? yt}) : _yt = yt ?? YoutubeExplode();
@@ -38,14 +52,17 @@ class YoutubeExplodeGateway implements YoutubeGateway {
       'Authorization': 'Bearer $accessToken',
     })));
     try { old.close(); } catch (_) {}
+    print('[YoutubeGateway] OAuth token applied, YoutubeExplode rebuilt');
   }
 
   /// Rebuilds the YoutubeExplode instance with cookies injected.
   Future<void> applyAuthCookies() async {
     final cookieHeader = await YoutubeCookieAuth.loadCookieHeader();
+    print('[YoutubeGateway] applyAuthCookies: ${cookieHeader != null ? 'cookies found (${cookieHeader.length} chars)' : 'no cookies saved'}');
     final old = _yt;
     if (cookieHeader != null) {
-      _yt = YoutubeExplode(httpClient: YoutubeHttpClient(CookieHttpClient(cookieHeader)));
+      _yt = YoutubeExplode(httpClient: _AuthenticatedYoutubeHttpClient(cookieHeader));
+      print('[YoutubeGateway] YoutubeExplode rebuilt with cookies');
     } else {
       _yt = YoutubeExplode();
     }
@@ -226,23 +243,17 @@ class YouTubeService {
         _lastFm = lastFm ?? LastFmService(),
         _server = server ?? MusicServerService() {
     _downloadService = downloadService ?? DownloadService();
-    // Apply saved cookies on startup if available
     if (_gateway is YoutubeExplodeGateway) {
-      (_gateway as YoutubeExplodeGateway).applyAuthCookies();
+      _initFuture = (_gateway as YoutubeExplodeGateway).applyAuthCookies();
     }
   }
 
-  /// Call after user completes YouTube login to rebuild the client with fresh cookies.
+  Future<void>? _initFuture;
+
+  /// Call after user completes YouTube WebView login to rebuild the client with fresh cookies.
   Future<void> reloadAuthCookies() async {
     if (_gateway is YoutubeExplodeGateway) {
       await (_gateway as YoutubeExplodeGateway).applyAuthCookies();
-    }
-  }
-
-  /// Call after Google sign-in to authenticate YouTube requests with OAuth token.
-  void applyOAuthToken(String accessToken) {
-    if (_gateway is YoutubeExplodeGateway) {
-      (_gateway as YoutubeExplodeGateway).applyOAuthToken(accessToken);
     }
   }
 
@@ -305,6 +316,10 @@ class YouTubeService {
   }
 
   Future<String> getAudioUrl(String videoId) async {
+    if (_initFuture != null) {
+      await _initFuture;
+      _initFuture = null;
+    }
     try {
       return await _gateway.getAudioUrl(videoId);
     } on YouTubeRateLimitException {
@@ -426,6 +441,10 @@ class YouTubeService {
   }
 
   Future<String> getPlayableAudioPath(String videoId, {String serverId = '', Song? song}) async {
+    if (_initFuture != null) {
+      await _initFuture;
+      _initFuture = null;
+    }
     // 1. Permanent downloads
     final downloadedPath = await _downloadService.getDownloadedPathById(videoId);
     if (downloadedPath != null) {

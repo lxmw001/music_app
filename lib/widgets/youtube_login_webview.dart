@@ -24,6 +24,7 @@ class _YouTubeLoginWebViewState extends State<YouTubeLoginWebView> {
     if (cookies.length < 2) return; // not logged in yet
 
     _saving = true;
+    print('[YouTubeLogin] saving cookies: ${cookies.keys.toList()}');
     await YoutubeCookieAuth.saveCookies(cookies);
     if (mounted) Navigator.of(context).pop(true);
   }
