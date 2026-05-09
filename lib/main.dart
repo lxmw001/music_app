@@ -21,17 +21,23 @@ import 'widgets/youtube_login_webview.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  // Use media_kit backend on Android for better codec compatibility
+  
   if (defaultTargetPlatform == TargetPlatform.android) {
     JustAudioMediaKit.ensureInitialized(android: true);
   }
-  // Request battery optimization exemption for background playback (Xiaomi/MIUI)
+  
   if (defaultTargetPlatform == TargetPlatform.android) {
     try {
       await const MethodChannel('com.lxmw.musicapp/battery')
           .invokeMethod('requestIgnoreBatteryOptimizations');
-    } catch (_) {} // ignore if not supported
+    } catch (_) {}
   }
+  
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    systemNavigationBarColor: Colors.black,
+  ));
+
   runApp(
     MultiProvider(
       providers: [
@@ -59,6 +65,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Music App',
+      debugShowCheckedModeBanner: false,
       localizationsDelegates: const [
         AppLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,
@@ -70,9 +77,28 @@ class MyApp extends StatelessWidget {
         Locale('es'),
       ],
       theme: ThemeData(
-        primarySwatch: Colors.green,
+        useMaterial3: true,
         brightness: Brightness.dark,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF1DB954),
+          brightness: Brightness.dark,
+          surface: Colors.black,
+          onSurface: Colors.white,
+          primary: const Color(0xFF1DB954),
+        ),
         scaffoldBackgroundColor: Colors.black,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.black,
+          elevation: 0,
+          centerTitle: false,
+        ),
+        bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+          backgroundColor: Colors.black,
+          selectedItemColor: Color(0xFF1DB954),
+          unselectedItemColor: Colors.grey,
+          type: BottomNavigationBarType.fixed,
+          elevation: 0,
+        ),
       ),
       home: const MainScreen(),
     );
@@ -84,7 +110,6 @@ class MainScreen extends StatefulWidget {
   const MainScreen({super.key, this.youtubeService});
 
   @override
-  // ignore: library_private_types_in_public_api
   _MainScreenState createState() => _MainScreenState();
 }
 
@@ -106,56 +131,42 @@ class _MainScreenState extends State<MainScreen> {
     UpdateService().checkForUpdate().then((url) {
       if (url != null && mounted) setState(() => _updateUrl = url);
     });
-    // Show snackbar and switch to offline when rate limited
+    
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      (context.read<MusicPlayerProvider>() as MusicPlayerProviderImpl)
-          .setOnRateLimit(() {
+      final player = context.read<MusicPlayerProvider>() as MusicPlayerProviderImpl;
+      player.setOnRateLimit(() {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('YouTube rate limited — playing downloaded songs'),
           duration: Duration(seconds: 4),
+          behavior: SnackBarBehavior.floating,
         ));
       });
-      (context.read<MusicPlayerProvider>() as MusicPlayerProviderImpl)
-          .setOnStreamError((title) {
+      player.setOnStreamError((title) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('Could not load "$title"'),
           duration: const Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
         ));
       });
     });
   }
 
-  Future<void> _openYouTubeLogin() async {
-    final loggedIn = await Navigator.push<bool>(
-      context,
-      MaterialPageRoute(builder: (_) => const YouTubeLoginWebView()),
-    );
-    if (loggedIn == true && mounted) {
-      // Rebuild YoutubeExplode with fresh cookies
-      final player = context.read<MusicPlayerProvider>();
-      if (player is MusicPlayerProviderImpl) {
-        await player.youtubeService.reloadAuthCookies();
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('YouTube signed in — rate limiting bypassed')),
-      );
-    }
-  }
-
   Future<bool> _onWillPop() async {
-    // If not on home tab, go to home tab first
     if (_currentIndex != 0) {
       setState(() => _currentIndex = 0);
       return false;
     }
-    // On home tab: require double-back within 2 seconds to exit
     final now = DateTime.now();
     if (_lastBackPress == null || now.difference(_lastBackPress!) > const Duration(seconds: 2)) {
       _lastBackPress = now;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(AppLocalizations.of(context)!.exitConfirm), duration: const Duration(seconds: 2)),
+        SnackBar(
+          content: Text(AppLocalizations.of(context)!.exitConfirm), 
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return false;
     }
@@ -172,132 +183,163 @@ class _MainScreenState extends State<MainScreen> {
         if (shouldPop && context.mounted) Navigator.of(context).pop();
       },
       child: Scaffold(
-      body: Column(
-        children: [
-          if (_updateUrl != null)
-            MaterialBanner(
-              content: _downloadProgress != null
-                  ? Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(AppLocalizations.of(context)!.updateDownloading((_downloadProgress! * 100).toInt())),
-                        const SizedBox(height: 6),
-                        LinearProgressIndicator(value: _downloadProgress),
+        body: Column(
+          children: [
+            if (_updateUrl != null)
+              MaterialBanner(
+                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                content: _downloadProgress != null
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(AppLocalizations.of(context)!.updateDownloading((_downloadProgress! * 100).toInt())),
+                          const SizedBox(height: 6),
+                          LinearProgressIndicator(value: _downloadProgress),
+                        ],
+                      )
+                    : Text(AppLocalizations.of(context)!.updateAvailable),
+                actions: _downloadProgress != null
+                    ? [const SizedBox.shrink()]
+                    : [
+                        TextButton(
+                          onPressed: () async {
+                            setState(() => _downloadProgress = 0.0);
+                            await UpdateService().downloadAndInstall(
+                              _updateUrl!,
+                              onProgress: (p) => setState(() => _downloadProgress = p),
+                            );
+                            setState(() { _updateUrl = null; _downloadProgress = null; });
+                          },
+                          child: Text(AppLocalizations.of(context)!.updateButton),
+                        ),
+                        TextButton(
+                          onPressed: () => setState(() => _updateUrl = null),
+                          child: Text(AppLocalizations.of(context)!.updateDismiss),
+                        ),
                       ],
-                    )
-                  : Text(AppLocalizations.of(context)!.updateAvailable),
-              actions: _downloadProgress != null
-                  ? [const SizedBox.shrink()]
-                  : [
-                      TextButton(
-                        onPressed: () async {
-                          setState(() => _downloadProgress = 0.0);
-                          await UpdateService().downloadAndInstall(
-                            _updateUrl!,
-                            onProgress: (p) => setState(() => _downloadProgress = p),
+              ),
+            Expanded(
+              child: IndexedStack(
+                index: _currentIndex,
+                children: _screens,
+              ),
+            ),
+            // Improved Mini Player
+            Consumer<MusicPlayerProvider>(
+              builder: (context, player, child) {
+                if (player.currentSong != null) {
+                  return GestureDetector(
+                    onTap: () => Navigator.push(
+                      context,
+                      PageRouteBuilder(
+                        pageBuilder: (context, animation, secondaryAnimation) => const PlayerScreen(),
+                        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                          return SlideTransition(
+                            position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero).animate(animation),
+                            child: child,
                           );
-                          setState(() { _updateUrl = null; _downloadProgress = null; });
                         },
-                        child: Text(AppLocalizations.of(context)!.updateButton),
                       ),
-                      TextButton(
-                        onPressed: () => setState(() => _updateUrl = null),
-                        child: Text(AppLocalizations.of(context)!.updateDismiss),
-                      ),
-                    ],
-            ),
-          Expanded(
-            child: IndexedStack(
-              index: _currentIndex,
-              children: _screens,
-            ),
-          ),
-          Consumer<MusicPlayerProvider>(
-            builder: (context, player, child) {
-              if (player.currentSong != null) {
-                return GestureDetector(
-                  key: const Key('mini_player'),
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const PlayerScreen()),
-                  ),
-                  child: Container(
-                    height: 60,
-                    color: Colors.grey[900],
-                    child: Stack(
-                      children: [
-                        Positioned(
-                          bottom: 0, left: 0, right: 0,
-                          child: LinearProgressIndicator(
-                            value: player.totalDuration.inSeconds > 0
-                                ? (player.currentPosition.inSeconds / player.totalDuration.inSeconds).clamp(0.0, 1.0)
-                                : 0.0,
-                            backgroundColor: Colors.grey[800],
-                            valueColor: const AlwaysStoppedAnimation<Color>(Colors.green),
-                            minHeight: 2,
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Row(
-                            children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(4),
-                                child: Image.network(
-                                  player.currentSong!.imageUrl,
-                                  width: 40, height: 40, fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Container(
-                                    width: 40, height: 40, color: Colors.grey[700],
-                                    child: const Icon(Icons.music_note, size: 20),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(player.currentSong!.title,
-                                        style: const TextStyle(fontWeight: FontWeight.bold),
-                                        overflow: TextOverflow.ellipsis),
-                                    Text(player.currentSong!.artist,
-                                        style: const TextStyle(color: Colors.grey),
-                                        overflow: TextOverflow.ellipsis),
-                                  ],
-                                ),
-                              ),
-                              IconButton(
-                                icon: Icon(player.isPlaying ? Icons.pause : Icons.play_arrow),
-                                onPressed: () => player.isPlaying ? player.pause() : player.resume(),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
                     ),
-                  ),
-                );
-              }
-              return const SizedBox.shrink();
-            },
-          ),
-        ],
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[900]?.withValues(alpha: 0.9),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.5),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              child: Row(
+                                children: [
+                                  Hero(
+                                    tag: 'player_art',
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Image.network(
+                                        player.currentSong!.imageUrl,
+                                        width: 44, height: 44, fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => Container(
+                                          width: 44, height: 44, color: Colors.grey[800],
+                                          child: const Icon(Icons.music_note, size: 24),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          player.currentSong!.title,
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        Text(
+                                          player.currentSong!.artist,
+                                          style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: Icon(player.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded, size: 32),
+                                    onPressed: () => player.isPlaying ? player.pause() : player.resume(),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            LinearProgressIndicator(
+                              value: player.totalDuration.inSeconds > 0
+                                  ? (player.currentPosition.inSeconds / player.totalDuration.inSeconds).clamp(0.0, 1.0)
+                                  : 0.0,
+                              backgroundColor: Colors.transparent,
+                              valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).primaryColor),
+                              minHeight: 2,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            ),
+          ],
+        ),
+        bottomNavigationBar: BottomNavigationBar(
+          currentIndex: _currentIndex,
+          onTap: (index) => setState(() => _currentIndex = index),
+          items: [
+            BottomNavigationBarItem(
+              icon: Icon(_currentIndex == 0 ? Icons.home_rounded : Icons.home_outlined),
+              label: AppLocalizations.of(context)!.navHome,
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(_currentIndex == 1 ? Icons.search_rounded : Icons.search_outlined),
+              label: AppLocalizations.of(context)!.navSearch,
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(_currentIndex == 2 ? Icons.library_music_rounded : Icons.library_music_outlined),
+              label: AppLocalizations.of(context)!.navLibrary,
+            ),
+          ],
+        ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: Colors.black,
-        selectedItemColor: Colors.green,
-        unselectedItemColor: Colors.grey,
-        items: [
-          BottomNavigationBarItem(icon: const Icon(Icons.home), label: AppLocalizations.of(context)!.navHome),
-          BottomNavigationBarItem(icon: const Icon(Icons.search), label: AppLocalizations.of(context)!.navSearch),
-          BottomNavigationBarItem(icon: const Icon(Icons.library_music), label: AppLocalizations.of(context)!.navLibrary),
-        ],
-      ),
-    ), // Scaffold
-    ); // PopScope
+    );
   }
 }

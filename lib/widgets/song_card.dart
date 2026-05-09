@@ -15,43 +15,80 @@ class SongCard extends StatelessWidget {
     return GestureDetector(
       onTap: () => context.read<MusicPlayerProvider>().playSong(song),
       child: Container(
-        width: 160,
+        width: 140,
         margin: const EdgeInsets.only(right: 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Image.network(
-                    song.imageUrl,
-                    width: 160, height: 150,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => _defaultCover(),
-                    loadingBuilder: (_, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return _defaultCover();
-                    },
-                  ),
-                  if (isLoading)
-                    Container(
-                      width: 160, height: 150,
-                      color: Colors.black45,
-                      child: const Center(
-                        child: SizedBox(
-                          width: 32, height: 32,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+            AspectRatio(
+              aspectRatio: 1,
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Image.network(
+                        song.imageUrl,
+                        width: double.infinity,
+                        height: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _defaultCover(),
+                        loadingBuilder: (_, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return _defaultCover();
+                        },
+                      ),
+                      if (isLoading)
+                        Container(
+                          color: Colors.black45,
+                          child: const Center(
+                            child: SizedBox(
+                              width: 24, height: 24,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            ),
+                          ),
+                        ),
+                      Positioned(
+                        bottom: 8,
+                        right: 8,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.6),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 20),
                         ),
                       ),
-                    ),
-                ],
+                    ],
+                  ),
+                ),
               ),
             ),
-            const SizedBox(height: 4),
-            Text(song.title, style: const TextStyle(fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis, maxLines: 2),
-            Text(song.artist, style: const TextStyle(color: Colors.grey), overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 10),
+            Text(
+              song.title,
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
+            Text(
+              song.artist,
+              style: TextStyle(color: Colors.grey[400], fontSize: 12),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
           ],
         ),
       ),
@@ -59,8 +96,7 @@ class SongCard extends StatelessWidget {
   }
 
   Widget _defaultCover() => Container(
-    width: 160, height: 150,
-    color: Colors.grey[800],
-    child: const Icon(Icons.music_note, color: Colors.white54),
+    color: Colors.grey[900],
+    child: const Icon(Icons.music_note_rounded, color: Colors.white24, size: 40),
   );
 }

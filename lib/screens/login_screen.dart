@@ -21,18 +21,15 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _busy = false);
       return;
     }
-    // Skip YouTube WebView if cookies already saved from a previous login
+    
     final hasCookies = await YoutubeCookieAuth.hasCookies();
     if (!hasCookies && mounted) {
-      print('[LoginScreen] Google sign-in OK, opening YouTube WebView');
       final ytOk = await Navigator.push<bool>(
         context,
         MaterialPageRoute(builder: (_) => const YouTubeLoginWebView()),
       );
-      print('[LoginScreen] YouTube WebView result: $ytOk');
       if (mounted && ytOk == true) {
         await auth.reloadYouTubeCookies();
-        print('[LoginScreen] YouTube cookies reloaded');
       }
     }
     if (mounted) Navigator.of(context).pop();
@@ -41,40 +38,100 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.music_note, size: 80, color: Colors.green),
-              const SizedBox(height: 24),
-              const Text('Music App', style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              const Text('Sign in to unlock all features', style: TextStyle(color: Colors.grey)),
-              const SizedBox(height: 48),
-              if (_busy)
-                const CircularProgressIndicator(color: Colors.green)
-              else
-                OutlinedButton.icon(
-                  onPressed: _signIn,
-                  icon: Image.network(
-                    'https://www.google.com/favicon.ico',
-                    width: 20, height: 20,
-                    errorBuilder: (_, __, ___) => const Icon(Icons.login, size: 20),
+      body: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Theme.of(context).primaryColor.withValues(alpha: 0.15),
+              Colors.black,
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
                   ),
-                  label: const Text('Continue with Google'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    side: const BorderSide(color: Colors.grey),
+                  child: Icon(
+                    Icons.music_note_rounded, 
+                    size: 100, 
+                    color: Theme.of(context).primaryColor,
                   ),
                 ),
-              const SizedBox(height: 16),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Continue without signing in', style: TextStyle(color: Colors.grey)),
-              ),
-            ],
+                const SizedBox(height: 40),
+                const Text(
+                  'Music App', 
+                  style: TextStyle(
+                    fontSize: 40, 
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: -1,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Millions of songs.\nFree on Music App.', 
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.grey[400], 
+                    fontSize: 16,
+                    height: 1.4,
+                  ),
+                ),
+                const Spacer(),
+                if (_busy)
+                  const CircularProgressIndicator()
+                else ...[
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: FilledButton.icon(
+                      onPressed: _signIn,
+                      icon: Image.network(
+                        'https://www.google.com/favicon.ico',
+                        width: 24, height: 24,
+                        errorBuilder: (_, __, ___) => const Icon(Icons.login_rounded, size: 24),
+                      ),
+                      label: const Text(
+                        'Continue with Google',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black),
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Theme.of(context).primaryColor,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: Colors.grey[800]!),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                      ),
+                      child: const Text(
+                        'Continue without signing in',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 40),
+              ],
+            ),
           ),
         ),
       ),

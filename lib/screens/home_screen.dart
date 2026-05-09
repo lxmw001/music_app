@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/music_player_provider.dart';
@@ -16,7 +15,6 @@ class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, this.youtubeService});
 
   @override
-  // ignore: library_private_types_in_public_api
   _HomeScreenState createState() => _HomeScreenState();
 }
 
@@ -36,7 +34,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadWithCache() async {
-    // 1. Show cached data immediately
     final cached = await _history.loadCachedTrending();
     final cachedSuggested = await _history.loadCachedSuggested();
     final playlists = await context.read<MusicPlayerProvider>().loadPlaylists();
@@ -45,11 +42,10 @@ class _HomeScreenState extends State<HomeScreen> {
         if (cached.isNotEmpty) trendingSongs = cached;
         if (cachedSuggested.isNotEmpty) suggestedSongs = cachedSuggested;
         recentPlaylists = playlists;
-        isLoading = cached.isEmpty; // only show spinner if no cache
+        isLoading = cached.isEmpty;
       });
     }
 
-    // 2. Fetch fresh data in background
     final fresh = await _youtubeService.getTrendingMusic();
     if (fresh.isNotEmpty) {
       await _history.cacheTrending(fresh);
@@ -78,70 +74,102 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(AppLocalizations.of(context)!.homeGreeting),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        actions: [
-          Consumer<AuthProvider>(
-            builder: (context, auth, _) => auth.isSignedIn
-                ? GestureDetector(
-                    onTap: () => _showProfileMenu(context, auth),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      child: CircleAvatar(
-                        radius: 16,
-                        backgroundImage: auth.user?.photoURL != null
-                            ? NetworkImage(auth.user!.photoURL!)
-                            : null,
-                        child: auth.user?.photoURL == null
-                            ? const Icon(Icons.person, size: 18)
-                            : null,
-                      ),
-                    ),
-                  )
-                : IconButton(
-                    icon: const Icon(Icons.account_circle_outlined),
-                    tooltip: 'Sign in',
-                    onPressed: () => Navigator.push(context,
-                        MaterialPageRoute(builder: (_) => const LoginScreen())),
+      body: RefreshIndicator(
+        onRefresh: _loadWithCache,
+        color: Theme.of(context).primaryColor,
+        child: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              floating: true,
+              pinned: false,
+              snap: true,
+              backgroundColor: Colors.black.withValues(alpha: 0.8),
+              title: Text(
+                AppLocalizations.of(context)!.homeGreeting,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22),
+              ),
+              actions: [
+                Consumer<AuthProvider>(
+                  builder: (context, auth, _) => IconButton(
+                    icon: auth.isSignedIn && auth.user?.photoURL != null
+                        ? CircleAvatar(
+                            radius: 14,
+                            backgroundImage: NetworkImage(auth.user!.photoURL!),
+                          )
+                        : const Icon(Icons.account_circle_outlined),
+                    onPressed: () => auth.isSignedIn 
+                        ? _showProfileMenu(context, auth) 
+                        : Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginScreen())),
                   ),
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(AppLocalizations.of(context)!.homeRecentlyPlayed, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            if (recentPlaylists.isEmpty)
-              Column(
-                children: [
-                  const SizedBox(height: 16),
-                  const Icon(Icons.queue_music, size: 48, color: Colors.grey),
+                ),
+                const SizedBox(width: 8),
+              ],
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
                   const SizedBox(height: 8),
-                  Text(AppLocalizations.of(context)!.homeNoPlaylists, style: const TextStyle(color: Colors.grey, fontSize: 13), textAlign: TextAlign.center),
+                  _buildSectionHeader(AppLocalizations.of(context)!.homeRecentlyPlayed),
                   const SizedBox(height: 16),
-                ],
-              )
-            else
-              RecentPlaylistsGrid(playlists: recentPlaylists),
-            const SizedBox(height: 32),
-            Text(AppLocalizations.of(context)!.homeTrending, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : SongCardList(songs: trendingSongs),
-            if (suggestedSongs.isNotEmpty) ...[
-              const SizedBox(height: 32),
-              Text(AppLocalizations.of(context)!.homeSuggested, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 16),
-              SongCardList(songs: suggestedSongs),
-            ],
+                  if (recentPlaylists.isEmpty)
+                    _buildEmptyState(
+                      Icons.queue_music_rounded,
+                      AppLocalizations.of(context)!.homeNoPlaylists,
+                    )
+                  else
+                    RecentPlaylistsGrid(playlists: recentPlaylists),
+                  
+                  const SizedBox(height: 32),
+                  _buildSectionHeader(AppLocalizations.of(context)!.homeTrending),
+                  const SizedBox(height: 16),
+                  isLoading
+                      ? const Center(child: Padding(
+                          padding: EdgeInsets.all(32.0),
+                          child: CircularProgressIndicator(),
+                        ))
+                      : SongCardList(songs: trendingSongs),
+                  
+                  if (suggestedSongs.isNotEmpty) ...[
+                    const SizedBox(height: 32),
+                    _buildSectionHeader(AppLocalizations.of(context)!.homeSuggested),
+                    const SizedBox(height: 16),
+                    SongCardList(songs: suggestedSongs),
+                  ],
+                  const SizedBox(height: 100), // Space for mini player
+                ]),
+              ),
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Text(
+      title,
+      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: -0.5),
+    );
+  }
+
+  Widget _buildEmptyState(IconData icon, String message) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 24),
+      decoration: BoxDecoration(
+        color: Colors.grey[900]?.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, size: 40, color: Colors.grey[700]),
+          const SizedBox(height: 12),
+          Text(
+            message,
+            style: TextStyle(color: Colors.grey[500], fontSize: 13),
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
     );
   }
@@ -150,27 +178,43 @@ class _HomeScreenState extends State<HomeScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.grey[900],
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircleAvatar(
-              radius: 32,
-              backgroundImage: auth.user?.photoURL != null ? NetworkImage(auth.user!.photoURL!) : null,
-              child: auth.user?.photoURL == null ? const Icon(Icons.person, size: 32) : null,
-            ),
-            const SizedBox(height: 12),
-            Text(auth.user?.displayName ?? '', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            Text(auth.user?.email ?? '', style: const TextStyle(color: Colors.grey)),
-            const SizedBox(height: 24),
-            ListTile(
-              leading: const Icon(Icons.logout, color: Colors.red),
-              title: const Text('Sign out', style: TextStyle(color: Colors.red)),
-              onTap: () { Navigator.pop(context); auth.signOut(); },
-            ),
-          ],
+      elevation: 0,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40, height: 4,
+                margin: const EdgeInsets.only(bottom: 24),
+                decoration: BoxDecoration(color: Colors.grey[700], borderRadius: BorderRadius.circular(2)),
+              ),
+              CircleAvatar(
+                radius: 40,
+                backgroundImage: auth.user?.photoURL != null ? NetworkImage(auth.user!.photoURL!) : null,
+                child: auth.user?.photoURL == null ? const Icon(Icons.person, size: 40) : null,
+              ),
+              const SizedBox(height: 16),
+              Text(auth.user?.displayName ?? 'User', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              if (auth.user?.email != null) ...[
+                const SizedBox(height: 4),
+                Text(auth.user!.email!, style: TextStyle(color: Colors.grey[400])),
+              ],
+              const SizedBox(height: 32),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: Colors.red.withValues(alpha: 0.1), shape: BoxShape.circle),
+                  child: const Icon(Icons.logout_rounded, color: Colors.red),
+                ),
+                title: const Text('Sign out', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
+                onTap: () { Navigator.pop(context); auth.signOut(); },
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ],
+          ),
         ),
       ),
     );

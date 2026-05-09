@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../l10n/app_localizations.dart';
 import '../models/music_models.dart';
 import '../providers/music_player_provider.dart';
 import '../providers/auth_provider.dart';
@@ -14,7 +15,15 @@ class SongListTile extends StatefulWidget {
   final VoidCallback? onTap;
   final bool showDownload;
 
-  const SongListTile({super.key, required this.song, this.isLoading = false, this.onRemove, this.queue, this.onTap, this.showDownload = true});
+  const SongListTile({
+    super.key, 
+    required this.song, 
+    this.isLoading = false, 
+    this.onRemove, 
+    this.queue, 
+    this.onTap, 
+    this.showDownload = true,
+  });
 
   @override
   State<SongListTile> createState() => _SongListTileState();
@@ -29,7 +38,10 @@ class _SongListTileState extends State<SongListTile> with SingleTickerProviderSt
   @override
   void initState() {
     super.initState();
-    _eqController = AnimationController(vsync: this, duration: const Duration(milliseconds: 600))..repeat(reverse: true);
+    _eqController = AnimationController(
+      vsync: this, 
+      duration: const Duration(milliseconds: 600),
+    )..repeat(reverse: true);
     _checkDownloaded();
   }
 
@@ -47,91 +59,159 @@ class _SongListTileState extends State<SongListTile> with SingleTickerProviderSt
   Future<void> _download() async {
     setState(() => _isDownloading = true);
     final path = await _downloadService.downloadSong(widget.song);
-    if (mounted) setState(() { _isDownloading = false; _isDownloaded = path != null; });
+    if (mounted) setState(() { 
+      _isDownloading = false; 
+      _isDownloaded = path != null; 
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final primaryColor = Theme.of(context).primaryColor;
+    final l10n = AppLocalizations.of(context)!;
+    
     return Selector<MusicPlayerProvider, ({String? id, bool playing})>(
       selector: (_, p) => (id: p.currentSong?.id, playing: p.isPlaying),
       builder: (context, state, _) {
         final isCurrent = state.id == widget.song.id;
-        return ListTile(
-          leading: ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Image.network(
-                  widget.song.imageUrl,
-                  width: 50, height: 50, fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => _defaultCover(),
-                  loadingBuilder: (_, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return _defaultCover();
-                  },
-                ),
-                if (widget.isLoading)
-                  Container(width: 50, height: 50, color: Colors.black54,
-                      child: const CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
-                if (isCurrent && !widget.isLoading)
-                  Container(
-                    width: 50, height: 50, color: Colors.black54,
-                    child: Center(child: _EqualizerIcon(controller: _eqController, playing: state.playing)),
-                  ),
-              ],
-            ),
-          ),
-          title: Text(widget.song.title, overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: isCurrent ? Colors.green : Colors.white)),
-          subtitle: Text(widget.song.artist, overflow: TextOverflow.ellipsis),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (_isDownloading)
-                const SizedBox(width: 20, height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              else if (widget.showDownload && context.watch<AuthProvider>().canDownload)
-                IconButton(
-                  icon: Icon(_isDownloaded ? Icons.download_done : Icons.download,
-                      size: 20, color: _isDownloaded ? Colors.green : Colors.grey),
-                  onPressed: _isDownloaded ? null : _download,
-                ),
-              if (widget.onRemove != null)
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert, size: 20, color: Colors.grey),
-                  onSelected: (value) { if (value == 'remove') widget.onRemove!(); },
-                  itemBuilder: (_) => const [PopupMenuItem(value: 'remove', child: Text('Remove from liked'))],
-                ),
-            ],
-          ),
+        
+        return InkWell(
           onTap: widget.onTap ?? () {
             final provider = context.read<MusicPlayerProvider>();
             if (provider.currentSong?.id == widget.song.id) {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => PlayerScreen()));
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerScreen()));
             } else {
               provider.playSong(widget.song, queue: widget.queue);
             }
           },
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Image.network(
+                        widget.song.imageUrl,
+                        width: 52, height: 52, fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => _defaultCover(),
+                        loadingBuilder: (_, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return _defaultCover();
+                        },
+                      ),
+                      if (widget.isLoading)
+                        Container(
+                          width: 52, height: 52, color: Colors.black54,
+                          child: const Center(
+                            child: SizedBox(
+                              width: 20, height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            ),
+                          ),
+                        ),
+                      if (isCurrent && !widget.isLoading)
+                        Container(
+                          width: 52, height: 52, color: Colors.black54,
+                          child: Center(
+                            child: _EqualizerIcon(
+                              controller: _eqController, 
+                              playing: state.playing,
+                              color: primaryColor,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.song.title, 
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: isCurrent ? primaryColor : Colors.white,
+                          fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        widget.song.artist, 
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.grey[400],
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_isDownloading)
+                      const SizedBox(
+                        width: 20, height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    else if (widget.showDownload && context.watch<AuthProvider>().canDownload)
+                      IconButton(
+                        icon: Icon(
+                          _isDownloaded ? Icons.download_done_rounded : Icons.download_rounded,
+                          size: 22, 
+                          color: _isDownloaded ? primaryColor : Colors.grey[600],
+                        ),
+                        onPressed: _isDownloaded ? null : _download,
+                      ),
+                    if (widget.onRemove != null)
+                      PopupMenuButton<String>(
+                        icon: Icon(Icons.more_vert_rounded, size: 22, color: Colors.grey[600]),
+                        onSelected: (value) { if (value == 'remove') widget.onRemove!(); },
+                        itemBuilder: (_) => [
+                          PopupMenuItem(
+                            value: 'remove', 
+                            child: Row(
+                              children: [
+                                const Icon(Icons.favorite_border_rounded, size: 18),
+                                const SizedBox(width: 8),
+                                Text(l10n.playerQueue), // Placeholder for "Remove from liked"
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         );
       },
     );
   }
 
   Widget _defaultCover() => Container(
-    width: 50, height: 50, color: Colors.grey[800],
-    child: const Icon(Icons.music_note, color: Colors.white54),
+    width: 52, height: 52, color: Colors.grey[900],
+    child: const Icon(Icons.music_note_rounded, color: Colors.white24),
   );
 }
 
 class _EqualizerIcon extends StatelessWidget {
   final AnimationController controller;
   final bool playing;
-  const _EqualizerIcon({required this.controller, required this.playing});
+  final Color color;
+  const _EqualizerIcon({required this.controller, required this.playing, required this.color});
 
   @override
   Widget build(BuildContext context) {
-    if (!playing) return const Icon(Icons.pause, color: Colors.white, size: 18);
+    if (!playing) return const Icon(Icons.pause_rounded, color: Colors.white, size: 20);
     return AnimatedBuilder(
       animation: controller,
       builder: (_, __) => Row(
@@ -151,7 +231,6 @@ class _EqualizerIcon extends StatelessWidget {
   Widget _bar(double heightFactor) => Container(
     width: 3,
     height: 16 * heightFactor,
-    decoration: BoxDecoration(color: Colors.green, borderRadius: BorderRadius.circular(1)),
+    decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(1)),
   );
 }
-
