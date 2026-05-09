@@ -63,6 +63,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   void setAuthProvider(AuthProvider auth) => _authProvider = auth;
   VoidCallback? _onRateLimit;
   void setOnRateLimit(VoidCallback cb) => _onRateLimit = cb;
+  bool _isRateLimited = false;
   void Function(String title)? _onStreamError;
   void setOnStreamError(void Function(String title) cb) => _onStreamError = cb;
   Timer? _positionSaveTimer;
@@ -197,7 +198,14 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         if (completedSongId != null && wasPlaying && nearEnd) {
           _historyService.recordPlay(_currentSong!, _lastPosition.inSeconds);
           Future.delayed(const Duration(milliseconds: 300), () {
-            if (_currentSong?.id == completedSongId) nextSong();
+            if (_currentSong?.id != completedSongId) return;
+            if (_isRateLimited) {
+              _isRateLimited = false;
+              _onRateLimit?.call();
+              _playOfflineByGenre(_currentSong!);
+            } else {
+              nextSong();
+            }
           });
         } else if (completedSongId != null && wasPlaying && !nearEnd) {
           rlog('[MusicPlayerProvider] ignoring early completed at ${_lastPosition.inSeconds}s / ${duration.inSeconds}s');
@@ -311,16 +319,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     if (offlineQueue.isEmpty) offlineQueue = downloaded;
 
     rlog('[MusicPlayerProvider] offline queue: ${offlineQueue.length} songs, first: ${offlineQueue.first.title}');
-    // Use microtask to break synchronous call stack and prevent stack overflow in AOT
-    // Future.microtask(() => playSong(offlineQueue.first, queue: offlineQueue));
-    // For now, just stop playback - user can manually play downloaded songs
-    Future.microtask(() async {
-      try {
-        await _audioHandler.stop();
-      } catch (_) {}
-    });
-    _currentSong = null;
-    notifyListeners();
+    Future.microtask(() => playSong(offlineQueue.first, queue: offlineQueue));
   }
 
   @override
@@ -355,6 +354,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     // Show song immediately in UI while audio URL is being fetched
     _currentSong = song;
     // Only skip generatePlaylist when navigating within existing queue (next/prev)
+    if (!fromQueue) _isRateLimited = false; // user manually picked a song, allow retrying YouTube
     if (fromQueue) {
       if (queue != null) {
         _queue = queue;
@@ -425,12 +425,16 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         rlog('[MusicPlayerProvider] Playable audio for \\${song.title}: \\${audioUrl.isEmpty ? "EMPTY" : audioUrl}');
         song.audioUrl = audioUrl;
       } on YouTubeRateLimitException {
-        rlog('[MusicPlayerProvider] Rate limited — switching to offline');
-        _onRateLimit?.call();
+        rlog('[MusicPlayerProvider] Rate limited');
+        _isRateLimited = true;
         _loadingAudioIds.remove(song.id);
         _audioHandler.nextEnabled = true;
         notifyListeners();
-        await _playOfflineByGenre(song);
+        // If nothing is playing, switch to offline now; otherwise wait for current song to finish
+        if (!isPlaying) {
+          _onRateLimit?.call();
+          await _playOfflineByGenre(song);
+        }
         return;
       } finally {
         _loadingAudioIds.remove(song.id);
@@ -506,8 +510,8 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
 
   /// Fetch suggestions for the seed song and append to queue in background
   void _seedQueueWithSuggestions(Song seedSong) {
-    if (_isSeeding) {
-      rlog('[MusicPlayerProvider] already seeding, skipped for: ${seedSong.title}');
+    if (_isSeeding || _isRateLimited) {
+      rlog('[MusicPlayerProvider] seeding skipped: isSeeding=$_isSeeding, rateLimited=$_isRateLimited');
       return;
     }
     _isSeeding = true;
@@ -655,7 +659,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   }
 
   Future<void> _fetchAndPlaySuggestion() async {
-    if (_currentSong == null || _isSeeding) return;
+    if (_currentSong == null || _isSeeding || _isRateLimited) return;
     try {
       // Use pending seed queries first (no repeats)
       if (_pendingSeedQueries.isNotEmpty) {
