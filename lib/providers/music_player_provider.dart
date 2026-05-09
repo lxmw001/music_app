@@ -58,6 +58,16 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   YouTubeService get youtubeService => _youtubeService;
   final PlayHistoryService _historyService = PlayHistoryService();
   final DownloadService _downloadService = DownloadService();
+
+  Timer? _notifyTimer;
+  static const _notifyInterval = Duration(milliseconds: 250);
+
+  @override
+  void notifyListeners() {
+    if (_notifyTimer?.isActive ?? false) return;
+    super.notifyListeners();
+    _notifyTimer = Timer(_notifyInterval, () {});
+  }
   final LastFmService _lastFmService = LastFmService();
   AuthProvider? _authProvider;
   void setAuthProvider(AuthProvider auth) => _authProvider = auth;
@@ -816,6 +826,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
 
   @override
   void dispose() {
+    _notifyTimer?.cancel();
     _positionSaveTimer?.cancel();
     _stallTimer?.cancel();
     if (_isInitialized) {
