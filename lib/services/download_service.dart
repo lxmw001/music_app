@@ -33,7 +33,6 @@ class DownloadService {
 
       final yt = YoutubeExplode();
       try {
-        print('[Download] fetching stream manifest for ${song.id}');
         final manifest = await yt.videos.streamsClient.getManifest(
           song.id,
           ytClients: [YoutubeApiClient.ios, YoutubeApiClient.androidVr],
@@ -55,10 +54,8 @@ class DownloadService {
       }
 
       await _saveMeta(song, file.path);
-      print('[Download] complete: ${file.path}');
       return file.path;
     } catch (e) {
-      print('[Download] error: $e');
       return null;
     }
   }
@@ -82,12 +79,12 @@ class DownloadService {
     final raw = prefs.getString(_metaKey);
     final list = raw != null ? List<Map<String, dynamic>>.from(jsonDecode(raw)) : <Map<String, dynamic>>[];
     list.removeWhere((e) => e['id'] == song.id);
-    list.insert(0, {
-      'id': song.id, 'title': song.title, 'artist': song.artist,
-      'album': song.album, 'imageUrl': song.imageUrl,
-      'audioUrl': localPath, 'duration': song.duration.inSeconds,
-      'genres': song.genres,
-    });
+    
+    // Create a JSON-serializable map from the Song object
+    final songJson = song.toJson();
+    songJson['audioUrl'] = localPath;
+    
+    list.insert(0, songJson);
     await prefs.setString(_metaKey, jsonEncode(list));
   }
 

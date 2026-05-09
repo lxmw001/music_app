@@ -111,9 +111,6 @@ class _SearchScreenState extends State<SearchScreen> {
         },
         fieldViewBuilder: (ctx, controller, autoFocusNode, onSubmit) {
           _autoFocusNode = autoFocusNode;
-          if (_searchController.text != controller.text && _searchController.text.isNotEmpty) {
-             // Sync if needed, but usually controller is the source of truth
-          }
           return Container(
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.1),
@@ -372,6 +369,11 @@ class _SearchScreenState extends State<SearchScreen> {
             itemCount: 8,
             itemBuilder: (context, index) {
               final genres = ['Pop','Rock','Hip-Hop','Jazz','Classical','Electronic','Country','R&B'];
+              final icons = [
+                Icons.music_note_rounded, Icons.music_video_rounded, Icons.headphones_rounded,
+                Icons.piano_rounded, Icons.queue_music_rounded, Icons.graphic_eq_rounded,
+                Icons.album_rounded, Icons.mic_rounded,
+              ];
               final gradients = [
                 [const Color(0xFFE91E63), const Color(0xFF880E4F)],
                 [const Color(0xFF3F51B5), const Color(0xFF1A237E)],
@@ -401,9 +403,25 @@ class _SearchScreenState extends State<SearchScreen> {
                     ],
                   ),
                   padding: const EdgeInsets.all(16),
-                  child: Text(
-                    genres[index], 
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                  child: Stack(
+                    children: [
+                      Text(
+                        genres[index], 
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                      Positioned(
+                        right: -10,
+                        bottom: -10,
+                        child: Transform.rotate(
+                          angle: 0.3,
+                          child: Icon(
+                            icons[index], 
+                            size: 48, 
+                            color: Colors.white.withValues(alpha: 0.2),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               );
