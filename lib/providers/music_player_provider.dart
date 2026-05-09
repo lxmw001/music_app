@@ -64,6 +64,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   VoidCallback? _onRateLimit;
   void setOnRateLimit(VoidCallback cb) => _onRateLimit = cb;
   bool _isRateLimited = false;
+  bool _isSwitchingSong = false;
   void Function(String title)? _onStreamError;
   void setOnStreamError(void Function(String title) cb) => _onStreamError = cb;
   Timer? _positionSaveTimer;
@@ -186,7 +187,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     });
 
     _audioHandler.playbackState.listen((state) {
-      if (state.processingState == AudioProcessingState.completed && !_isFetchingSuggestions) {
+      if (state.processingState == AudioProcessingState.completed && !_isFetchingSuggestions && !_isSwitchingSong) {
         final completedSongId = _currentSong?.id;
         final duration = totalDuration;
         // Real completion: played at least 5s
@@ -456,6 +457,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       duration: song.duration,
     );
     _lastPosition = Duration.zero; // reset before setAudioSource to prevent stale position triggering false completed
+    _isSwitchingSong = true;
     try {
       await _audioHandler.setAudioSource(audioUrl, mediaItem);
       if (seekTo != null && seekTo > Duration.zero) {
@@ -468,6 +470,8 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       _onStreamError?.call(song.title);
       notifyListeners();
       return;
+    } finally {
+      _isSwitchingSong = false;
     }
     
     _consecutiveSkips = 0;
