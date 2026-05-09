@@ -15,7 +15,30 @@ class AudioPlayerHandler extends BaseAudioHandler {
   }
 
   void _init() {
-    _player.playbackEventStream.map(_transformEvent).pipe(playbackState);
+    // Throttle playbackState updates to ~4/sec to avoid Android notification rate limit
+    DateTime _lastEmit = DateTime.fromMillisecondsSinceEpoch(0);
+    PlaybackState? _pending;
+    Timer? _throttleTimer;
+
+    void emit(PlaybackState state) {
+      final now = DateTime.now();
+      if (now.difference(_lastEmit).inMilliseconds >= 250) {
+        _lastEmit = now;
+        playbackState.add(state);
+      } else {
+        _pending = state;
+        _throttleTimer ??= Timer(const Duration(milliseconds: 250), () {
+          _throttleTimer = null;
+          if (_pending != null) {
+            _lastEmit = DateTime.now();
+            playbackState.add(_pending!);
+            _pending = null;
+          }
+        });
+      }
+    }
+
+    _player.playbackEventStream.map(_transformEvent).listen(emit);
     _player.sequenceStateStream.listen((sequenceState) {
       final currentItem = sequenceState.currentSource?.tag as MediaItem?;
       if (currentItem != null) {
