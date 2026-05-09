@@ -33,7 +33,7 @@ android {
 
     defaultConfig {
         applicationId = "com.lxmw.musicapp"
-        minSdk = flutter.minSdkVersion  // DO NOT CHANGE - Firebase Auth requires API 23+
+        minSdk = 23  // DO NOT CHANGE - Firebase Auth requires API 23+
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
