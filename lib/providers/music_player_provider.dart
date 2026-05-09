@@ -158,7 +158,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     bool _isUpdatingMediaItem = false; // Guard against recursive mediaItem updates
     
     _audioHandler.positionStream.listen((position) {
-      if (position > Duration.zero) _lastPosition = position;
+      if (!_isSwitchingSong && position > Duration.zero) _lastPosition = position;
       if (_currentSong != null && _autoAddSuggestions) {
         final duration = totalDuration;
         // Only fetch suggestions if we're near the end AND queue is almost exhausted
@@ -348,6 +348,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     // Snapshot position before it resets, then record play for previous song
     final previousSong = _currentSong;
     final previousPosition = currentPosition.inSeconds;
+    _lastPosition = Duration.zero; // reset immediately so stale position can't trigger completion
     if (previousSong != null && previousPosition > 0) {
       rlog('[MusicPlayerProvider] recording play: ${previousSong.title}, position=${previousPosition}s, duration=${previousSong.duration.inSeconds}s');
       _historyService.recordPlay(previousSong, previousPosition);
