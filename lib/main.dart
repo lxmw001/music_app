@@ -9,6 +9,7 @@ import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'firebase_options.dart';
 import 'providers/music_player_provider.dart';
 import 'providers/auth_provider.dart';
+import 'providers/theme_provider.dart';
 import 'screens/home_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/library_screen.dart';
@@ -41,6 +42,7 @@ void main() async {
   runApp(
     MultiProvider(
       providers: [
+        ChangeNotifierProvider<ThemeProvider>(create: (_) => ThemeProvider()),
         ChangeNotifierProvider<MusicPlayerProvider>(create: (_) => MusicPlayerProviderImpl()),
         ChangeNotifierProxyProvider<MusicPlayerProvider, AuthProvider>(
           create: (_) => AuthProvider(),
@@ -63,44 +65,48 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Music App',
-      debugShowCheckedModeBanner: false,
-      localizationsDelegates: const [
-        AppLocalizations.delegate,
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
-      supportedLocales: const [
-        Locale('en'),
-        Locale('es'),
-      ],
-      theme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF1DB954),
-          brightness: Brightness.dark,
-          surface: Colors.black,
-          onSurface: Colors.white,
-          primary: const Color(0xFF1DB954),
-        ),
-        scaffoldBackgroundColor: Colors.black,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.black,
-          elevation: 0,
-          centerTitle: false,
-        ),
-        bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-          backgroundColor: Colors.black,
-          selectedItemColor: Color(0xFF1DB954),
-          unselectedItemColor: Colors.grey,
-          type: BottomNavigationBarType.fixed,
-          elevation: 0,
-        ),
-      ),
-      home: const MainScreen(),
+    return Consumer<ThemeProvider>(
+      builder: (context, theme, _) {
+        return MaterialApp(
+          title: 'Music App',
+          debugShowCheckedModeBanner: false,
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [
+            Locale('en'),
+            Locale('es'),
+          ],
+          theme: ThemeData(
+            useMaterial3: true,
+            brightness: Brightness.dark,
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: theme.accentColor,
+              brightness: Brightness.dark,
+              surface: Colors.black,
+              onSurface: Colors.white,
+              primary: theme.accentColor,
+            ),
+            scaffoldBackgroundColor: Colors.black,
+            appBarTheme: const AppBarTheme(
+              backgroundColor: Colors.black,
+              elevation: 0,
+              centerTitle: false,
+            ),
+            bottomNavigationBarTheme: BottomNavigationBarThemeData(
+              backgroundColor: Colors.black,
+              selectedItemColor: theme.accentColor,
+              unselectedItemColor: Colors.grey,
+              type: BottomNavigationBarType.fixed,
+              elevation: 0,
+            ),
+          ),
+          home: const MainScreen(),
+        );
+      },
     );
   }
 }

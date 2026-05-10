@@ -8,6 +8,7 @@ import '../l10n/app_localizations.dart';
 import '../providers/music_player_provider.dart';
 import '../providers/auth_provider.dart';
 import '../services/download_service.dart';
+import '../widgets/waveform_progress_bar.dart';
 
 class PlayerScreen extends StatefulWidget {
   const PlayerScreen({super.key});
@@ -247,7 +248,7 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
             ],
           ),
           const SizedBox(height: 16),
-          _buildProgressBar(player),
+          _buildWaveformProgressBar(player),
           _buildMainControls(player, isLoading),
           const Spacer(),
         ],
@@ -255,7 +256,7 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
     );
   }
 
-  Widget _buildProgressBar(MusicPlayerProvider player) {
+  Widget _buildWaveformProgressBar(MusicPlayerProvider player) {
     return StreamBuilder<Duration>(
       stream: player.positionStream,
       builder: (context, snap) {
@@ -267,22 +268,15 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
 
         return Column(
           children: [
-            SliderTheme(
-              data: SliderTheme.of(context).copyWith(
-                trackHeight: 4,
-                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
-                activeTrackColor: Colors.white,
-                inactiveTrackColor: Colors.white.withValues(alpha: 0.2),
-                thumbColor: Colors.white,
-              ),
-              child: Slider(
-                value: progress,
-                onChanged: (v) => player.seekTo(Duration(seconds: (v * total.inSeconds).toInt())),
-              ),
+            WaveformProgressBar(
+              progress: progress,
+              isPlaying: player.isPlaying,
+              color: Colors.white,
+              onSeek: (p) => player.seekTo(Duration(seconds: (p * total.inSeconds).toInt())),
             ),
+            const SizedBox(height: 8),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 4),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [

@@ -22,10 +22,10 @@ class _SearchScreenState extends State<SearchScreen> {
   final _focusNode = FocusNode();
 
   MusicSearchResult _result = const MusicSearchResult();
-  List<String> _suggestions = [];
+  List<String> _popularSuggestions = [];
   bool isLoading = false;
   String _currentQuery = '';
-  String? _activeFilter; // null = top results, 'songs'|'mixes'|'videos'|'artists'
+  String? _activeFilter; 
 
   bool get _hasResults => !_result.isEmpty;
 
@@ -34,7 +34,7 @@ class _SearchScreenState extends State<SearchScreen> {
     super.initState();
     _youtubeService = widget.youtubeService ?? YouTubeService();
     _serverService.getSearchSuggestions().then((s) {
-      if (mounted) setState(() => _suggestions = s);
+      if (mounted) setState(() => _popularSuggestions = s);
     });
   }
 
@@ -66,9 +66,9 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   List<String> _matchingSuggestions(String input) {
-    if (input.isEmpty || _suggestions.isEmpty) return [];
+    if (input.isEmpty || _popularSuggestions.isEmpty) return [];
     final lower = input.toLowerCase();
-    return _suggestions
+    return _popularSuggestions
         .where((s) => s.toLowerCase().contains(lower))
         .take(5)
         .toList();
@@ -332,104 +332,196 @@ class _SearchScreenState extends State<SearchScreen> {
   );
 
   Widget _buildEmptyState() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (_suggestions.isNotEmpty) ...[
-            const Text('Popular searches', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 8, runSpacing: 8,
-              children: _suggestions.take(6).map((s) => ActionChip(
-                label: Text(s),
-                backgroundColor: Colors.grey[900],
-                side: BorderSide(color: Colors.grey[800]!),
-                onPressed: () {
-                  _searchController.text = s;
-                  _autoFocusNode?.unfocus();
-                  _performSearch(s);
-                },
-              )).toList(),
-            ),
-            const SizedBox(height: 32),
-          ],
-          const Text('Browse all', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2, 
-              childAspectRatio: 1.8,
-              crossAxisSpacing: 12, 
-              mainAxisSpacing: 12,
-            ),
-            itemCount: 8,
-            itemBuilder: (context, index) {
-              final genres = ['Pop','Rock','Hip-Hop','Jazz','Classical','Electronic','Country','R&B'];
-              final icons = [
-                Icons.music_note_rounded, Icons.music_video_rounded, Icons.headphones_rounded,
-                Icons.piano_rounded, Icons.queue_music_rounded, Icons.graphic_eq_rounded,
-                Icons.album_rounded, Icons.mic_rounded,
-              ];
-              final gradients = [
-                [const Color(0xFFE91E63), const Color(0xFF880E4F)],
-                [const Color(0xFF3F51B5), const Color(0xFF1A237E)],
-                [const Color(0xFF9C27B0), const Color(0xFF4A148C)],
-                [const Color(0xFF009688), const Color(0xFF004D40)],
-                [const Color(0xFF795548), const Color(0xFF3E2723)],
-                [const Color(0xFF00BCD4), const Color(0xFF006064)],
-                [const Color(0xFF8BC34A), const Color(0xFF33691E)],
-                [const Color(0xFFFF9800), const Color(0xFFE65100)],
-              ];
-              return GestureDetector(
-                onTap: () => _performSearch(genres[index]),
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: gradients[index], 
-                      begin: Alignment.topLeft, 
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.3),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  padding: const EdgeInsets.all(16),
-                  child: Stack(
+    return FutureBuilder<List<String>>(
+      future: context.read<MusicPlayerProvider>().getSearchHistory(),
+      builder: (context, snapshot) {
+        final history = snapshot.data ?? [];
+        return SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (history.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        genres[index], 
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-                      ),
-                      Positioned(
-                        right: -10,
-                        bottom: -10,
-                        child: Transform.rotate(
-                          angle: 0.3,
-                          child: Icon(
-                            icons[index], 
-                            size: 48, 
-                            color: Colors.white.withValues(alpha: 0.2),
-                          ),
-                        ),
+                      const Text('Recent searches', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      TextButton(
+                        onPressed: () async {
+                          await context.read<MusicPlayerProvider>().clearSearchHistory();
+                          setState(() {});
+                        },
+                        child: Text('Clear', style: TextStyle(color: Colors.grey[400], fontSize: 13)),
                       ),
                     ],
                   ),
                 ),
-              );
-            },
+                SizedBox(
+                  height: 40,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    itemCount: history.length,
+                    itemBuilder: (context, i) => Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: ActionChip(
+                        label: Text(history[i], style: const TextStyle(fontSize: 13)),
+                        backgroundColor: Colors.grey[900],
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        side: BorderSide(color: Colors.grey[800]!),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        onPressed: () {
+                          _searchController.text = history[i];
+                          _performSearch(history[i]);
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
+              
+              if (_popularSuggestions.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(AppLocalizations.of(context)!.searchPopular, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                ),
+                const SizedBox(height: 12),
+                ..._popularSuggestions.take(6).toList().asMap().entries.map((entry) {
+                  final index = entry.key + 1;
+                  final query = entry.value;
+                  return InkWell(
+                    onTap: () {
+                      _searchController.text = query;
+                      _performSearch(query);
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 32,
+                            height: 32,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: index == 1 ? Theme.of(context).primaryColor.withValues(alpha: 0.15) : Colors.grey[900],
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text('$index', 
+                              style: TextStyle(
+                                color: index == 1 ? Theme.of(context).primaryColor : Colors.grey[400], 
+                                fontWeight: FontWeight.bold, 
+                                fontSize: 15
+                              )
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Text(query, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 16)),
+                          ),
+                          Icon(
+                            Icons.trending_up_rounded, 
+                            size: 20, 
+                            color: index <= 3 ? Theme.of(context).primaryColor.withValues(alpha: 0.5) : Colors.grey[800]
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+                const SizedBox(height: 24),
+              ],
+              
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(AppLocalizations.of(context)!.searchBrowseGenre, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              ),
+              const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: _buildGenreGrid(),
+              ),
+              const SizedBox(height: 100),
+            ],
           ),
-          const SizedBox(height: 100),
-        ],
+        );
+      }
+    );
+  }
+
+  Widget _buildGenreGrid() {
+    final genres = ['Pop','Rock','Hip-Hop','Jazz','Classical','Electronic','Country','R&B'];
+    final icons = [
+      Icons.music_note_rounded, Icons.music_video_rounded, Icons.headphones_rounded,
+      Icons.piano_rounded, Icons.queue_music_rounded, Icons.graphic_eq_rounded,
+      Icons.album_rounded, Icons.mic_rounded,
+    ];
+    final gradients = [
+      [const Color(0xFFE91E63), const Color(0xFF880E4F)],
+      [const Color(0xFF3F51B5), const Color(0xFF1A237E)],
+      [const Color(0xFF9C27B0), const Color(0xFF4A148C)],
+      [const Color(0xFF009688), const Color(0xFF004D40)],
+      [const Color(0xFF795548), const Color(0xFF3E2723)],
+      [const Color(0xFF00BCD4), const Color(0xFF006064)],
+      [const Color(0xFF8BC34A), const Color(0xFF33691E)],
+      [const Color(0xFFFF9800), const Color(0xFFE65100)],
+    ];
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2, 
+        childAspectRatio: 1.8,
+        crossAxisSpacing: 12, 
+        mainAxisSpacing: 12,
       ),
+      itemCount: 8,
+      itemBuilder: (context, index) {
+        return GestureDetector(
+          onTap: () => _performSearch(genres[index]),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: gradients[index], 
+                begin: Alignment.topLeft, 
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.3),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.all(16),
+            child: Stack(
+              children: [
+                Text(
+                  genres[index], 
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+                Positioned(
+                  right: -10,
+                  bottom: -10,
+                  child: Transform.rotate(
+                    angle: 0.3,
+                    child: Icon(
+                      icons[index], 
+                      size: 48, 
+                      color: Colors.white.withValues(alpha: 0.2),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

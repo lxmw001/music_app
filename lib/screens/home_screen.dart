@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
@@ -80,13 +81,27 @@ class _HomeScreenState extends State<HomeScreen> {
         child: CustomScrollView(
           slivers: [
             SliverAppBar(
-              floating: true,
-              pinned: false,
-              snap: true,
-              backgroundColor: Colors.black.withValues(alpha: 0.8),
-              title: Text(
-                AppLocalizations.of(context)!.homeGreeting,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22),
+              expandedHeight: 120,
+              floating: false,
+              pinned: true,
+              stretch: true,
+              backgroundColor: Colors.transparent,
+              flexibleSpace: FlexibleSpaceBar(
+                stretchModes: const [StretchMode.blurBackground, StretchMode.zoomBackground],
+                centerTitle: false,
+                titlePadding: const EdgeInsets.only(left: 16, bottom: 16),
+                title: Text(
+                  AppLocalizations.of(context)!.homeGreeting,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 22),
+                ),
+                background: ClipRect(
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: Container(
+                      color: Colors.black.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ),
               ),
               actions: [
                 Consumer<AuthProvider>(
@@ -109,7 +124,7 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 16),
                   _buildSectionHeader(AppLocalizations.of(context)!.homeRecentlyPlayed),
                   const SizedBox(height: 16),
                   if (recentPlaylists.isEmpty)
