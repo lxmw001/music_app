@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:palette_generator/palette_generator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/music_models.dart';
 import '../services/audio_handler.dart';
@@ -12,6 +13,7 @@ import '../services/download_service.dart';
 import '../services/youtube_service.dart' show YouTubeService, YouTubeRateLimitException;
 import '../utils/logger.dart';
 import 'auth_provider.dart';
+import 'theme_provider.dart';
 
 abstract class MusicPlayerProvider extends ChangeNotifier {
   Song? get currentSong;
@@ -23,6 +25,7 @@ abstract class MusicPlayerProvider extends ChangeNotifier {
   bool get autoAddSuggestions;
   bool get isFetchingSuggestions;
   List<Song> get suggestedSongs;
+  Color? get dominantColor;
   bool isLoadingAudio(String songId);
   void prefetchAudioUrls(List<Song> songs);
   bool get isPlaying;
@@ -73,7 +76,11 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   }
   final LastFmService _lastFmService = LastFmService();
   AuthProvider? _authProvider;
+  ThemeProvider? _themeProvider;
+  
   void setAuthProvider(AuthProvider auth) => _authProvider = auth;
+  void setThemeProvider(ThemeProvider theme) => _themeProvider = theme;
+
   VoidCallback? _onRateLimit;
   void setOnRateLimit(VoidCallback cb) => _onRateLimit = cb;
   bool _isRateLimited = false;
@@ -93,6 +100,11 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   bool _isInitialized = false;
   bool _autoAddSuggestions = true;
   final Set<String> _loadingAudioIds = {};
+  Color? _dominantColor;
+
+  @override
+  Color? get dominantColor => _dominantColor;
+
   @override
   bool isLoadingAudio(String songId) => _loadingAudioIds.contains(songId);
   bool _isFetchingSuggestions = false;
@@ -161,6 +173,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         _currentIndex = savedQueue.currentIndex;
         _currentSong = _queue[_currentIndex];
         rlog('[MusicPlayerProvider] restored queue: ${_queue.length} songs, index=$_currentIndex');
+        _updateDominantColor(_currentSong?.imageUrl);
         notifyListeners();
       }
     }
@@ -249,6 +262,21 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   }
   }
 
+  Future<void> _updateDominantColor(String? imageUrl) async {
+    if (imageUrl == null || imageUrl.isEmpty) return;
+    try {
+      final generator = await PaletteGenerator.fromImageProvider(
+        NetworkImage(imageUrl),
+        size: const Size(100, 100),
+      );
+      _dominantColor = generator.dominantColor?.color;
+      if (_dominantColor != null && _themeProvider != null) {
+        _themeProvider!.updateAdaptiveColor(_dominantColor!);
+      }
+      notifyListeners();
+    } catch (_) {}
+  }
+
   Future<void> _handleStall() async {
     final song = _currentSong;
     if (song == null || _isRecoveringFromStall) return;
@@ -326,7 +354,10 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     if (previousSong != null && previousPosition > 0) {
       _historyService.recordPlay(previousSong, previousPosition);
     }
+    
     _currentSong = song;
+    _updateDominantColor(song.imageUrl);
+    
     if (fromQueue) {
       if (queue != null) _queue = queue;
       _currentIndex = _queue.indexWhere((s) => s.id == song.id);

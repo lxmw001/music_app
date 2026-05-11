@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -18,6 +19,8 @@ import 'screens/login_screen.dart';
 import 'services/youtube_service.dart';
 import 'services/update_service.dart';
 import 'widgets/youtube_login_webview.dart';
+import 'widgets/mini_equalizer.dart';
+import 'widgets/mesh_gradient.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,14 +39,22 @@ void main() async {
   
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
-    systemNavigationBarColor: Colors.black,
+    systemNavigationBarColor: Colors.transparent,
+    systemNavigationBarIconBrightness: Brightness.light,
   ));
 
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider<ThemeProvider>(create: (_) => ThemeProvider()),
-        ChangeNotifierProvider<MusicPlayerProvider>(create: (_) => MusicPlayerProviderImpl()),
+        ChangeNotifierProxyProvider<ThemeProvider, MusicPlayerProvider>(
+          create: (_) => MusicPlayerProviderImpl(),
+          update: (_, theme, player) {
+            final impl = player as MusicPlayerProviderImpl;
+            impl.setThemeProvider(theme);
+            return impl;
+          },
+        ),
         ChangeNotifierProxyProvider<MusicPlayerProvider, AuthProvider>(
           create: (_) => AuthProvider(),
           update: (_, musicPlayer, auth) {
@@ -80,30 +91,7 @@ class MyApp extends StatelessWidget {
             Locale('en'),
             Locale('es'),
           ],
-          theme: ThemeData(
-            useMaterial3: true,
-            brightness: Brightness.dark,
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: theme.accentColor,
-              brightness: Brightness.dark,
-              surface: Colors.black,
-              onSurface: Colors.white,
-              primary: theme.accentColor,
-            ),
-            scaffoldBackgroundColor: Colors.black,
-            appBarTheme: const AppBarTheme(
-              backgroundColor: Colors.black,
-              elevation: 0,
-              centerTitle: false,
-            ),
-            bottomNavigationBarTheme: BottomNavigationBarThemeData(
-              backgroundColor: Colors.black,
-              selectedItemColor: theme.accentColor,
-              unselectedItemColor: Colors.grey,
-              type: BottomNavigationBarType.fixed,
-              elevation: 0,
-            ),
-          ),
+          theme: theme.getThemeData(),
           home: const MainScreen(),
         );
       },
@@ -121,6 +109,7 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
+  late final PageController _pageController;
   late final List<Widget> _screens;
   String? _updateUrl;
   double? _downloadProgress;
@@ -129,6 +118,7 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
+    _pageController = PageController(initialPage: 0);
     _screens = [
       HomeScreen(youtubeService: widget.youtubeService),
       SearchScreen(youtubeService: widget.youtubeService),
@@ -159,9 +149,15 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
   Future<bool> _onWillPop() async {
     if (_currentIndex != 0) {
-      setState(() => _currentIndex = 0);
+      _jumpToPage(0);
       return false;
     }
     final now = DateTime.now();
@@ -179,8 +175,19 @@ class _MainScreenState extends State<MainScreen> {
     return true;
   }
 
+  void _jumpToPage(int index) {
+    HapticFeedback.selectionClick();
+    _pageController.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeOutQuart,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = context.watch<ThemeProvider>();
+    
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) async {
@@ -189,161 +196,288 @@ class _MainScreenState extends State<MainScreen> {
         if (shouldPop && context.mounted) Navigator.of(context).pop();
       },
       child: Scaffold(
-        body: Column(
+        extendBody: true,
+        body: Stack(
           children: [
-            if (_updateUrl != null)
-              MaterialBanner(
-                backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                content: _downloadProgress != null
-                    ? Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(AppLocalizations.of(context)!.updateDownloading((_downloadProgress! * 100).toInt())),
-                          const SizedBox(height: 6),
-                          LinearProgressIndicator(value: _downloadProgress),
-                        ],
-                      )
-                    : Text(AppLocalizations.of(context)!.updateAvailable),
-                actions: _downloadProgress != null
-                    ? [const SizedBox.shrink()]
-                    : [
-                        TextButton(
-                          onPressed: () async {
-                            setState(() => _downloadProgress = 0.0);
-                            await UpdateService().downloadAndInstall(
-                              _updateUrl!,
-                              onProgress: (p) => setState(() => _downloadProgress = p),
-                            );
-                            setState(() { _updateUrl = null; _downloadProgress = null; });
-                          },
-                          child: Text(AppLocalizations.of(context)!.updateButton),
-                        ),
-                        TextButton(
-                          onPressed: () => setState(() => _updateUrl = null),
-                          child: Text(AppLocalizations.of(context)!.updateDismiss),
-                        ),
-                      ],
-              ),
-            Expanded(
-              child: IndexedStack(
-                index: _currentIndex,
-                children: _screens,
+            // Global Mesh Aura
+            MeshGradient(color: theme.accentColor),
+            
+            Column(
+              children: [
+                if (_updateUrl != null)
+                  MaterialBanner(
+                    backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                    content: _downloadProgress != null
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(AppLocalizations.of(context)!.updateDownloading((_downloadProgress! * 100).toInt())),
+                              const SizedBox(height: 6),
+                              LinearProgressIndicator(value: _downloadProgress),
+                            ],
+                          )
+                        : Text(AppLocalizations.of(context)!.updateAvailable),
+                    actions: _downloadProgress != null
+                        ? [const SizedBox.shrink()]
+                        : [
+                            TextButton(
+                              onPressed: () async {
+                                setState(() => _downloadProgress = 0.0);
+                                await UpdateService().downloadAndInstall(
+                                  _updateUrl!,
+                                  onProgress: (p) => setState(() => _downloadProgress = p),
+                                );
+                                setState(() { _updateUrl = null; _downloadProgress = null; });
+                              },
+                              child: Text(AppLocalizations.of(context)!.updateButton),
+                            ),
+                            TextButton(
+                              onPressed: () => setState(() => _updateUrl = null),
+                              child: Text(AppLocalizations.of(context)!.updateDismiss),
+                            ),
+                          ],
+                  ),
+                Expanded(
+                  child: PageView(
+                    controller: _pageController,
+                    onPageChanged: (index) => setState(() => _currentIndex = index),
+                    physics: const BouncingScrollPhysics(),
+                    children: _screens,
+                  ),
+                ),
+              ],
+            ),
+            // Floating Mini Player (Glassmorphic)
+            Positioned(
+              left: 12, right: 12, bottom: 95,
+              child: Consumer<MusicPlayerProvider>(
+                builder: (context, player, child) {
+                  if (player.currentSong == null) return const SizedBox.shrink();
+                  return _buildMiniPlayer(player);
+                },
               ),
             ),
-            // Improved Mini Player
-            Consumer<MusicPlayerProvider>(
-              builder: (context, player, child) {
-                if (player.currentSong != null) {
-                  return GestureDetector(
-                    onTap: () => Navigator.push(
-                      context,
-                      PageRouteBuilder(
-                        pageBuilder: (context, animation, secondaryAnimation) => const PlayerScreen(),
-                        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                          return SlideTransition(
-                            position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero).animate(animation),
-                            child: child,
-                          );
-                        },
+            // Floating Glass Navigation Pill
+            Positioned(
+              left: 20, right: 20, bottom: 20,
+              child: _buildFloatingNavBar(theme),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFloatingNavBar(ThemeProvider theme) {
+    return Container(
+      height: 64,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(32),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 25, offset: const Offset(0, 10)),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(32),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+          child: Container(
+            color: Colors.white.withValues(alpha: 0.06),
+            child: Stack(
+              children: [
+                // Animated Sliding Indicator
+                AnimatedAlign(
+                  duration: const Duration(milliseconds: 400),
+                  curve: Curves.easeOutBack,
+                  alignment: Alignment(-1.0 + (_currentIndex * 1.0), 0.0),
+                  child: FractionallySizedBox(
+                    widthFactor: 1/3,
+                    child: Center(
+                      child: Container(
+                        width: 54, height: 44,
+                        decoration: BoxDecoration(
+                          color: theme.accentColor.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(22),
+                          border: Border.all(color: theme.accentColor.withValues(alpha: 0.1), width: 1),
+                        ),
                       ),
                     ),
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[900]?.withValues(alpha: 0.9),
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.5),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
+                  ),
+                ),
+                Positioned.fill(
+                  child: Row(
+                    children: [
+                      _navItem(0, Icons.home_rounded, Icons.home_outlined),
+                      _navItem(1, Icons.search_rounded, Icons.search_outlined),
+                      _navItem(2, Icons.library_music_rounded, Icons.library_music_outlined),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _navItem(int index, IconData activeIcon, IconData inactiveIcon) {
+    final isSelected = _currentIndex == index;
+    final color = isSelected ? Theme.of(context).primaryColor : Colors.white54;
+    
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => _jumpToPage(index),
+        behavior: HitTestBehavior.opaque,
+        child: Center(
+          child: Icon(isSelected ? activeIcon : inactiveIcon, color: color, size: 28),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMiniPlayer(MusicPlayerProvider player) {
+    final theme = Theme.of(context);
+    final song = player.currentSong!;
+    final progress = player.totalDuration.inSeconds > 0
+        ? (player.currentPosition.inSeconds / player.totalDuration.inSeconds).clamp(0.0, 1.0)
+        : 0.0;
+    
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) => const PlayerScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return SlideTransition(
+              position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
+                .chain(CurveTween(curve: Curves.easeOutQuart))
+                .animate(animation),
+              child: child,
+            );
+          },
+        ),
+      ),
+      onHorizontalDragEnd: (details) {
+        if (details.primaryVelocity == null) return;
+        if (details.primaryVelocity! < -300) {
+          HapticFeedback.mediumImpact();
+          player.nextSong();
+        } else if (details.primaryVelocity! > 300) {
+          HapticFeedback.mediumImpact();
+          player.previousSong();
+        }
+      },
+      child: Container(
+        height: 68,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 20, offset: const Offset(0, 5)),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+            child: Container(
+              color: Colors.white.withValues(alpha: 0.08),
+              child: Stack(
+                children: [
+                  // LIQUID PROGRESS FILL
+                  Positioned.fill(
+                    child: FractionallySizedBox(
+                      alignment: Alignment.centerLeft,
+                      widthFactor: progress,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              theme.primaryColor.withValues(alpha: 0.15),
+                              theme.primaryColor.withValues(alpha: 0.05),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
                           ),
-                        ],
+                        ),
                       ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              child: Row(
-                                children: [
-                                  Hero(
-                                    tag: 'player_art',
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: Image.network(
-                                        player.currentSong!.imageUrl,
-                                        width: 44, height: 44, fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) => Container(
-                                          width: 44, height: 44, color: Colors.grey[800],
-                                          child: const Icon(Icons.music_note, size: 24),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          player.currentSong!.title,
-                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        Text(
-                                          player.currentSong!.artist,
-                                          style: TextStyle(color: Colors.grey[400], fontSize: 12),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  IconButton(
-                                    icon: Icon(player.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded, size: 32),
-                                    onPressed: () => player.isPlaying ? player.pause() : player.resume(),
-                                  ),
-                                ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                    child: Row(
+                      children: [
+                        Hero(
+                          tag: 'player_art',
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.network(
+                              song.imageUrl,
+                              width: 44, height: 44, fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                width: 44, height: 44, color: Colors.grey[800],
+                                child: const Icon(Icons.music_note, size: 24),
                               ),
                             ),
-                            LinearProgressIndicator(
-                              value: player.totalDuration.inSeconds > 0
-                                  ? (player.currentPosition.inSeconds / player.totalDuration.inSeconds).clamp(0.0, 1.0)
-                                  : 0.0,
-                              backgroundColor: Colors.transparent,
-                              valueColor: AlwaysStoppedAnimation<Color>(Theme.of(context).primaryColor),
-                              minHeight: 2,
-                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                song.title,
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: -0.2),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Text(
+                                song.artist,
+                                style: TextStyle(color: Colors.white60, fontSize: 11, fontWeight: FontWeight.w500),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (player.isPlaying) 
+                          Padding(
+                            padding: const EdgeInsets.only(right: 12),
+                            child: MiniEqualizer(isPlaying: true, color: theme.primaryColor),
+                          ),
+                        IconButton(
+                          icon: Icon(player.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded, size: 34),
+                          onPressed: () {
+                            HapticFeedback.lightImpact();
+                            player.isPlaying ? player.pause() : player.resume();
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Progress line indicator at bottom
+                  Positioned(
+                    left: 0, right: 0, bottom: 0,
+                    child: FractionallySizedBox(
+                      alignment: Alignment.centerLeft,
+                      widthFactor: player.totalDuration.inSeconds > 0
+                          ? (player.currentPosition.inSeconds / player.totalDuration.inSeconds).clamp(0.0, 1.0)
+                          : 0.0,
+                      child: Container(
+                        height: 3,
+                        decoration: BoxDecoration(
+                          color: theme.primaryColor,
+                          boxShadow: [
+                            BoxShadow(color: theme.primaryColor.withValues(alpha: 0.6), blurRadius: 6),
                           ],
                         ),
                       ),
                     ),
-                  );
-                }
-                return const SizedBox.shrink();
-              },
+                  ),
+                ],
+              ),
             ),
-          ],
-        ),
-        bottomNavigationBar: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: (index) => setState(() => _currentIndex = index),
-          items: [
-            BottomNavigationBarItem(
-              icon: Icon(_currentIndex == 0 ? Icons.home_rounded : Icons.home_outlined),
-              label: AppLocalizations.of(context)!.navHome,
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(_currentIndex == 1 ? Icons.search_rounded : Icons.search_outlined),
-              label: AppLocalizations.of(context)!.navSearch,
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(_currentIndex == 2 ? Icons.library_music_rounded : Icons.library_music_outlined),
-              label: AppLocalizations.of(context)!.navLibrary,
-            ),
-          ],
+          ),
         ),
       ),
     );

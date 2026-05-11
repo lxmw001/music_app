@@ -1,11 +1,16 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
 import '../services/youtube_service.dart';
 import '../services/music_server_service.dart';
 import '../models/music_models.dart';
 import '../providers/music_player_provider.dart';
+import '../providers/theme_provider.dart';
 import '../widgets/song_list_tile.dart';
+import '../widgets/mesh_gradient.dart';
+import '../widgets/animated_list_item.dart';
 
 class SearchScreen extends StatefulWidget {
   final YouTubeService? youtubeService;
@@ -76,6 +81,8 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.watch<ThemeProvider>();
+    
     return PopScope(
       canPop: !_hasResults,
       onPopInvokedWithResult: (didPop, _) {
@@ -84,17 +91,22 @@ class _SearchScreenState extends State<SearchScreen> {
         }
       },
       child: Scaffold(
-        body: SafeArea(
-          child: Column(
-            children: [
-              _buildSearchBar(),
-              Expanded(
-                child: isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : _hasResults ? _buildResults() : _buildEmptyState(),
+        body: Stack(
+          children: [
+            MeshGradient(color: theme.accentColor),
+            SafeArea(
+              child: Column(
+                children: [
+                  _buildSearchBar(),
+                  Expanded(
+                    child: isLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : _hasResults ? _buildResults() : _buildEmptyState(),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -111,60 +123,74 @@ class _SearchScreenState extends State<SearchScreen> {
         },
         fieldViewBuilder: (ctx, controller, autoFocusNode, onSubmit) {
           _autoFocusNode = autoFocusNode;
-          return Container(
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: TextField(
-              controller: controller,
-              focusNode: autoFocusNode,
-              textAlignVertical: TextAlignVertical.center,
-              decoration: InputDecoration(
-                hintText: AppLocalizations.of(ctx)!.searchHint,
-                hintStyle: TextStyle(color: Colors.grey[500]),
-                border: InputBorder.none,
-                prefixIcon: const Icon(Icons.search_rounded, color: Colors.white70),
-                suffixIcon: controller.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.close_rounded, color: Colors.white70),
-                        onPressed: () {
-                          controller.clear();
-                          _searchController.clear();
-                          autoFocusNode.unfocus();
-                          setState(() { _result = const MusicSearchResult(); _currentQuery = ''; _activeFilter = null; });
-                        },
-                      )
-                    : null,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                ),
+                child: TextField(
+                  controller: controller,
+                  focusNode: autoFocusNode,
+                  textAlignVertical: TextAlignVertical.center,
+                  style: const TextStyle(fontSize: 16),
+                  decoration: InputDecoration(
+                    hintText: AppLocalizations.of(ctx)!.searchHint,
+                    hintStyle: TextStyle(color: Colors.white24, fontSize: 16),
+                    border: InputBorder.none,
+                    prefixIcon: const Icon(Icons.search_rounded, color: Colors.white70),
+                    suffixIcon: controller.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                            onPressed: () {
+                              controller.clear();
+                              _searchController.clear();
+                              autoFocusNode.unfocus();
+                              setState(() { _result = const MusicSearchResult(); _currentQuery = ''; _activeFilter = null; });
+                            },
+                          )
+                        : null,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  ),
+                  onSubmitted: (text) => _performSearch(text),
+                ),
               ),
-              onSubmitted: (text) => _performSearch(text),
             ),
           );
         },
         optionsViewBuilder: (ctx, onSelected, options) => Align(
           alignment: Alignment.topLeft,
-          child: Material(
-            elevation: 8,
-            color: Colors.grey[900],
-            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxHeight: 200, 
-                maxWidth: MediaQuery.of(context).size.width - 32,
-              ),
-              child: ListView.builder(
-                padding: EdgeInsets.zero,
-                shrinkWrap: true,
-                itemCount: options.length,
-                itemBuilder: (context, index) {
-                  final option = options.elementAt(index);
-                  return ListTile(
-                    leading: const Icon(Icons.history_rounded, size: 18, color: Colors.grey),
-                    title: Text(option, style: const TextStyle(fontSize: 14)),
-                    onTap: () => onSelected(option),
-                  );
-                },
+          child: Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Material(
+              elevation: 12,
+              color: Colors.black.withValues(alpha: 0.9),
+              borderRadius: BorderRadius.circular(16),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: 250, 
+                    maxWidth: MediaQuery.of(context).size.width - 32,
+                  ),
+                  child: ListView.builder(
+                    padding: EdgeInsets.zero,
+                    shrinkWrap: true,
+                    itemCount: options.length,
+                    itemBuilder: (context, index) {
+                      final option = options.elementAt(index);
+                      return ListTile(
+                        leading: const Icon(Icons.history_rounded, size: 20, color: Colors.white38),
+                        title: Text(option, style: const TextStyle(fontSize: 15)),
+                        onTap: () => onSelected(option),
+                      );
+                    },
+                  ),
+                ),
               ),
             ),
           ),
@@ -189,27 +215,31 @@ class _SearchScreenState extends State<SearchScreen> {
         children: [
           if (chips.length > 1)
             SizedBox(
-              height: 50,
+              height: 54,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 itemCount: chips.length,
                 itemBuilder: (context, i) {
                   final chip = chips[i];
                   final active = _activeFilter == chip.toLowerCase();
+                  final primary = Theme.of(context).primaryColor;
                   return Padding(
-                    padding: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.only(right: 10),
                     child: ChoiceChip(
                       label: Text(chip),
                       selected: active,
-                      onSelected: (_) => setState(() => _activeFilter = active ? null : chip.toLowerCase()),
-                      backgroundColor: Colors.transparent,
-                      selectedColor: Theme.of(context).primaryColor,
+                      onSelected: (selected) {
+                        HapticFeedback.selectionClick();
+                        setState(() => _activeFilter = active ? null : chip.toLowerCase());
+                      },
+                      backgroundColor: Colors.white.withValues(alpha: 0.05),
+                      selectedColor: primary.withValues(alpha: 0.15),
                       labelStyle: TextStyle(
-                        color: active ? Colors.black : Colors.white,
+                        color: active ? primary : Colors.white70,
                         fontWeight: active ? FontWeight.bold : FontWeight.normal,
                       ),
-                      shape: StadiumBorder(side: BorderSide(color: active ? Colors.transparent : Colors.grey[800]!)),
+                      shape: StadiumBorder(side: BorderSide(color: active ? primary : Colors.white10)),
                       showCheckmark: false,
                     ),
                   );
@@ -239,35 +269,37 @@ class _SearchScreenState extends State<SearchScreen> {
           children: [
             if (_result.songs.isNotEmpty) ...[
               _sectionHeader('Top Songs'),
-              ..._result.songs.take(3).map((s) => _songTile(s, loadingIds)),
+              for (var i = 0; i < _result.songs.length && i < 3; i++)
+                AnimatedListItem(index: i, child: _songTile(_result.songs[i], loadingIds)),
               if (_result.songs.length > 3)
                 _seeAllButton('Songs', () => setState(() => _activeFilter = 'songs')),
             ],
             if (_result.mixes.isNotEmpty) ...[
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
               _sectionHeader('Mixes'),
-              ..._result.mixes.take(3).map((s) => _songTile(s, loadingIds)),
+              for (var i = 0; i < _result.mixes.length && i < 3; i++)
+                AnimatedListItem(index: i, child: _songTile(_result.mixes[i], loadingIds)),
               if (_result.mixes.length > 3)
                 _seeAllButton('Mixes', () => setState(() => _activeFilter = 'mixes')),
             ],
-            const SizedBox(height: 100),
+            const SizedBox(height: 120),
           ],
         );
     }
   }
 
   Widget _songsList(List<Song> songs, Set<String> loadingIds, {bool showLoadMore = false}) {
-    if (songs.isEmpty) return const Center(child: Text('No results', style: TextStyle(color: Colors.grey)));
+    if (songs.isEmpty) return const Center(child: Text('No results found', style: TextStyle(color: Colors.white38)));
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       itemCount: songs.length + (showLoadMore ? 1 : 0) + 1,
       itemBuilder: (context, i) {
         if (i == songs.length) {
           if (showLoadMore) {
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              child: Center(
-                child: TextButton(
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: FilledButton.tonal(
                   onPressed: () async {
                     setState(() => isLoading = true);
                     final more = await _youtubeService.searchSongs(_currentQuery);
@@ -285,19 +317,22 @@ class _SearchScreenState extends State<SearchScreen> {
               ),
             );
           }
-          return const SizedBox(height: 100);
+          return const SizedBox(height: 120);
         }
-        return _songTile(songs[i], loadingIds);
+        return AnimatedListItem(index: i, child: _songTile(songs[i], loadingIds));
       },
     );
   }
 
   Widget _artistsList() {
-    if (_result.artists.isEmpty) return const Center(child: Text('No artists found', style: TextStyle(color: Colors.grey)));
+    if (_result.artists.isEmpty) return const Center(child: Text('No artists found', style: TextStyle(color: Colors.white38)));
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      itemCount: _result.artists.length,
-      itemBuilder: (context, i) => _artistTile(_result.artists[i]),
+      itemCount: _result.artists.length + 1,
+      itemBuilder: (context, i) {
+        if (i == _result.artists.length) return const SizedBox(height: 120);
+        return AnimatedListItem(index: i, child: _artistTile(_result.artists[i]));
+      },
     );
   }
 
@@ -309,18 +344,19 @@ class _SearchScreenState extends State<SearchScreen> {
   );
 
   Widget _artistTile(String a) => ListTile(
-    contentPadding: EdgeInsets.zero,
-    leading: CircleAvatar(
-      backgroundColor: Colors.grey[900],
-      child: Text(a[0].toUpperCase(), style: const TextStyle(color: Colors.white)),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+    leading: Container(
+      width: 52, height: 52,
+      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), shape: BoxShape.circle, border: Border.all(color: Colors.white10)),
+      child: Center(child: Text(a[0].toUpperCase(), style: const TextStyle(color: Colors.white70, fontSize: 18, fontWeight: FontWeight.bold))),
     ),
-    title: Text(a, style: const TextStyle(fontWeight: FontWeight.w500)),
+    title: Text(a, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
     onTap: () => _performSearch(a),
   );
 
   Widget _sectionHeader(String title) => Padding(
-    padding: const EdgeInsets.only(bottom: 8, top: 8),
-    child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+    padding: const EdgeInsets.fromLTRB(4, 16, 4, 12),
+    child: Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
   );
 
   Widget _seeAllButton(String label, VoidCallback onTap) => Align(
@@ -332,6 +368,8 @@ class _SearchScreenState extends State<SearchScreen> {
   );
 
   Widget _buildEmptyState() {
+    final theme = context.watch<ThemeProvider>();
+    
     return FutureBuilder<List<String>>(
       future: context.read<MusicPlayerProvider>().getSearchHistory(),
       builder: (context, snapshot) {
@@ -353,7 +391,7 @@ class _SearchScreenState extends State<SearchScreen> {
                           await context.read<MusicPlayerProvider>().clearSearchHistory();
                           setState(() {});
                         },
-                        child: Text('Clear', style: TextStyle(color: Colors.grey[400], fontSize: 13)),
+                        child: Text('Clear', style: TextStyle(color: Colors.white38, fontSize: 13)),
                       ),
                     ],
                   ),
@@ -367,11 +405,10 @@ class _SearchScreenState extends State<SearchScreen> {
                     itemBuilder: (context, i) => Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       child: ActionChip(
-                        label: Text(history[i], style: const TextStyle(fontSize: 13)),
-                        backgroundColor: Colors.grey[900],
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        side: BorderSide(color: Colors.grey[800]!),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        label: Text(history[i], style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                        backgroundColor: Colors.white.withValues(alpha: 0.05),
+                        side: const BorderSide(color: Colors.white10),
+                        shape: StadiumBorder(),
                         onPressed: () {
                           _searchController.text = history[i];
                           _performSearch(history[i]);
@@ -389,48 +426,8 @@ class _SearchScreenState extends State<SearchScreen> {
                   child: Text(AppLocalizations.of(context)!.searchPopular, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 ),
                 const SizedBox(height: 12),
-                ..._popularSuggestions.take(6).toList().asMap().entries.map((entry) {
-                  final index = entry.key + 1;
-                  final query = entry.value;
-                  return InkWell(
-                    onTap: () {
-                      _searchController.text = query;
-                      _performSearch(query);
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 32,
-                            height: 32,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: index == 1 ? Theme.of(context).primaryColor.withValues(alpha: 0.15) : Colors.grey[900],
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text('$index', 
-                              style: TextStyle(
-                                color: index == 1 ? Theme.of(context).primaryColor : Colors.grey[400], 
-                                fontWeight: FontWeight.bold, 
-                                fontSize: 15
-                              )
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Text(query, style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 16)),
-                          ),
-                          Icon(
-                            Icons.trending_up_rounded, 
-                            size: 20, 
-                            color: index <= 3 ? Theme.of(context).primaryColor.withValues(alpha: 0.5) : Colors.grey[800]
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }),
+                for (var i = 0; i < _popularSuggestions.length && i < 6; i++)
+                  _buildTrendingItem(i + 1, _popularSuggestions[i], theme.accentColor),
                 const SizedBox(height: 24),
               ],
               
@@ -443,11 +440,52 @@ class _SearchScreenState extends State<SearchScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: _buildGenreGrid(),
               ),
-              const SizedBox(height: 100),
+              const SizedBox(height: 150),
             ],
           ),
         );
       }
+    );
+  }
+
+  Widget _buildTrendingItem(int index, String query, Color accentColor) {
+    return InkWell(
+      onTap: () {
+        _searchController.text = query;
+        _performSearch(query);
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: index == 1 ? accentColor.withValues(alpha: 0.15) : Colors.white.withValues(alpha: 0.03),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text('$index', 
+                style: TextStyle(
+                  color: index == 1 ? accentColor : Colors.white38, 
+                  fontWeight: FontWeight.bold, 
+                  fontSize: 15
+                )
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(query, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            ),
+            Icon(
+              Icons.trending_up_rounded, 
+              size: 20, 
+              color: index <= 3 ? accentColor.withValues(alpha: 0.4) : Colors.white10
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -458,16 +496,6 @@ class _SearchScreenState extends State<SearchScreen> {
       Icons.piano_rounded, Icons.queue_music_rounded, Icons.graphic_eq_rounded,
       Icons.album_rounded, Icons.mic_rounded,
     ];
-    final gradients = [
-      [const Color(0xFFE91E63), const Color(0xFF880E4F)],
-      [const Color(0xFF3F51B5), const Color(0xFF1A237E)],
-      [const Color(0xFF9C27B0), const Color(0xFF4A148C)],
-      [const Color(0xFF009688), const Color(0xFF004D40)],
-      [const Color(0xFF795548), const Color(0xFF3E2723)],
-      [const Color(0xFF00BCD4), const Color(0xFF006064)],
-      [const Color(0xFF8BC34A), const Color(0xFF33691E)],
-      [const Color(0xFFFF9800), const Color(0xFFE65100)],
-    ];
 
     return GridView.builder(
       shrinkWrap: true,
@@ -475,27 +503,25 @@ class _SearchScreenState extends State<SearchScreen> {
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2, 
         childAspectRatio: 1.8,
-        crossAxisSpacing: 12, 
-        mainAxisSpacing: 12,
+        crossAxisSpacing: 14, 
+        mainAxisSpacing: 14,
       ),
       itemCount: 8,
       itemBuilder: (context, index) {
+        final colors = [Colors.primaries[index % Colors.primaries.length], Colors.primaries[(index+3) % Colors.primaries.length]];
         return GestureDetector(
           onTap: () => _performSearch(genres[index]),
           child: Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: gradients[index], 
+                colors: [colors[0].withValues(alpha: 0.7), colors[1].withValues(alpha: 0.3)], 
                 begin: Alignment.topLeft, 
                 end: Alignment.bottomRight,
               ),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white10),
               boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.3),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
+                BoxShadow(color: Colors.black26, blurRadius: 8, offset: const Offset(0, 4)),
               ],
             ),
             padding: const EdgeInsets.all(16),
@@ -503,7 +529,7 @@ class _SearchScreenState extends State<SearchScreen> {
               children: [
                 Text(
                   genres[index], 
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -0.5),
                 ),
                 Positioned(
                   right: -10,
@@ -512,7 +538,7 @@ class _SearchScreenState extends State<SearchScreen> {
                     angle: 0.3,
                     child: Icon(
                       icons[index], 
-                      size: 48, 
+                      size: 56, 
                       color: Colors.white.withValues(alpha: 0.2),
                     ),
                   ),

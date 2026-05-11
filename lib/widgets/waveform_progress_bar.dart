@@ -1,11 +1,13 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class WaveformProgressBar extends StatefulWidget {
-  final double progress; // 0.0 to 1.0
+  final double progress; 
   final bool isPlaying;
   final ValueChanged<double>? onSeek;
   final Color color;
+  final String songId;
 
   const WaveformProgressBar({
     super.key,
@@ -13,6 +15,7 @@ class WaveformProgressBar extends StatefulWidget {
     required this.isPlaying,
     this.onSeek,
     required this.color,
+    required this.songId,
   });
 
   @override
@@ -21,22 +24,31 @@ class WaveformProgressBar extends StatefulWidget {
 
 class _WaveformProgressBarState extends State<WaveformProgressBar> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
+  late List<double> _baseHeights;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 2),
+      duration: const Duration(seconds: 15), // Slow, cinematic cycle
     );
-    if (widget.isPlaying) {
-      _controller.repeat();
-    }
+    _generateWaveform();
+    if (widget.isPlaying) _controller.repeat();
+  }
+
+  void _generateWaveform() {
+    final random = Random(widget.songId.hashCode);
+    // 55 bars for a high-density "Elite" resolution
+    _baseHeights = List.generate(55, (_) => 0.2 + random.nextDouble() * 0.6);
   }
 
   @override
   void didUpdateWidget(WaveformProgressBar oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.songId != oldWidget.songId) {
+      _generateWaveform();
+    }
     if (widget.isPlaying != oldWidget.isPlaying) {
       if (widget.isPlaying) {
         _controller.repeat();
@@ -57,14 +69,14 @@ class _WaveformProgressBarState extends State<WaveformProgressBar> with SingleTi
     return GestureDetector(
       onHorizontalDragUpdate: (details) {
         final box = context.findRenderObject() as RenderBox;
-        final x = details.localPosition.dx;
-        final p = (x / box.size.width).clamp(0.0, 1.0);
+        final p = (details.localPosition.dx / box.size.width).clamp(0.0, 1.0);
+        if ((p - widget.progress).abs() > 0.05) HapticFeedback.selectionClick();
         widget.onSeek?.call(p);
       },
       onTapDown: (details) {
         final box = context.findRenderObject() as RenderBox;
-        final x = details.localPosition.dx;
-        final p = (x / box.size.width).clamp(0.0, 1.0);
+        final p = (details.localPosition.dx / box.size.width).clamp(0.0, 1.0);
+        HapticFeedback.lightImpact();
         widget.onSeek?.call(p);
       },
       child: AnimatedBuilder(
@@ -73,13 +85,15 @@ class _WaveformProgressBarState extends State<WaveformProgressBar> with SingleTi
           return Container(
             height: 60,
             width: double.infinity,
-            color: Colors.transparent,
+            padding: const EdgeInsets.symmetric(vertical: 8),
             child: CustomPaint(
               painter: _WaveformPainter(
                 progress: widget.progress,
                 color: widget.color,
+                heights: _baseHeights,
+                // Loop t ensure bit-identical start/end states by sampling a 2D circle
+                t: _controller.value,
                 isPlaying: widget.isPlaying,
-                animationValue: _controller.value,
               ),
             ),
           );
@@ -92,14 +106,16 @@ class _WaveformProgressBarState extends State<WaveformProgressBar> with SingleTi
 class _WaveformPainter extends CustomPainter {
   final double progress;
   final Color color;
+  final List<double> heights;
+  final double t; 
   final bool isPlaying;
-  final double animationValue;
 
   _WaveformPainter({
     required this.progress,
     required this.color,
+    required this.heights,
+    required this.t,
     required this.isPlaying,
-    required this.animationValue,
   });
 
   @override
@@ -108,42 +124,101 @@ class _WaveformPainter extends CustomPainter {
       ..style = PaintingStyle.fill
       ..strokeCap = StrokeCap.round;
 
-    const barWidth = 3.0;
-    const gap = 2.0;
-    final count = (size.width / (barWidth + gap)).floor();
+    final count = heights.length;
+    final spacing = size.width / count;
+    final barWidth = spacing * 0.55;
+
+    // We use "Circular Sampling" to guarantee perfect seamless loops.
+    // nx and ny rotate on a 2D circle as t goes 0 -> 1.
+    final nx = cos(t * 2 * pi);
+    final ny = sin(t * 2 * pi);
 
     for (int i = 0; i < count; i++) {
-      final x = i * (barWidth + gap);
+      final x = i * spacing + spacing / 2;
       final normalizedX = i / count;
       
-      // Dynamic height factor
-      double heightFactor = 0.2 + 
-          0.3 * sin(i * 0.2 + animationValue * 2 * pi) + 
-          0.2 * cos(i * 0.5 - animationValue * pi);
+      double h = heights[i];
       
-      heightFactor = heightFactor.clamp(0.1, 1.0);
-      final barHeight = size.height * heightFactor;
-      
-      paint.color = normalizedX <= progress 
-          ? color 
-          : color.withValues(alpha: 0.2);
+      if (isPlaying) {
+        // LIQUID DYNAMICS
+        // Sample overlapping harmonic waves keyed to the circular path (nx, ny)
+        final phase = i * 0.2;
+        final wave = 0.15 * (sin(phase + nx * 1.5) + cos(phase * 0.5 + ny * 2.0));
+        h = (h + wave).clamp(0.12, 1.0);
+      }
 
+      final isPlayed = normalizedX <= progress;
+      final barHeight = size.height * h;
+
+      // Track (Background)
+      paint.color = color.withValues(alpha: 0.12);
       canvas.drawRRect(
         RRect.fromRectAndRadius(
-          Rect.fromCenter(
-            center: Offset(x + barWidth / 2, size.height / 2),
-            width: barWidth,
-            height: barHeight,
-          ),
+          Rect.fromCenter(center: Offset(x, size.height / 2), width: barWidth, height: size.height * 0.7),
           const Radius.circular(2),
         ),
         paint,
       );
+
+      // Played track (Foreground)
+      if (isPlayed) {
+        // Vertical glow gradient on bars
+        final barRect = Rect.fromCenter(center: Offset(x, size.height / 2), width: barWidth, height: barHeight);
+        paint.shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [color.withValues(alpha: 0.75), color, color.withValues(alpha: 0.75)],
+        ).createShader(barRect);
+
+        canvas.drawRRect(RRect.fromRectAndRadius(barRect, const Radius.circular(3)), paint);
+        paint.shader = null;
+
+        // Subtle reflection for glass-floor look
+        final reflectionPaint = Paint()
+          ..shader = LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [color.withValues(alpha: 0.2), Colors.transparent],
+          ).createShader(Rect.fromLTWH(x - barWidth/2, size.height * 0.8, barWidth, size.height * 0.2));
+        
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromLTWH(x - barWidth/2, size.height * 0.8, barWidth, barHeight * 0.2),
+            const Radius.circular(1),
+          ),
+          reflectionPaint,
+        );
+      }
     }
+
+    // THE LASER PLAYHEAD
+    final playheadX = progress * size.width;
+    
+    // Playhead Glow Bloom
+    final bloomPaint = Paint()
+      ..color = color.withValues(alpha: 0.4)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 16);
+    canvas.drawCircle(Offset(playheadX, size.height / 2), 16, bloomPaint);
+
+    // Playhead Laser Vertical Line
+    final laserPaint = Paint()
+      ..color = Colors.white
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: Offset(playheadX, size.height / 2), width: 2.2, height: size.height + 14),
+        const Radius.circular(1.1),
+      ),
+      laserPaint,
+    );
+    
+    // Solid Core
+    paint.shader = null;
+    paint.color = Colors.white;
+    canvas.drawCircle(Offset(playheadX, size.height / 2), 3.5, paint);
   }
 
   @override
-  bool shouldRepaint(_WaveformPainter oldDelegate) {
-    return true; // Re-paint on every animation frame
-  }
+  bool shouldRepaint(_WaveformPainter oldDelegate) => 
+      isPlaying || oldDelegate.progress != progress;
 }
