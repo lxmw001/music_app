@@ -243,6 +243,15 @@ class PlayHistoryService {
     await p.setString(_searchHistoryKey, jsonEncode(searches.take(50).toList()));
   }
 
+  Future<void> deleteSearch(String query) async {
+    final p = await _prefs;
+    final raw = p.getString(_searchHistoryKey);
+    if (raw == null) return;
+    final searches = List<String>.from(jsonDecode(raw));
+    searches.remove(query);
+    await p.setString(_searchHistoryKey, jsonEncode(searches));
+  }
+
   Future<List<String>> getSearchHistory() async {
     final p = await _prefs;
     final raw = p.getString(_searchHistoryKey);

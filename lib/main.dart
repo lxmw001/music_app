@@ -176,6 +176,9 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _jumpToPage(int index) {
+    if (_currentIndex != index) {
+      FocusScope.of(context).unfocus();
+    }
     HapticFeedback.selectionClick();
     _pageController.animateToPage(
       index,
@@ -240,7 +243,10 @@ class _MainScreenState extends State<MainScreen> {
                 Expanded(
                   child: PageView(
                     controller: _pageController,
-                    onPageChanged: (index) => setState(() => _currentIndex = index),
+                    onPageChanged: (index) {
+                      FocusScope.of(context).unfocus();
+                      setState(() => _currentIndex = index);
+                    },
                     physics: const BouncingScrollPhysics(),
                     children: _screens,
                   ),

@@ -28,9 +28,11 @@ class _SearchScreenState extends State<SearchScreen> {
 
   MusicSearchResult _result = const MusicSearchResult();
   List<String> _popularSuggestions = [];
+  List<String> _history = [];
   bool isLoading = false;
   String _currentQuery = '';
   String? _activeFilter; 
+  bool _showRecentAndPopular = false;
 
   bool get _hasResults => !_result.isEmpty;
 
@@ -41,6 +43,17 @@ class _SearchScreenState extends State<SearchScreen> {
     _serverService.getSearchSuggestions().then((s) {
       if (mounted) setState(() => _popularSuggestions = s);
     });
+    _focusNode.addListener(() {
+      if (mounted) {
+        // Reset suggestions flag if we lose focus entirely
+        if (!_focusNode.hasFocus) {
+          setState(() => _showRecentAndPopular = false);
+        } else {
+          setState(() {});
+        }
+      }
+    });
+    _updateHistory();
   }
 
   @override
@@ -51,15 +64,22 @@ class _SearchScreenState extends State<SearchScreen> {
     super.dispose();
   }
 
-  FocusNode? _autoFocusNode;
+  Future<void> _updateHistory() async {
+    final history = await context.read<MusicPlayerProvider>().getSearchHistory();
+    if (mounted) setState(() => _history = history);
+  }
 
   Future<void> _performSearch(String query) async {
     if (query.isEmpty) {
-      setState(() { _result = const MusicSearchResult(); _activeFilter = null; });
+      _resetSearch();
       return;
     }
-    _autoFocusNode?.unfocus();
-    setState(() { isLoading = true; _activeFilter = null; });
+    _focusNode.unfocus();
+    setState(() { 
+      isLoading = true; 
+      _activeFilter = null; 
+      _showRecentAndPopular = false;
+    });
     final result = await _youtubeService.searchSongs(query);
     setState(() { 
       _result = result; 
@@ -67,27 +87,42 @@ class _SearchScreenState extends State<SearchScreen> {
       _currentQuery = query; 
       _activeFilter = 'songs'; 
     });
-    if (mounted) context.read<MusicPlayerProvider>().saveSearch(query);
+    if (mounted) {
+      await context.read<MusicPlayerProvider>().saveSearch(query);
+      _updateHistory();
+    }
   }
 
-  List<String> _matchingSuggestions(String input) {
-    if (input.isEmpty || _popularSuggestions.isEmpty) return [];
+  void _resetSearch() {
+    _searchController.clear();
+    _focusNode.unfocus();
+    setState(() { 
+      _result = const MusicSearchResult(); 
+      _currentQuery = ''; 
+      _activeFilter = null; 
+      _showRecentAndPopular = false;
+    });
+  }
+
+  Iterable<String> _matchingSuggestions(String input) {
+    if (input.isEmpty) return const Iterable<String>.empty();
     final lower = input.toLowerCase();
-    return _popularSuggestions
-        .where((s) => s.toLowerCase().contains(lower))
-        .take(5)
-        .toList();
+    final historyMatches = _history.where((s) => s.toLowerCase().contains(lower));
+    final popularMatches = _popularSuggestions.where((s) => s.toLowerCase().contains(lower));
+    return {...historyMatches, ...popularMatches}.take(10);
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>();
+    // Show history/popular ONLY if focused AND text is empty AND specifically tapped
+    final isSearching = _showRecentAndPopular && _focusNode.hasFocus && _searchController.text.isEmpty;
     
     return PopScope(
       canPop: !_hasResults,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop && _hasResults) {
-          setState(() { _result = const MusicSearchResult(); _activeFilter = null; });
+          _resetSearch();
         }
       },
       child: Scaffold(
@@ -101,7 +136,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   Expanded(
                     child: isLoading
                         ? const Center(child: CircularProgressIndicator())
-                        : _hasResults ? _buildResults() : _buildEmptyState(),
+                        : (isSearching || !_hasResults) ? _buildEmptyState(isSearching) : _buildResults(),
                   ),
                 ],
               ),
@@ -115,14 +150,15 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget _buildSearchBar() {
     return Padding(
       padding: const EdgeInsets.all(16.0),
-      child: Autocomplete<String>(
+      child: RawAutocomplete<String>(
+        focusNode: _focusNode,
+        textEditingController: _searchController,
         optionsBuilder: (v) => _matchingSuggestions(v.text),
         onSelected: (s) { 
           _searchController.text = s; 
           _performSearch(s); 
         },
-        fieldViewBuilder: (ctx, controller, autoFocusNode, onSubmit) {
-          _autoFocusNode = autoFocusNode;
+        fieldViewBuilder: (ctx, controller, focusNode, onSubmit) {
           return ClipRRect(
             borderRadius: BorderRadius.circular(16),
             child: BackdropFilter(
@@ -135,23 +171,22 @@ class _SearchScreenState extends State<SearchScreen> {
                 ),
                 child: TextField(
                   controller: controller,
-                  focusNode: autoFocusNode,
+                  focusNode: focusNode,
                   textAlignVertical: TextAlignVertical.center,
                   style: const TextStyle(fontSize: 16),
+                  onTap: () {
+                    // This flag ensures we only show suggestions after an explicit tap
+                    setState(() => _showRecentAndPopular = true);
+                  },
                   decoration: InputDecoration(
                     hintText: AppLocalizations.of(ctx)!.searchHint,
-                    hintStyle: TextStyle(color: Colors.white24, fontSize: 16),
+                    hintStyle: const TextStyle(color: Colors.white24, fontSize: 16),
                     border: InputBorder.none,
                     prefixIcon: const Icon(Icons.search_rounded, color: Colors.white70),
                     suffixIcon: controller.text.isNotEmpty
                         ? IconButton(
                             icon: const Icon(Icons.close_rounded, color: Colors.white70),
-                            onPressed: () {
-                              controller.clear();
-                              _searchController.clear();
-                              autoFocusNode.unfocus();
-                              setState(() { _result = const MusicSearchResult(); _currentQuery = ''; _activeFilter = null; });
-                            },
+                            onPressed: _resetSearch,
                           )
                         : null,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -183,8 +218,13 @@ class _SearchScreenState extends State<SearchScreen> {
                     itemCount: options.length,
                     itemBuilder: (context, index) {
                       final option = options.elementAt(index);
+                      final isHistory = _history.contains(option);
                       return ListTile(
-                        leading: const Icon(Icons.history_rounded, size: 20, color: Colors.white38),
+                        leading: Icon(
+                          isHistory ? Icons.history_rounded : Icons.trending_up_rounded, 
+                          size: 20, 
+                          color: Colors.white38
+                        ),
                         title: Text(option, style: const TextStyle(fontSize: 15)),
                         onTap: () => onSelected(option),
                       );
@@ -367,125 +407,169 @@ class _SearchScreenState extends State<SearchScreen> {
     ),
   );
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(bool isSearching) {
     final theme = context.watch<ThemeProvider>();
+    final player = context.read<MusicPlayerProvider>();
+    final history = _history;
     
-    return FutureBuilder<List<String>>(
-      future: context.read<MusicPlayerProvider>().getSearchHistory(),
-      builder: (context, snapshot) {
-        final history = snapshot.data ?? [];
-        return SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (history.isNotEmpty) ...[
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Recent searches', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      TextButton(
-                        onPressed: () async {
-                          await context.read<MusicPlayerProvider>().clearSearchHistory();
-                          setState(() {});
-                        },
-                        child: Text('Clear', style: TextStyle(color: Colors.white38, fontSize: 13)),
-                      ),
-                    ],
+    return ListView(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      physics: const BouncingScrollPhysics(),
+      children: [
+        if (isSearching) ...[
+          if (history.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Recent Searches', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
+                  GestureDetector(
+                    onTap: () async {
+                      HapticFeedback.mediumImpact();
+                      await player.clearSearchHistory();
+                      _updateHistory();
+                    },
+                    child: Text('Clear All', style: TextStyle(color: theme.accentColor, fontSize: 13, fontWeight: FontWeight.bold)),
                   ),
-                ),
-                SizedBox(
-                  height: 40,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    itemCount: history.length,
-                    itemBuilder: (context, i) => Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: ActionChip(
-                        label: Text(history[i], style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                        backgroundColor: Colors.white.withValues(alpha: 0.05),
-                        side: const BorderSide(color: Colors.white10),
-                        shape: StadiumBorder(),
-                        onPressed: () {
-                          _searchController.text = history[i];
-                          _performSearch(history[i]);
-                        },
+                ],
+              ),
+            ),
+            SizedBox(
+              height: 44,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: history.length,
+                itemBuilder: (context, i) {
+                  final query = history[i];
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 10),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(22),
+                        border: Border.all(color: Colors.white10),
                       ),
+                      child: InkWell(
+                        onTap: () {
+                          _searchController.text = query;
+                          _performSearch(query);
+                        },
+                        borderRadius: BorderRadius.circular(22),
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(14, 0, 8, 0),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.history_rounded, size: 16, color: Colors.white38),
+                              const SizedBox(width: 8),
+                              Text(query, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                              const SizedBox(width: 4),
+                              IconButton(
+                                icon: const Icon(Icons.close_rounded, size: 14, color: Colors.white38),
+                                onPressed: () async {
+                                  HapticFeedback.lightImpact();
+                                  await player.deleteSearch(query);
+                                  _updateHistory();
+                                },
+                                constraints: const BoxConstraints(),
+                                padding: const EdgeInsets.all(4),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 32),
+          ],
+          
+          if (_popularSuggestions.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              child: Text(AppLocalizations.of(context)!.searchPopular, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
+            ),
+            ...List.generate(_popularSuggestions.length > 6 ? 6 : _popularSuggestions.length, (index) {
+              final query = _popularSuggestions[index];
+              final rank = index + 1;
+              final isTop3 = rank <= 3;
+              
+              return AnimatedListItem(
+                index: index,
+                child: InkWell(
+                  onTap: () {
+                    _searchController.text = query;
+                    _performSearch(query);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            gradient: isTop3 ? LinearGradient(
+                              colors: [theme.accentColor, theme.accentColor.withValues(alpha: 0.6)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ) : null,
+                            color: isTop3 ? null : Colors.white.withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: isTop3 ? [
+                              BoxShadow(color: theme.accentColor.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 4))
+                            ] : null,
+                          ),
+                          child: Text('$rank', 
+                            style: TextStyle(
+                              color: isTop3 ? Colors.black : Colors.white54, 
+                              fontWeight: FontWeight.w900, 
+                              fontSize: 16
+                            )
+                          ),
+                        ),
+                        const SizedBox(width: 18),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(query, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: -0.2)),
+                              if (isTop3)
+                                Text('Trending #$rank', style: TextStyle(color: theme.accentColor.withValues(alpha: 0.7), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.0)),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          Icons.trending_up_rounded, 
+                          size: 22, 
+                          color: isTop3 ? theme.accentColor : Colors.white10
+                        ),
+                      ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 24),
-              ],
-              
-              if (_popularSuggestions.isNotEmpty) ...[
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Text(AppLocalizations.of(context)!.searchPopular, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                ),
-                const SizedBox(height: 12),
-                for (var i = 0; i < _popularSuggestions.length && i < 6; i++)
-                  _buildTrendingItem(i + 1, _popularSuggestions[i], theme.accentColor),
-                const SizedBox(height: 24),
-              ],
-              
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text(AppLocalizations.of(context)!.searchBrowseGenre, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              ),
-              const SizedBox(height: 16),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: _buildGenreGrid(),
-              ),
-              const SizedBox(height: 150),
-            ],
-          ),
-        );
-      }
-    );
-  }
-
-  Widget _buildTrendingItem(int index, String query, Color accentColor) {
-    return InkWell(
-      onTap: () {
-        _searchController.text = query;
-        _performSearch(query);
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: index == 1 ? accentColor.withValues(alpha: 0.15) : Colors.white.withValues(alpha: 0.03),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text('$index', 
-                style: TextStyle(
-                  color: index == 1 ? accentColor : Colors.white38, 
-                  fontWeight: FontWeight.bold, 
-                  fontSize: 15
-                )
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Text(query, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            ),
-            Icon(
-              Icons.trending_up_rounded, 
-              size: 20, 
-              color: index <= 3 ? accentColor.withValues(alpha: 0.4) : Colors.white10
-            ),
+              );
+            }),
+            const SizedBox(height: 32),
           ],
+        ],
+        
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          child: Text(AppLocalizations.of(context)!.searchBrowseGenre, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
         ),
-      ),
+        const SizedBox(height: 16),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: _buildGenreGrid(),
+        ),
+        const SizedBox(height: 150),
+      ],
     );
   }
 

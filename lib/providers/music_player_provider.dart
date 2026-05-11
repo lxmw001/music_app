@@ -52,6 +52,7 @@ abstract class MusicPlayerProvider extends ChangeNotifier {
   Future<void> toggleLike(Song song);
   Future<List<({Song song, int likedCount, int playCount})>> getMostLiked(List<Song> knownSongs);
   Future<void> saveSearch(String query);
+  Future<void> deleteSearch(String query);
   Future<List<String>> getSearchHistory();
   Future<void> clearSearchHistory();
   Future<List<Playlist>> loadPlaylists();
@@ -681,8 +682,17 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       _historyService.getMostLiked(knownSongs);
 
   @override
-  Future<void> saveSearch(String query) => _historyService.saveSearch(query);
+  Future<void> saveSearch(String query) async {
+    await _historyService.saveSearch(query);
+    notifyListeners();
+  }
   
+  @override
+  Future<void> deleteSearch(String query) async {
+    await _historyService.deleteSearch(query);
+    notifyListeners();
+  }
+
   @override
   Future<List<String>> getSearchHistory() => _historyService.getSearchHistory();
 
