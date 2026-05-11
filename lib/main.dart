@@ -16,8 +16,10 @@ import 'screens/search_screen.dart';
 import 'screens/library_screen.dart';
 import 'screens/player_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/onboarding_screen.dart';
 import 'services/youtube_service.dart';
 import 'services/update_service.dart';
+import 'services/profile_service.dart';
 import 'widgets/youtube_login_webview.dart';
 import 'widgets/mini_equalizer.dart';
 import 'widgets/mesh_gradient.dart';
@@ -92,9 +94,47 @@ class MyApp extends StatelessWidget {
             Locale('es'),
           ],
           theme: theme.getThemeData(),
-          home: const MainScreen(),
+          initialRoute: '/',
+          routes: {
+            '/': (context) => const Initializer(),
+            '/home': (context) => const MainScreen(),
+            '/onboarding': (context) => const OnboardingScreen(),
+          },
         );
       },
+    );
+  }
+}
+
+class Initializer extends StatefulWidget {
+  const Initializer({super.key});
+
+  @override
+  State<Initializer> createState() => _InitializerState();
+}
+
+class _InitializerState extends State<Initializer> {
+  @override
+  void initState() {
+    super.initState();
+    _checkOnboarding();
+  }
+
+  Future<void> _checkOnboarding() async {
+    final onboarded = await ProfileService().isOnboarded();
+    if (mounted) {
+      if (onboarded) {
+        Navigator.of(context).pushReplacementNamed('/home');
+      } else {
+        Navigator.of(context).pushReplacementNamed('/onboarding');
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(child: CircularProgressIndicator()),
     );
   }
 }

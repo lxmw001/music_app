@@ -5,12 +5,15 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:palette_generator/palette_generator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/music_models.dart';
+import '../models/user_profile.dart';
 import '../services/audio_handler.dart';
 import '../services/youtube_service.dart';
 import '../services/play_history_service.dart';
 import '../services/lastfm_service.dart';
 import '../services/download_service.dart';
 import '../services/youtube_service.dart' show YouTubeService, YouTubeRateLimitException;
+import '../services/music_server_service.dart';
+import '../services/profile_service.dart';
 import '../utils/logger.dart';
 import 'auth_provider.dart';
 import 'theme_provider.dart';
@@ -26,6 +29,7 @@ abstract class MusicPlayerProvider extends ChangeNotifier {
   bool get isFetchingSuggestions;
   List<Song> get suggestedSongs;
   Color? get dominantColor;
+  UserProfile? get userProfile;
   bool isLoadingAudio(String songId);
   void prefetchAudioUrls(List<Song> songs);
   bool get isPlaying;
@@ -34,6 +38,7 @@ abstract class MusicPlayerProvider extends ChangeNotifier {
   Stream<Duration> get positionStream;
 
   Future<void> playSong(Song song, {List<Song>? queue, Duration? seekTo, bool fromQueue = false, String? searchQuery});
+  Future<void> playFastMode({required String vibeId, String? subCategoryId});
   Future<void> pause();
   Future<void> resume();
   Future<void> stop();
@@ -88,6 +93,9 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   bool _isSwitchingSong = false;
   void Function(String title)? _onStreamError;
   void setOnStreamError(void Function(String title) cb) => _onStreamError = cb;
+
+  final MusicServerService _serverService = MusicServerService();
+  final ProfileService _profileService = ProfileService();
   Timer? _positionSaveTimer;
   Timer? _stallTimer;
   bool _isRecoveringFromStall = false;
@@ -110,6 +118,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   bool isLoadingAudio(String songId) => _loadingAudioIds.contains(songId);
   bool _isFetchingSuggestions = false;
   List<Song> _suggestedSongs = [];
+  UserProfile? _userProfile;
 
   Song? _pendingSong;
   List<Song>? _pendingQueue;
@@ -132,6 +141,8 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   bool get isFetchingSuggestions => _isFetchingSuggestions;
   @override
   List<Song> get suggestedSongs => _suggestedSongs;
+  @override
+  UserProfile? get userProfile => _userProfile;
 
   @override
   bool get isPlaying => _isInitialized ? _audioHandler.playbackState.value.playing : false;
@@ -166,6 +177,8 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     rlog('[MusicPlayerProvider] AudioService.init complete');
 
     final savedQueue = await _historyService.loadQueue();
+    final lastSongData = await _historyService.loadLastSong();
+    _userProfile = await _profileService.getProfile();
 
     _isInitialized = true;
     if (_pendingSong == null) {
@@ -478,6 +491,36 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       }
     }
   }
+
+  @override
+  Future<void> playFastMode({required String vibeId, String? subCategoryId}) async {
+    if (_userProfile == null) {
+      _userProfile = await _profileService.getProfile();
+    }
+
+    // Check for premium status if needed (implement based on your claims logic)
+    // if (!_userProfile!.isPremium) { ... }
+
+    print('[MusicPlayerProvider] playFastMode: $vibeId / $subCategoryId');
+
+    // Show a loading state if possible, or just start fetching
+    final songs = await _serverService.fetchAIVibe(
+      vibeId: vibeId,
+      subCategoryId: subCategoryId,
+      profile: _userProfile!,
+    );
+
+    if (songs.isNotEmpty) {
+      _queue = songs;
+      _currentIndex = 0;
+      notifyListeners();
+      await playSong(songs.first, queue: songs, fromQueue: true);
+    } else {
+      print('[MusicPlayerProvider] AI Vibe returned no songs');
+      // Maybe show a snackbar error
+    }
+  }
+
   bool _isSeeding = false;
   int _consecutiveSkips = 0;
 

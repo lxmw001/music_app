@@ -13,6 +13,7 @@ import '../widgets/song_card_list.dart';
 import '../widgets/recent_songs_grid.dart';
 import '../widgets/shimmer.dart';
 import '../widgets/animated_list_item.dart';
+import '../widgets/fast_mode_section.dart';
 import 'login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -157,6 +158,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 delegate: SliverChildListDelegate([
                   const SizedBox(height: 24),
                   
+                  // 0. FAST MODE
+                  const FastModeSection(),
+
+                  const SizedBox(height: 24),
+
                   // 1. MOOD / VIBE PICKER
                   _buildSectionHeader('Your Vibe'),
                   const SizedBox(height: 16),

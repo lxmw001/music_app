@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/music_models.dart';
+import '../models/user_profile.dart';
 
 class MusicServerService {
   static const _base = 'https://music-app-server-lupbg4y2ha-uc.a.run.app';
@@ -133,6 +134,57 @@ class MusicServerService {
     } catch (e) {
       print('[MusicServer] generate-playlist error: $e');
       return [];
+    }
+  }
+
+  // ── AI Vibes (Fast Mode) ───────────────────────────────────────────────────
+
+  Future<List<Song>> fetchAIVibe({
+    required String vibeId,
+    String? subCategoryId,
+    required UserProfile profile,
+  }) async {
+    final now = DateTime.now();
+    final payload = {
+      'vibeId': vibeId,
+      'subCategoryId': subCategoryId,
+      'birthYear': profile.birthYear,
+      'genres': profile.favoriteGenres,
+      'localTime': now.toIso8601String(),
+      'dayOfWeek': _getDayName(now.weekday),
+    };
+
+    final uri = Uri.parse('$_base/vibe/generate');
+    print('[MusicServer] POST $uri with payload: $payload');
+    try {
+      final response = await _client.post(
+        uri,
+        headers: _authHeaders,
+        body: jsonEncode(payload),
+      ).timeout(const Duration(seconds: 45));
+
+      print('[MusicServer] AI Vibe status: ${response.statusCode}');
+      if (response.statusCode < 200 || response.statusCode >= 300) return [];
+
+      final data = jsonDecode(response.body);
+      final List songs = data['songs'] as List? ?? [];
+      return _mapSongs(songs);
+    } catch (e) {
+      print('[MusicServer] AI Vibe error: $e');
+      return [];
+    }
+  }
+
+  String _getDayName(int weekday) {
+    switch (weekday) {
+      case DateTime.monday: return 'Monday';
+      case DateTime.tuesday: return 'Tuesday';
+      case DateTime.wednesday: return 'Wednesday';
+      case DateTime.thursday: return 'Thursday';
+      case DateTime.friday: return 'Friday';
+      case DateTime.saturday: return 'Saturday';
+      case DateTime.sunday: return 'Sunday';
+      default: return '';
     }
   }
 
