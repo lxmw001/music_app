@@ -36,30 +36,30 @@ class ApiService {
     return headers;
   }
 
-  Future<dynamic> get(String path, {bool requiresAuth = true}) async {
+  Future<dynamic> get(String path, {bool requiresAuth = true, Duration timeout = const Duration(seconds: 15)}) async {
     final res = await _client.get(
       Uri.parse('$baseUrl$path'),
       headers: await _headers(requiresAuth: requiresAuth),
-    ).timeout(const Duration(seconds: 15));
+    ).timeout(timeout);
     if (res.statusCode >= 400) throw ApiException.fromResponse(res);
     return jsonDecode(res.body);
   }
 
-  Future<dynamic> post(String path, {Map<String, dynamic>? body, bool requiresAuth = true}) async {
+  Future<dynamic> post(String path, {Map<String, dynamic>? body, bool requiresAuth = true, Duration timeout = const Duration(seconds: 15)}) async {
     final res = await _client.post(
       Uri.parse('$baseUrl$path'),
       headers: await _headers(requiresAuth: requiresAuth),
       body: body != null ? jsonEncode(body) : null,
-    ).timeout(const Duration(seconds: 15));
+    ).timeout(timeout);
     if (res.statusCode >= 400) throw ApiException.fromResponse(res);
     return res.statusCode == 204 ? null : jsonDecode(res.body);
   }
 
-  Future<void> delete(String path, {bool requiresAuth = true}) async {
+  Future<void> delete(String path, {bool requiresAuth = true, Duration timeout = const Duration(seconds: 15)}) async {
     final res = await _client.delete(
       Uri.parse('$baseUrl$path'),
       headers: await _headers(requiresAuth: requiresAuth),
-    ).timeout(const Duration(seconds: 15));
+    ).timeout(timeout);
     if (res.statusCode >= 400) throw ApiException.fromResponse(res);
   }
 }

@@ -6,6 +6,7 @@ import 'package:palette_generator/palette_generator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/music_models.dart';
 import '../models/user_profile.dart';
+import '../models/vibe.dart';
 import '../services/audio_handler.dart';
 import '../services/youtube_service.dart';
 import '../services/play_history_service.dart';
@@ -27,9 +28,11 @@ abstract class MusicPlayerProvider extends ChangeNotifier {
   bool get isInitialized;
   bool get autoAddSuggestions;
   bool get isFetchingSuggestions;
+  bool get isFetchingVibe;
   List<Song> get suggestedSongs;
   Color? get dominantColor;
   UserProfile? get userProfile;
+  List<Vibe> get vibes;
   bool isLoadingAudio(String songId);
   void prefetchAudioUrls(List<Song> songs);
   bool get isPlaying;
@@ -62,6 +65,7 @@ abstract class MusicPlayerProvider extends ChangeNotifier {
   Future<void> clearSearchHistory();
   Future<List<Playlist>> loadPlaylists();
   Future<void> deletePlaylist(String id);
+  Future<void> refreshVibes();
 }
 
 class MusicPlayerProviderImpl extends MusicPlayerProvider {
@@ -117,8 +121,10 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   @override
   bool isLoadingAudio(String songId) => _loadingAudioIds.contains(songId);
   bool _isFetchingSuggestions = false;
+  bool _isFetchingVibe = false;
   List<Song> _suggestedSongs = [];
   UserProfile? _userProfile;
+  List<Vibe> _vibes = availableVibes;
 
   Song? _pendingSong;
   List<Song>? _pendingQueue;
@@ -140,9 +146,13 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   @override
   bool get isFetchingSuggestions => _isFetchingSuggestions;
   @override
+  bool get isFetchingVibe => _isFetchingVibe;
+  @override
   List<Song> get suggestedSongs => _suggestedSongs;
   @override
   UserProfile? get userProfile => _userProfile;
+  @override
+  List<Vibe> get vibes => _vibes;
 
   @override
   bool get isPlaying => _isInitialized ? _audioHandler.playbackState.value.playing : false;
@@ -177,8 +187,8 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     rlog('[MusicPlayerProvider] AudioService.init complete');
 
     final savedQueue = await _historyService.loadQueue();
-    final lastSongData = await _historyService.loadLastSong();
     _userProfile = await _profileService.getProfile();
+    refreshVibes(); // Fetch vibes from server
 
     _isInitialized = true;
     if (_pendingSong == null) {
@@ -274,6 +284,19 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     } catch (e, st) {
     rlog('[MusicPlayerProvider] _init ERROR: $e\n$st');
   }
+  }
+
+  @override
+  Future<void> refreshVibes() async {
+    try {
+      final serverVibes = await _serverService.getVibes();
+      if (serverVibes.isNotEmpty) {
+        _vibes = serverVibes;
+        notifyListeners();
+      }
+    } catch (e) {
+      print('[MusicPlayerProvider] refreshVibes error: $e');
+    }
   }
 
   Future<void> _updateDominantColor(String? imageUrl) async {
@@ -498,26 +521,30 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       _userProfile = await _profileService.getProfile();
     }
 
-    // Check for premium status if needed (implement based on your claims logic)
-    // if (!_userProfile!.isPremium) { ... }
+    _isFetchingVibe = true;
+    notifyListeners();
 
-    print('[MusicPlayerProvider] playFastMode: $vibeId / $subCategoryId');
+    // FAST MODE IS CURRENTLY FREE FOR ALL USERS
+    print('[MusicPlayerProvider] playFastMode (Free Preview): $vibeId / $subCategoryId');
 
-    // Show a loading state if possible, or just start fetching
-    final songs = await _serverService.fetchAIVibe(
-      vibeId: vibeId,
-      subCategoryId: subCategoryId,
-      profile: _userProfile!,
-    );
+    try {
+      final songs = await _serverService.fetchAIVibe(
+        vibeId: vibeId,
+        subCategoryId: subCategoryId,
+        profile: _userProfile ?? UserProfile(favoriteGenres: ['Pop', 'Rock']),
+      );
 
-    if (songs.isNotEmpty) {
-      _queue = songs;
-      _currentIndex = 0;
+      if (songs.isNotEmpty) {
+        _queue = songs;
+        _currentIndex = 0;
+        notifyListeners();
+        await playSong(songs.first, queue: songs, fromQueue: true);
+      } else {
+        print('[MusicPlayerProvider] AI Vibe returned no songs');
+      }
+    } finally {
+      _isFetchingVibe = false;
       notifyListeners();
-      await playSong(songs.first, queue: songs, fromQueue: true);
-    } else {
-      print('[MusicPlayerProvider] AI Vibe returned no songs');
-      // Maybe show a snackbar error
     }
   }
 
