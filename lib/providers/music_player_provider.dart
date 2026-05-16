@@ -29,6 +29,10 @@ abstract class MusicPlayerProvider extends ChangeNotifier {
   bool get autoAddSuggestions;
   bool get isFetchingSuggestions;
   bool get isFetchingVibe;
+  bool get isFastModeActive;
+  String? get activeVibeId;
+  String? get activeSubCategoryId;
+  ({String vibeId, String? subCategoryId})? get lastSavedVibe;
   List<Song> get suggestedSongs;
   Color? get dominantColor;
   UserProfile? get userProfile;
@@ -42,6 +46,8 @@ abstract class MusicPlayerProvider extends ChangeNotifier {
 
   Future<void> playSong(Song song, {List<Song>? queue, Duration? seekTo, bool fromQueue = false, String? searchQuery});
   Future<void> playFastMode({required String vibeId, String? subCategoryId});
+  Future<void> resumeLastVibe();
+  void exitFastMode();
   Future<void> pause();
   Future<void> resume();
   Future<void> stop();
@@ -115,6 +121,9 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   final Set<String> _loadingAudioIds = {};
   Color? _dominantColor;
 
+  Song? _pendingSong;
+  List<Song>? _pendingQueue;
+
   @override
   Color? get dominantColor => _dominantColor;
 
@@ -122,12 +131,13 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   bool isLoadingAudio(String songId) => _loadingAudioIds.contains(songId);
   bool _isFetchingSuggestions = false;
   bool _isFetchingVibe = false;
+  bool _isFastModeActive = false;
+  String? _activeVibeId;
+  String? _activeSubCategoryId;
+  ({String vibeId, String? subCategoryId})? _lastSavedVibe;
   List<Song> _suggestedSongs = [];
   UserProfile? _userProfile;
   List<Vibe> _vibes = availableVibes;
-
-  Song? _pendingSong;
-  List<Song>? _pendingQueue;
 
   @override
   Song? get currentSong => _currentSong;
@@ -147,6 +157,14 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   bool get isFetchingSuggestions => _isFetchingSuggestions;
   @override
   bool get isFetchingVibe => _isFetchingVibe;
+  @override
+  bool get isFastModeActive => _isFastModeActive;
+  @override
+  String? get activeVibeId => _activeVibeId;
+  @override
+  String? get activeSubCategoryId => _activeSubCategoryId;
+  @override
+  ({String vibeId, String? subCategoryId})? get lastSavedVibe => _lastSavedVibe;
   @override
   List<Song> get suggestedSongs => _suggestedSongs;
   @override
@@ -188,19 +206,10 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
 
     final savedQueue = await _historyService.loadQueue();
     _userProfile = await _profileService.getProfile();
+    _lastSavedVibe = await _historyService.loadVibeState();
     refreshVibes(); // Fetch vibes from server
 
     _isInitialized = true;
-    if (_pendingSong == null) {
-      if (savedQueue != null) {
-        _queue = savedQueue.queue;
-        _currentIndex = savedQueue.currentIndex;
-        _currentSong = _queue[_currentIndex];
-        rlog('[MusicPlayerProvider] restored queue: ${_queue.length} songs, index=$_currentIndex');
-        _updateDominantColor(_currentSong?.imageUrl);
-        notifyListeners();
-      }
-    }
     
     _audioHandler.positionStream.listen((position) {
       if (!_isSwitchingSong && position > Duration.zero) _lastPosition = position;
@@ -271,16 +280,21 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       notifyListeners();
     });
 
-    notifyListeners();
-    
     if (_pendingSong != null) {
-      final song = _pendingSong;
+      final song = _pendingSong!;
       final queue = _pendingQueue;
       _pendingSong = null;
       _pendingQueue = null;
-      _loadingAudioIds.remove(song!.id);
       await playSong(song, queue: queue);
+    } else if (savedQueue != null) {
+      _queue = savedQueue.queue;
+      _currentIndex = savedQueue.currentIndex;
+      _currentSong = _queue[_currentIndex];
+      rlog('[MusicPlayerProvider] restored queue: ${_queue.length} songs, index=$_currentIndex');
+      _updateDominantColor(_currentSong?.imageUrl);
     }
+    
+    notifyListeners();
     } catch (e, st) {
     rlog('[MusicPlayerProvider] _init ERROR: $e\n$st');
   }
@@ -373,7 +387,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     if (!_isInitialized) {
       _pendingSong = song;
       _pendingQueue = queue;
-      _loadingAudioIds.add(song.id);
       _currentSong = song;
       if (queue != null) {
         _queue = queue;
@@ -400,6 +413,10 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       _currentIndex = _queue.indexWhere((s) => s.id == song.id);
       if (_currentIndex < 0) _currentIndex = 0;
     } else {
+      _isFastModeActive = false; // Exit Fast Mode if playing from other sources
+      _lastSavedVibe = null;
+      _historyService.clearVibeState();
+
       if (queue != null) {
         _queue = queue;
         _currentIndex = queue.indexWhere((s) => s.id == song.id);
@@ -522,6 +539,11 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     }
 
     _isFetchingVibe = true;
+    _activeVibeId = vibeId;
+    _activeSubCategoryId = subCategoryId;
+    _isFastModeActive = true;
+    _lastSavedVibe = (vibeId: vibeId, subCategoryId: subCategoryId);
+    _historyService.saveVibeState(vibeId, subCategoryId);
     notifyListeners();
 
     // FAST MODE IS CURRENTLY FREE FOR ALL USERS
@@ -541,11 +563,46 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         await playSong(songs.first, queue: songs, fromQueue: true);
       } else {
         print('[MusicPlayerProvider] AI Vibe returned no songs');
+        _isFastModeActive = false;
+        _lastSavedVibe = null;
+        _historyService.clearVibeState();
       }
+    } catch (e) {
+      _isFastModeActive = false;
+      _lastSavedVibe = null;
+      _historyService.clearVibeState();
+      rethrow;
     } finally {
       _isFetchingVibe = false;
       notifyListeners();
     }
+  }
+
+  @override
+  Future<void> resumeLastVibe() async {
+    if (_lastSavedVibe != null) {
+      _isFastModeActive = true;
+      _activeVibeId = _lastSavedVibe!.vibeId;
+      _activeSubCategoryId = _lastSavedVibe!.subCategoryId;
+      notifyListeners();
+      
+      // If we have a queue, play it. Otherwise fetch new.
+      if (_queue.isNotEmpty) {
+        await playSong(_queue[_currentIndex], fromQueue: true);
+      } else {
+        await playFastMode(vibeId: _activeVibeId!, subCategoryId: _activeSubCategoryId);
+      }
+    }
+  }
+
+  @override
+  void exitFastMode() {
+    _isFastModeActive = false;
+    _activeVibeId = null;
+    _activeSubCategoryId = null;
+    _lastSavedVibe = null;
+    _historyService.clearVibeState();
+    notifyListeners();
   }
 
   bool _isSeeding = false;

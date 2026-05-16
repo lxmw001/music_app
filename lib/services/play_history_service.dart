@@ -12,6 +12,7 @@ class PlayHistoryService {
   static const _queueKey = 'saved_queue';
   static const _queueIndexKey = 'saved_queue_index';
   static const _searchHistoryKey = 'search_history';
+  static const _vibeStateKey = 'saved_vibe_state';
 
   Future<SharedPreferences> get _prefs => SharedPreferences.getInstance();
 
@@ -172,8 +173,13 @@ class PlayHistoryService {
   Future<List<Song>> loadCachedSuggested() async {
     final p = await _prefs;
     final raw = p.getString(_suggestedCacheKey);
-    if (raw == null) return [];
-    return (jsonDecode(raw) as List).map((e) => Song.fromJson(e)).toList();
+    if (raw != null) {
+      final decoded = jsonDecode(raw);
+      if (decoded is List) {
+        return decoded.map((e) => Song.fromJson(e)).toList();
+      }
+    }
+    return [];
   }
 
   Future<void> savePlaylist(String name, List<Song> songs) async {
@@ -270,5 +276,30 @@ class PlayHistoryService {
         .map((e) => Song.fromJson(e.value))
         .take(limit)
         .toList();
+  }
+
+  Future<void> saveVibeState(String vibeId, String? subCategoryId) async {
+    final p = await _prefs;
+    await p.setString(_vibeStateKey, jsonEncode({
+      'vibeId': vibeId,
+      'subCategoryId': subCategoryId,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    }));
+  }
+
+  Future<({String vibeId, String? subCategoryId})?> loadVibeState() async {
+    final p = await _prefs;
+    final raw = p.getString(_vibeStateKey);
+    if (raw == null) return null;
+    final data = jsonDecode(raw) as Map<String, dynamic>;
+    return (
+      vibeId: data['vibeId'] as String,
+      subCategoryId: data['subCategoryId'] as String?,
+    );
+  }
+
+  Future<void> clearVibeState() async {
+    final p = await _prefs;
+    await p.remove(_vibeStateKey);
   }
 }

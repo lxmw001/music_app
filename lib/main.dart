@@ -230,11 +230,17 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>();
-    
+    final player = context.watch<MusicPlayerProvider>();
+    final isFastMode = player.isFastModeActive;
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
+        if (isFastMode) {
+          player.exitFastMode();
+          return;
+        }
         final shouldPop = await _onWillPop();
         if (shouldPop && context.mounted) Navigator.of(context).pop();
       },
@@ -242,12 +248,12 @@ class _MainScreenState extends State<MainScreen> {
         extendBody: true,
         body: Stack(
           children: [
-            // Global Mesh Aura
-            MeshGradient(color: theme.accentColor),
+            // Global Mesh Aura - Hide if Fast Mode is active (it will have its own)
+            if (!isFastMode) MeshGradient(color: theme.accentColor),
             
             Column(
               children: [
-                if (_updateUrl != null)
+                if (!isFastMode && _updateUrl != null)
                   MaterialBanner(
                     backgroundColor: Theme.of(context).colorScheme.primaryContainer,
                     content: _downloadProgress != null
@@ -287,27 +293,31 @@ class _MainScreenState extends State<MainScreen> {
                       FocusScope.of(context).unfocus();
                       setState(() => _currentIndex = index);
                     },
-                    physics: const BouncingScrollPhysics(),
+                    physics: isFastMode 
+                        ? const NeverScrollableScrollPhysics() 
+                        : const BouncingScrollPhysics(),
                     children: _screens,
                   ),
                 ),
               ],
             ),
-            // Floating Mini Player (Glassmorphic)
-            Positioned(
-              left: 12, right: 12, bottom: 95,
-              child: Consumer<MusicPlayerProvider>(
-                builder: (context, player, child) {
-                  if (player.currentSong == null) return const SizedBox.shrink();
-                  return _buildMiniPlayer(player);
-                },
+            
+            // Floating Mini Player & NavBar - HIDE IF FAST MODE IS ACTIVE
+            if (!isFastMode) ...[
+              Positioned(
+                left: 12, right: 12, bottom: 95,
+                child: Consumer<MusicPlayerProvider>(
+                  builder: (context, player, child) {
+                    if (player.currentSong == null) return const SizedBox.shrink();
+                    return _buildMiniPlayer(player);
+                  },
+                ),
               ),
-            ),
-            // Floating Glass Navigation Pill
-            Positioned(
-              left: 20, right: 20, bottom: 20,
-              child: _buildFloatingNavBar(theme),
-            ),
+              Positioned(
+                left: 20, right: 20, bottom: 20,
+                child: _buildFloatingNavBar(theme),
+              ),
+            ],
           ],
         ),
       ),

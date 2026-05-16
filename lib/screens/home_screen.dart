@@ -79,8 +79,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final player = context.watch<MusicPlayerProvider>();
     final primaryColor = Theme.of(context).primaryColor;
     
+    // If Fast Mode is active, show NOTHING ELSE but the Fast Mode UI
+    if (player.isFastModeActive) {
+      return const Scaffold(
+        backgroundColor: Colors.transparent,
+        body: FastModeSection(),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.transparent, 
       body: RefreshIndicator(
@@ -158,7 +167,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 delegate: SliverChildListDelegate([
                   const SizedBox(height: 24),
                   
-                  // 0. FAST MODE
+                  // 0. FAST MODE LAUNCHER
                   const FastModeSection(),
 
                   const SizedBox(height: 40),
