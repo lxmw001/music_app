@@ -89,7 +89,7 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final primaryColor = Theme.of(context).primaryColor;
+    final primaryColor = Theme.of(context).colorScheme.primary;
     
     return Scaffold(
       body: Stack(
@@ -177,10 +177,10 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
         tabAlignment: TabAlignment.start,
         dividerColor: Colors.transparent,
         indicator: BoxDecoration(
-          color: Theme.of(context).primaryColor,
+          color: Theme.of(context).colorScheme.primary,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
-            BoxShadow(color: Theme.of(context).primaryColor.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 2)),
+            BoxShadow(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 2)),
           ],
         ),
         indicatorSize: TabBarIndicatorSize.tab,
@@ -215,7 +215,7 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
         HapticFeedback.mediumImpact();
         setState(() => _offlineOnly = v);
       },
-      selectedColor: Theme.of(context).primaryColor,
+      selectedColor: Theme.of(context).colorScheme.primary,
       backgroundColor: Colors.white.withValues(alpha: 0.05),
       showCheckmark: false,
       shape: StadiumBorder(side: BorderSide(color: _offlineOnly ? Colors.transparent : Colors.white10)),
@@ -293,7 +293,7 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
 
   Widget _buildTypeChip(String label, SongType? type) {
     final isSelected = _selectedType == type;
-    final primary = Theme.of(context).primaryColor;
+    final primary = Theme.of(context).colorScheme.primary;
     return ChoiceChip(
       label: Text(label),
       selected: isSelected,
@@ -552,7 +552,7 @@ class _PlaylistDetailSheet extends StatelessWidget {
                       context.read<MusicPlayerProvider>().playSong(playlist.songs.first, queue: playlist.songs);
                     },
                     icon: const Icon(Icons.play_arrow_rounded, color: Colors.black, size: 32),
-                    style: IconButton.styleFrom(backgroundColor: Theme.of(context).primaryColor, padding: const EdgeInsets.all(12)),
+                    style: IconButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.primary, padding: const EdgeInsets.all(12)),
                   ),
                 ],
               ),

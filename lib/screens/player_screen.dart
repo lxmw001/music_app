@@ -328,7 +328,7 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
                   return IconButton(
                     icon: Icon(
                       liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                      color: liked ? Theme.of(context).primaryColor : Colors.white70,
+                      color: liked ? Theme.of(context).colorScheme.primary : Colors.white70,
                       size: 34,
                     ),
                     onPressed: () {
@@ -395,7 +395,7 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         IconButton(
-          icon: Icon(Icons.shuffle_rounded, color: player.isShuffled ? theme.primaryColor : Colors.white70),
+          icon: Icon(Icons.shuffle_rounded, color: player.isShuffled ? theme.colorScheme.primary : Colors.white70),
           onPressed: () {
             HapticFeedback.lightImpact();
             player.toggleShuffle();
@@ -430,7 +430,7 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
           },
         ),
         IconButton(
-          icon: Icon(Icons.repeat_rounded, color: player.isRepeating ? theme.primaryColor : Colors.white70),
+          icon: Icon(Icons.repeat_rounded, color: player.isRepeating ? theme.colorScheme.primary : Colors.white70),
           onPressed: () {
             HapticFeedback.lightImpact();
             player.toggleRepeat();
@@ -447,7 +447,7 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           IconButton(
-            icon: Icon(_showLyrics ? Icons.lyrics_rounded : Icons.lyrics_outlined, color: _showLyrics ? Theme.of(context).primaryColor : Colors.white70, size: 28),
+            icon: Icon(_showLyrics ? Icons.lyrics_rounded : Icons.lyrics_outlined, color: _showLyrics ? Theme.of(context).colorScheme.primary : Colors.white70, size: 28),
             onPressed: () {
               HapticFeedback.lightImpact();
               setState(() => _showLyrics = !_showLyrics);
@@ -460,7 +460,7 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
           else if (context.watch<AuthProvider>().canDownload)
             IconButton(
               icon: Icon(_downloadedPath != null ? Icons.download_done_rounded : Icons.download_rounded,
-                  color: _downloadedPath != null ? Theme.of(context).primaryColor : Colors.white70, size: 28),
+                  color: _downloadedPath != null ? Theme.of(context).colorScheme.primary : Colors.white70, size: 28),
               onPressed: _downloadedPath != null ? null : () => _download(context),
             ),
           IconButton(
@@ -581,10 +581,10 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
                       leading: ClipRRect(borderRadius: BorderRadius.circular(8),
                         child: Image.network(s.imageUrl, width: 50, height: 50, fit: BoxFit.cover)),
                       title: Text(s.title, maxLines: 1, overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: isCurrent ? Theme.of(context).primaryColor : Colors.white, fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal, fontSize: 15)),
+                          style: TextStyle(color: isCurrent ? Theme.of(context).colorScheme.primary : Colors.white, fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal, fontSize: 15)),
                       subtitle: Text(s.artist, maxLines: 1, overflow: TextOverflow.ellipsis, 
-                          style: TextStyle(color: isCurrent ? Theme.of(context).primaryColor.withValues(alpha: 0.7) : Colors.white38, fontSize: 13)),
-                      trailing: isCurrent ? Icon(Icons.equalizer_rounded, color: Theme.of(context).primaryColor) : null,
+                          style: TextStyle(color: isCurrent ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.7) : Colors.white38, fontSize: 13)),
+                      trailing: isCurrent ? Icon(Icons.equalizer_rounded, color: Theme.of(context).colorScheme.primary) : null,
                       onTap: () {
                         HapticFeedback.lightImpact();
                         player.playSong(s, fromQueue: true); 

@@ -80,7 +80,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final player = context.watch<MusicPlayerProvider>();
-    final primaryColor = Theme.of(context).primaryColor;
+    final primaryColor = Theme.of(context).colorScheme.primary;
     
     // If Fast Mode is active, show NOTHING ELSE but the Fast Mode UI
     if (player.isFastModeActive) {
@@ -224,7 +224,7 @@ class _HomeScreenState extends State<HomeScreen> {
           width: 4, height: 24,
           margin: const EdgeInsets.only(right: 12),
           decoration: BoxDecoration(
-            color: Theme.of(context).primaryColor,
+            color: Theme.of(context).colorScheme.primary,
             borderRadius: BorderRadius.circular(2),
           ),
         ),
@@ -439,6 +439,24 @@ class _ProfileAndThemeSheet extends StatelessWidget {
                       HapticFeedback.heavyImpact();
                       Navigator.pop(context); 
                       auth.signOut(); 
+                    },
+                  ),
+                )
+              else
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.green.withValues(alpha: 0.1),
+                      foregroundColor: Colors.green,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    ),
+                    icon: const Icon(Icons.login_rounded),
+                    label: const Text('Sign In', style: TextStyle(fontWeight: FontWeight.bold)),
+                    onPressed: () {
+                      HapticFeedback.mediumImpact();
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
                     },
                   ),
                 ),

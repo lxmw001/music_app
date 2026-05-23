@@ -77,9 +77,13 @@ abstract class MusicPlayerProvider extends ChangeNotifier {
 class MusicPlayerProviderImpl extends MusicPlayerProvider {
   late AudioPlayerHandler _audioHandler;
   final YouTubeService _youtubeService = YouTubeService();
-  YouTubeService get youtubeService => _youtubeService;
   final PlayHistoryService _historyService = PlayHistoryService();
   final DownloadService _downloadService = DownloadService();
+  final MusicServerService _serverService = MusicServerService();
+  final ProfileService _profileService = ProfileService();
+  final LastFmService _lastFmService = LastFmService();
+
+  YouTubeService get youtubeService => _youtubeService;
 
   Timer? _notifyTimer;
   static const _notifyInterval = Duration(milliseconds: 250);
@@ -90,7 +94,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     super.notifyListeners();
     _notifyTimer = Timer(_notifyInterval, () {});
   }
-  final LastFmService _lastFmService = LastFmService();
+
   AuthProvider? _authProvider;
   ThemeProvider? _themeProvider;
   
@@ -104,16 +108,20 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   void Function(String title)? _onStreamError;
   void setOnStreamError(void Function(String title) cb) => _onStreamError = cb;
 
-  final MusicServerService _serverService = MusicServerService();
-  final ProfileService _profileService = ProfileService();
   Timer? _positionSaveTimer;
   Timer? _stallTimer;
   bool _isRecoveringFromStall = false;
   Duration _lastRestoredPosition = Duration.zero;
   Duration _lastPosition = Duration.zero;
+  
   Song? _currentSong;
-  List<Song> _queue = [];
-  int _currentIndex = 0;
+  
+  // Two separate queues for normal and fast mode
+  List<Song> _normalQueue = [];
+  int _normalIndex = 0;
+  List<Song> _vibeQueue = [];
+  int _vibeIndex = 0;
+
   bool _isShuffled = false;
   bool _isRepeating = false;
   bool _isInitialized = false;
@@ -121,14 +129,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   final Set<String> _loadingAudioIds = {};
   Color? _dominantColor;
 
-  Song? _pendingSong;
-  List<Song>? _pendingQueue;
-
-  @override
-  Color? get dominantColor => _dominantColor;
-
-  @override
-  bool isLoadingAudio(String songId) => _loadingAudioIds.contains(songId);
   bool _isFetchingSuggestions = false;
   bool _isFetchingVibe = false;
   bool _isFastModeActive = false;
@@ -139,20 +139,15 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   UserProfile? _userProfile;
   List<Vibe> _vibes = availableVibes;
 
+  // Pending initialization queue
+  Song? _pendingSong;
+  List<Song>? _pendingQueue;
+
   @override
-  Song? get currentSong => _currentSong;
+  Color? get dominantColor => _dominantColor;
+
   @override
-  List<Song> get queue => _queue;
-  @override
-  int get currentIndex => _currentIndex;
-  @override
-  bool get isShuffled => _isShuffled;
-  @override
-  bool get isRepeating => _isRepeating;
-  @override
-  bool get isInitialized => _isInitialized;
-  @override
-  bool get autoAddSuggestions => _autoAddSuggestions;
+  bool isLoadingAudio(String songId) => _loadingAudioIds.contains(songId);
   @override
   bool get isFetchingSuggestions => _isFetchingSuggestions;
   @override
@@ -173,6 +168,21 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   List<Vibe> get vibes => _vibes;
 
   @override
+  Song? get currentSong => _currentSong;
+  @override
+  List<Song> get queue => _isFastModeActive ? _vibeQueue : _normalQueue;
+  @override
+  int get currentIndex => _isFastModeActive ? _vibeIndex : _normalIndex;
+  @override
+  bool get isShuffled => _isShuffled;
+  @override
+  bool get isRepeating => _isRepeating;
+  @override
+  bool get isInitialized => _isInitialized;
+  @override
+  bool get autoAddSuggestions => _autoAddSuggestions;
+
+  @override
   bool get isPlaying => _isInitialized ? _audioHandler.playbackState.value.playing : false;
   @override
   Duration get currentPosition => _isInitialized ? _audioHandler.currentPosition : Duration.zero;
@@ -189,115 +199,164 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     try {
       rlog('[MusicPlayerProvider] starting AudioService.init');
       _audioHandler = await AudioService.init(
-      builder: () => AudioPlayerHandler(
-        onSkipToNext: () => nextSong(),
-        onSkipToPrevious: () => previousSong(),
-        onPlay: () => resume(),
-      ),
-      config: AudioServiceConfig(
-        androidNotificationChannelId: 'com.lxmw.musicapp.channel.audio',
-        androidNotificationChannelName: 'Music Player',
-        androidNotificationOngoing: true,
-        androidShowNotificationBadge: true,
-        androidStopForegroundOnPause: true,
-      ),
-    );
-    rlog('[MusicPlayerProvider] AudioService.init complete');
+        builder: () => AudioPlayerHandler(
+          onSkipToNext: () => nextSong(),
+          onSkipToPrevious: () => previousSong(),
+          onPlay: () => resume(),
+        ),
+        config: const AudioServiceConfig(
+          androidNotificationChannelId: 'com.lxmw.musicapp.channel.audio',
+          androidNotificationChannelName: 'Music Player',
+          androidNotificationOngoing: true,
+          androidShowNotificationBadge: true,
+          androidStopForegroundOnPause: true,
+        ),
+      );
+      rlog('[MusicPlayerProvider] AudioService.init complete');
 
-    final savedQueue = await _historyService.loadQueue();
-    _userProfile = await _profileService.getProfile();
-    _lastSavedVibe = await _historyService.loadVibeState();
-    refreshVibes(); // Fetch vibes from server
+      final savedNormal = await _historyService.loadQueue();
+      final savedVibeQueue = await _historyService.loadVibeQueue();
+      _userProfile = await _profileService.getProfile();
+      _lastSavedVibe = await _historyService.loadVibeState();
+      refreshVibes();
 
-    _isInitialized = true;
-    
-    _audioHandler.positionStream.listen((position) {
-      if (!_isSwitchingSong && position > Duration.zero) _lastPosition = position;
-      if (_currentSong != null && _autoAddSuggestions) {
-        final duration = totalDuration;
-        final queueHasMore = _currentIndex < _queue.length - 1;
-        if (duration.inSeconds > 0 &&
-            (duration - position).inSeconds <= 10 &&
-            !_isFetchingSuggestions &&
-            _suggestedSongs.isEmpty &&
-            !queueHasMore) {
-          _fetchSuggestionsInBackground();
+      _isInitialized = true;
+      
+      _audioHandler.positionStream.listen((position) {
+        if (!_isSwitchingSong && position > Duration.zero) _lastPosition = position;
+        if (_currentSong != null && _autoAddSuggestions) {
+          final duration = totalDuration;
+          final currentQueue = queue;
+          final index = currentIndex;
+          final queueHasMore = index < currentQueue.length - 1;
+          if (duration.inSeconds > 0 &&
+              (duration - position).inSeconds <= 10 &&
+              !_isFetchingSuggestions &&
+              _suggestedSongs.isEmpty &&
+              !queueHasMore) {
+            _fetchSuggestionsInBackground();
+          }
         }
-      }
-    });
+      });
 
-    _audioHandler.durationStream.listen((duration) {
-      if (duration != null && duration > Duration.zero && _currentSong != null) {
-        final current = _audioHandler.mediaItem.value;
-        if (current != null && (current.duration == null || current.duration == Duration.zero)) {
-          _audioHandler.mediaItem.add(current.copyWith(duration: duration));
+      _audioHandler.durationStream.listen((duration) {
+        if (duration != null && duration > Duration.zero && _currentSong != null) {
+          final current = _audioHandler.mediaItem.value;
+          if (current != null && (current.duration == null || current.duration == Duration.zero)) {
+            _audioHandler.mediaItem.add(current.copyWith(duration: duration));
+          }
+          notifyListeners();
         }
-        notifyListeners();
-      }
-    });
+      });
 
-    _audioHandler.playbackState.listen((state) {
-      if (state.processingState == AudioProcessingState.completed && !_isFetchingSuggestions && !_isSwitchingSong) {
-        final completedSongId = _currentSong?.id;
-        final duration = totalDuration;
-        final wasPlaying = _lastPosition.inSeconds >= 5;
-        final nearEnd = duration.inSeconds > 0
-            ? _lastPosition.inSeconds >= (duration.inSeconds - 20)
-            : _lastPosition.inSeconds >= 30;
-        if (completedSongId != null && wasPlaying && nearEnd) {
-          _historyService.recordPlay(_currentSong!, _lastPosition.inSeconds);
-          Future.delayed(const Duration(milliseconds: 300), () {
-            if (_currentSong?.id != completedSongId) return;
-            if (_isRateLimited) {
-              _isRateLimited = false;
-              _onRateLimit?.call();
-              _playOfflineByGenre(_currentSong!);
+      _audioHandler.playbackState.listen((state) {
+        if (state.processingState == AudioProcessingState.completed && !_isFetchingSuggestions && !_isSwitchingSong) {
+          final completedSongId = _currentSong?.id;
+          final duration = totalDuration;
+          final wasPlaying = _lastPosition.inSeconds >= 5;
+          final nearEnd = duration.inSeconds > 0
+              ? _lastPosition.inSeconds >= (duration.inSeconds - 20)
+              : _lastPosition.inSeconds >= 30;
+          if (completedSongId != null && wasPlaying && nearEnd) {
+            _historyService.recordPlay(_currentSong!, _lastPosition.inSeconds);
+            Future.delayed(const Duration(milliseconds: 300), () {
+              if (_currentSong?.id != completedSongId) return;
+              if (_isRateLimited) {
+                _isRateLimited = false;
+                _onRateLimit?.call();
+                _playOfflineByGenre(_currentSong!);
+              } else {
+                nextSong();
+              }
+            });
+          }
+        }
+
+        if (state.processingState == AudioProcessingState.buffering && state.playing && !_isRecoveringFromStall && _loadingAudioIds.isEmpty) {
+          _stallTimer ??= Timer(const Duration(seconds: 30), () {
+            final posNow = currentPosition.inSeconds;
+            if (posNow <= _lastPosition.inSeconds + 2) {
+              _handleStall();
             } else {
-              nextSong();
+              _stallTimer = null;
             }
           });
+        } else {
+          _stallTimer?.cancel();
+          _stallTimer = null;
+        }
+
+        notifyListeners();
+      });
+
+      _audioHandler.mediaItem.listen((_) {
+        notifyListeners();
+      });
+
+      if (savedNormal != null) {
+        _normalQueue = savedNormal.queue;
+        _normalIndex = savedNormal.currentIndex;
+      }
+      if (savedVibeQueue != null) {
+        _vibeQueue = savedVibeQueue.queue;
+        _vibeIndex = savedVibeQueue.currentIndex;
+      }
+
+      if (_pendingSong != null) {
+        final song = _pendingSong!;
+        final q = _pendingQueue;
+        _pendingSong = null;
+        _pendingQueue = null;
+        await playSong(song, queue: q);
+      } else {
+        // PER REQUEST: Start app in NORMAL player mode, even if a vibe was last.
+        // Fast Mode section will show the Resume card.
+        _isFastModeActive = false;
+        if (_normalQueue.isNotEmpty) {
+          _currentSong = _normalQueue[_normalIndex];
+          _updateDominantColor(_currentSong?.imageUrl);
         }
       }
-
-      if (state.processingState == AudioProcessingState.buffering && state.playing && !_isRecoveringFromStall && _loadingAudioIds.isEmpty) {
-        _stallTimer ??= Timer(const Duration(seconds: 30), () {
-          final posNow = currentPosition.inSeconds;
-          if (posNow <= _lastPosition.inSeconds + 2) {
-            _handleStall();
-          } else {
-            _stallTimer = null;
-          }
-        });
-      } else {
-        _stallTimer?.cancel();
-        _stallTimer = null;
-      }
-
+      
       notifyListeners();
-    });
 
-    _audioHandler.mediaItem.listen((_) {
-      notifyListeners();
-    });
-
-    if (_pendingSong != null) {
-      final song = _pendingSong!;
-      final queue = _pendingQueue;
-      _pendingSong = null;
-      _pendingQueue = null;
-      await playSong(song, queue: queue);
-    } else if (savedQueue != null) {
-      _queue = savedQueue.queue;
-      _currentIndex = savedQueue.currentIndex;
-      _currentSong = _queue[_currentIndex];
-      rlog('[MusicPlayerProvider] restored queue: ${_queue.length} songs, index=$_currentIndex');
-      _updateDominantColor(_currentSong?.imageUrl);
-    }
-    
-    notifyListeners();
+      // Listen for connectivity changes
+      Connectivity().onConnectivityChanged.listen(_onConnectivityChanged);
     } catch (e, st) {
-    rlog('[MusicPlayerProvider] _init ERROR: $e\n$st');
+      rlog('[MusicPlayerProvider] _init ERROR: $e\n$st');
+    }
   }
+
+  Song? _songBeforeOffline;
+  Duration _positionBeforeOffline = Duration.zero;
+  bool _isOfflineMode = false;
+
+  void _onConnectivityChanged(List<ConnectivityResult> results) {
+    final hasInternet = results.any((c) =>
+        c == ConnectivityResult.wifi || c == ConnectivityResult.mobile);
+
+    if (!hasInternet && !_isOfflineMode) {
+      // Lost internet — switch to offline
+      _isOfflineMode = true;
+      if (_currentSong != null && !(_currentSong!.audioUrl.startsWith('/') || _currentSong!.audioUrl.startsWith('file://'))) {
+        _songBeforeOffline = _currentSong;
+        _positionBeforeOffline = currentPosition;
+        rlog('[MusicPlayerProvider] internet lost, saving ${_currentSong!.title} at ${_positionBeforeOffline.inSeconds}s');
+        _playOfflineByGenre(_currentSong!);
+      }
+    } else if (hasInternet && _isOfflineMode) {
+      // Internet back — resume previous song
+      _isOfflineMode = false;
+      if (_songBeforeOffline != null) {
+        rlog('[MusicPlayerProvider] internet back, resuming ${_songBeforeOffline!.title}');
+        final song = _songBeforeOffline!;
+        final pos = _positionBeforeOffline;
+        _songBeforeOffline = null;
+        _positionBeforeOffline = Duration.zero;
+        song.audioUrl = ''; // force re-fetch
+        playSong(song, seekTo: pos);
+      }
+    }
   }
 
   @override
@@ -358,27 +417,37 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   }
 
   Future<void> _playOfflineByGenre(Song stalledSong) async {
+    if (_authProvider?.canDownload != true) return;
     final downloaded = await _downloadService.getDownloadedSongs();
     if (downloaded.isEmpty) return;
 
-    final stalledTags = stalledSong.genres.map((t) => t.toLowerCase()).toSet();
-    List<Song> offlineQueue;
-    if (stalledTags.isNotEmpty) {
-      final scored = downloaded
-          .where((s) => s.id != stalledSong.id)
-          .map((s) {
-            final shared = s.genres.map((t) => t.toLowerCase()).toSet()
-                .intersection(stalledTags).length;
-            return (song: s, score: shared);
-          })
-          .toList()
-        ..sort((a, b) => b.score.compareTo(a.score));
-      offlineQueue = scored.map((e) => e.song).toList();
-    } else {
-      offlineQueue = downloaded.where((s) => s.id != stalledSong.id).toList();
+    final downloadedIds = downloaded.map((s) => s.id).toSet();
+    final playlists = await _historyService.loadPlaylists();
+
+    // Collect first 10 downloaded songs from each playlist
+    final offlineQueue = <Song>[];
+    final seen = <String>{};
+    for (final pl in playlists) {
+      int count = 0;
+      for (final s in pl.songs) {
+        if (count >= 10) break;
+        if (downloadedIds.contains(s.id) && !seen.contains(s.id) && s.id != stalledSong.id) {
+          seen.add(s.id);
+          offlineQueue.add(s);
+          count++;
+        }
+      }
+    }
+    // Add remaining downloaded songs not in any playlist
+    for (final s in downloaded) {
+      if (!seen.contains(s.id) && s.id != stalledSong.id) {
+        offlineQueue.add(s);
+      }
     }
 
-    if (offlineQueue.isEmpty) offlineQueue = downloaded;
+    if (offlineQueue.isEmpty) return;
+    offlineQueue.shuffle();
+    rlog('[MusicPlayerProvider] playing offline: ${offlineQueue.length} songs');
     Future.microtask(() => playSong(offlineQueue.first, queue: offlineQueue));
   }
 
@@ -389,12 +458,13 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       _pendingQueue = queue;
       _currentSong = song;
       if (queue != null) {
-        _queue = queue;
-        _currentIndex = queue.indexOf(song);
+        _normalQueue = queue;
+        _normalIndex = queue.indexOf(song);
       }
       notifyListeners();
       return;
     }
+    
     final isCompleted = _audioHandler.playbackState.value.processingState == AudioProcessingState.completed;
     if (_currentSong?.id == song.id && isPlaying && !isCompleted && queue == null) return;
 
@@ -409,42 +479,55 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     _updateDominantColor(song.imageUrl);
     
     if (fromQueue) {
-      if (queue != null) _queue = queue;
-      _currentIndex = _queue.indexWhere((s) => s.id == song.id);
-      if (_currentIndex < 0) _currentIndex = 0;
+      if (_isFastModeActive) {
+        if (queue != null) _vibeQueue = queue;
+        _vibeIndex = _vibeQueue.indexWhere((s) => s.id == song.id);
+        if (_vibeIndex < 0) _vibeIndex = 0;
+        _historyService.saveVibeQueue(_vibeQueue, _vibeIndex);
+      } else {
+        if (queue != null) _normalQueue = queue;
+        _normalIndex = _normalQueue.indexWhere((s) => s.id == song.id);
+        if (_normalIndex < 0) _normalIndex = 0;
+        _historyService.saveQueue(_normalQueue, _normalIndex);
+      }
     } else {
-      _isFastModeActive = false; // Exit Fast Mode if playing from other sources
-      _lastSavedVibe = null;
-      _historyService.clearVibeState();
+      // PER REQUEST: IF WE WERE IN FAST MODE, AND WE ARE PLAYING SOMETHING ELSE, EXIT FAST MODE
+      if (_isFastModeActive) {
+        _isFastModeActive = false;
+        _activeVibeId = null;
+        _activeSubCategoryId = null;
+        _lastSavedVibe = null;
+        _historyService.clearVibeState();
+      }
 
       if (queue != null) {
-        _queue = queue;
-        _currentIndex = queue.indexWhere((s) => s.id == song.id);
-        if (_currentIndex < 0) _currentIndex = 0;
-        _historyService.saveQueue(_queue, _currentIndex);
+        _normalQueue = queue;
+        _normalIndex = _normalQueue.indexWhere((s) => s.id == song.id);
+        if (_normalIndex < 0) _normalIndex = 0;
       } else {
-        _queue = [song];
-        _currentIndex = 0;
+        _normalQueue = [song];
+        _normalIndex = 0;
         _isSeeding = false;
         _pendingSeedQueries = [];
         _usedSeedQueries.clear();
 
         Future.delayed(const Duration(seconds: 5), () {
-          _youtubeService.generatePlaylist(song, search: searchQuery).then((playlist) {
-            if (playlist.isEmpty) return;
-            if (_currentSong?.id == song.id) {
-              _queue = [song, ...playlist];
-              _currentIndex = 0;
-              _historyService.saveQueue(_queue, _currentIndex);
-              final playlistName = searchQuery?.isNotEmpty == true
-                  ? searchQuery!
-                  : '${song.title} Radio';
-              _historyService.savePlaylist(playlistName, _queue);
-              notifyListeners();
-            }
-          });
+          if (!_isFastModeActive && _currentSong?.id == song.id) {
+            _youtubeService.generatePlaylist(song, search: searchQuery).then((playlist) {
+              if (playlist.isEmpty) return;
+              if (!_isFastModeActive && _currentSong?.id == song.id) {
+                _normalQueue = [song, ...playlist];
+                _normalIndex = 0;
+                _historyService.saveQueue(_normalQueue, _normalIndex);
+                final plName = searchQuery?.isNotEmpty == true ? searchQuery! : '${song.title} Radio';
+                _historyService.savePlaylist(plName, _normalQueue);
+                notifyListeners();
+              }
+            });
+          }
         });
       }
+      _historyService.saveQueue(_normalQueue, _normalIndex);
     }
     notifyListeners();
 
@@ -473,11 +556,15 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         notifyListeners();
       }
     }
+    
     if (audioUrl.isEmpty) {
+      print('[MusicPlayerProvider] stream URL empty for ${song.title} (id=${song.id})');
+      rlog('[MusicPlayerProvider] stream URL empty for ${song.title} (id=${song.id})');
       _onStreamError?.call(song.title);
       notifyListeners();
       return;
     }
+    
     final mediaItem = MediaItem(
       id: song.id,
       title: song.title,
@@ -494,6 +581,8 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       }
       await _audioHandler.play();
     } catch (e) {
+      print('[MusicPlayerProvider] setAudioSource failed for ${song.title}: $e');
+      rlog('[MusicPlayerProvider] setAudioSource failed for ${song.title}: $e');
       _loadingAudioIds.remove(song.id);
       _onStreamError?.call(song.title);
       notifyListeners();
@@ -504,7 +593,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     
     _consecutiveSkips = 0;
     _historyService.savePosition(song, 0);
-    _historyService.saveQueue(_queue, _currentIndex);
     _startPositionSaveTimer(song);
     notifyListeners();
 
@@ -513,14 +601,16 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       final cacheUrl = audioUrl;
       final delay = song.duration > Duration.zero ? song.duration : const Duration(minutes: 5);
       Future.delayed(delay, () {
-        if (_currentSong?.id != cacheSongId) {
+        if (_currentSong?.id == cacheSongId) {
           _youtubeService.cacheAudioInBackground(cacheSongId, cacheUrl);
         }
       });
     }
 
-    if (_queue.isNotEmpty && _currentIndex < _queue.length - 1) {
-      final next = _queue[_currentIndex + 1];
+    final currentQueue = this.queue;
+    final index = currentIndex;
+    if (index < currentQueue.length - 1) {
+      final next = currentQueue[index + 1];
       if (next.audioUrl.isEmpty && !_loadingAudioIds.contains(next.id)) {
         _loadingAudioIds.add(next.id);
         _youtubeService.getPlayableAudioPath(next.id, serverId: next.serverId, song: next)
@@ -546,9 +636,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     _historyService.saveVibeState(vibeId, subCategoryId);
     notifyListeners();
 
-    // FAST MODE IS CURRENTLY FREE FOR ALL USERS
-    print('[MusicPlayerProvider] playFastMode (Free Preview): $vibeId / $subCategoryId');
-
     try {
       final songs = await _serverService.fetchAIVibe(
         vibeId: vibeId,
@@ -557,12 +644,12 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       );
 
       if (songs.isNotEmpty) {
-        _queue = songs;
-        _currentIndex = 0;
+        _vibeQueue = songs;
+        _vibeIndex = 0;
+        _historyService.saveVibeQueue(_vibeQueue, _vibeIndex);
         notifyListeners();
         await playSong(songs.first, queue: songs, fromQueue: true);
       } else {
-        print('[MusicPlayerProvider] AI Vibe returned no songs');
         _isFastModeActive = false;
         _lastSavedVibe = null;
         _historyService.clearVibeState();
@@ -580,17 +667,20 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
 
   @override
   Future<void> resumeLastVibe() async {
-    if (_lastSavedVibe != null) {
-      _isFastModeActive = true;
-      _activeVibeId = _lastSavedVibe!.vibeId;
-      _activeSubCategoryId = _lastSavedVibe!.subCategoryId;
-      notifyListeners();
-      
-      // If we have a queue, play it. Otherwise fetch new.
-      if (_queue.isNotEmpty) {
-        await playSong(_queue[_currentIndex], fromQueue: true);
+    final state = await _historyService.loadVibeState();
+    if (state != null) {
+      _lastSavedVibe = state;
+      final savedQ = await _historyService.loadVibeQueue();
+      if (savedQ != null) {
+        _isFastModeActive = true;
+        _activeVibeId = state.vibeId;
+        _activeSubCategoryId = state.subCategoryId;
+        _vibeQueue = savedQ.queue;
+        _vibeIndex = savedQ.currentIndex;
+        notifyListeners();
+        await playSong(_vibeQueue[_vibeIndex], fromQueue: true);
       } else {
-        await playFastMode(vibeId: _activeVibeId!, subCategoryId: _activeSubCategoryId);
+        await playFastMode(vibeId: state.vibeId, subCategoryId: state.subCategoryId);
       }
     }
   }
@@ -602,6 +692,12 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     _activeSubCategoryId = null;
     _lastSavedVibe = null;
     _historyService.clearVibeState();
+    
+    if (_normalQueue.isNotEmpty) {
+      playSong(_normalQueue[_normalIndex], fromQueue: true);
+    } else {
+      stop();
+    }
     notifyListeners();
   }
 
@@ -609,17 +705,25 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   int _consecutiveSkips = 0;
 
   void _addToQueue(List<Song> songs, String excludeId) {
-    final existing = _queue.map((s) => s.id).toSet();
+    final currentQueue = this.queue;
+    final existing = currentQueue.map((s) => s.id).toSet();
     final toAdd = songs.where((s) =>
       s.id != excludeId &&
       !existing.contains(s.id)
     ).toList();
+    
     if (toAdd.isNotEmpty) {
-      _queue.addAll(toAdd);
+      if (_isFastModeActive) {
+        _vibeQueue.addAll(toAdd);
+        _historyService.saveVibeQueue(_vibeQueue, _vibeIndex);
+      } else {
+        _normalQueue.addAll(toAdd);
+        _historyService.saveQueue(_normalQueue, _normalIndex);
+      }
+      
       if (toAdd.first.audioUrl.isEmpty) {
         _youtubeService.getAudioUrl(toAdd.first.id).then((url) => toAdd.first.audioUrl = url);
       }
-      _historyService.saveQueue(_queue, _currentIndex);
       notifyListeners();
     }
   }
@@ -670,17 +774,33 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
 
   Future<void> _nextSongAsync() async {
     if (!_isInitialized) return;
-    if (_queue.isNotEmpty && _currentIndex < _queue.length - 1) {
+    final currentQueue = this.queue;
+    var index = currentIndex;
+    
+    if (currentQueue.isNotEmpty && index < currentQueue.length - 1) {
       _consecutiveSkips = 0;
-      _currentIndex++;
-      playSong(_queue[_currentIndex], fromQueue: true);
-      _historyService.saveQueue(_queue, _currentIndex);
+      index++;
+      if (_isFastModeActive) {
+        _vibeIndex = index;
+        _historyService.saveVibeQueue(_vibeQueue, _vibeIndex);
+      } else {
+        _normalIndex = index;
+        _historyService.saveQueue(_normalQueue, _normalIndex);
+      }
+      playSong(currentQueue[index], fromQueue: true);
     } else if (_suggestedSongs.isNotEmpty) {
       _consecutiveSkips = 0;
       final next = _suggestedSongs.first;
       _suggestedSongs = [];
-      _queue.add(next);
-      _currentIndex = _queue.length - 1;
+      if (_isFastModeActive) {
+        _vibeQueue.add(next);
+        _vibeIndex = _vibeQueue.length - 1;
+        _historyService.saveVibeQueue(_vibeQueue, _vibeIndex);
+      } else {
+        _normalQueue.add(next);
+        _normalIndex = _normalQueue.length - 1;
+        _historyService.saveQueue(_normalQueue, _normalIndex);
+      }
       playSong(next, fromQueue: true);
     } else if (_currentSong != null) {
       _fetchAndPlaySuggestion();
@@ -696,17 +816,29 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
           _usedSeedQueries.add(query);
           final songs = await _youtubeService.searchByQuery(query, maxResults: 20);
           _addToQueue(songs, _currentSong!.id);
-          if (_queue.isNotEmpty && _currentIndex < _queue.length - 1) {
-            _currentIndex++;
-            playSong(_queue[_currentIndex]);
+          final currentQueue = this.queue;
+          final index = currentIndex;
+          if (currentQueue.isNotEmpty && index < currentQueue.length - 1) {
+            final nextIndex = index + 1;
+            if (_isFastModeActive) {
+              _vibeIndex = nextIndex;
+            } else {
+              _normalIndex = nextIndex;
+            }
+            playSong(currentQueue[nextIndex]);
             return;
           }
         }
       }
       final suggestions = await _youtubeService.getSuggestedSongs(_currentSong!.id, maxResults: 1, knownTitle: _currentSong!.title);
       if (suggestions.isNotEmpty) {
-        _queue.add(suggestions.first);
-        _currentIndex = _queue.length - 1;
+        if (_isFastModeActive) {
+          _vibeQueue.add(suggestions.first);
+          _vibeIndex = _vibeQueue.length - 1;
+        } else {
+          _normalQueue.add(suggestions.first);
+          _normalIndex = _normalQueue.length - 1;
+        }
         playSong(suggestions.first);
       } else {
         await _audioHandler.seek(Duration.zero);
@@ -721,10 +853,19 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   @override
   void previousSong() {
     if (!_isInitialized) return;
-    if (_queue.isNotEmpty && _currentIndex > 0) {
-      _currentIndex--;
-      playSong(_queue[_currentIndex], fromQueue: true);
-      _historyService.saveQueue(_queue, _currentIndex);
+    final currentQueue = this.queue;
+    var index = currentIndex;
+    
+    if (currentQueue.isNotEmpty && index > 0) {
+      index--;
+      if (_isFastModeActive) {
+        _vibeIndex = index;
+        _historyService.saveVibeQueue(_vibeQueue, _vibeIndex);
+      } else {
+        _normalIndex = index;
+        _historyService.saveQueue(_normalQueue, _normalIndex);
+      }
+      playSong(currentQueue[index], fromQueue: true);
     }
   }
 
@@ -837,8 +978,14 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   
   @override
   void addSuggestedToQueue(Song song) {
-    if (!_queue.contains(song)) {
-      _queue.add(song);
+    if (!queue.contains(song)) {
+      if (_isFastModeActive) {
+        _vibeQueue.add(song);
+        _historyService.saveVibeQueue(_vibeQueue, _vibeIndex);
+      } else {
+        _normalQueue.add(song);
+        _historyService.saveQueue(_normalQueue, _normalIndex);
+      }
       notifyListeners();
     }
   }

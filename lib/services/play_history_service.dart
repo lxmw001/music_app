@@ -2,10 +2,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/music_models.dart';
 
-/// Single source of truth for play history.
-/// Stores everything under two keys:
-///   - `play_history`: songId → {playCount, likedCount, lastPlayedAt (ms), lastPosition}
-///   - `known_songs`:  songId → song metadata
+/// Single source of truth for play history and state persistence.
 class PlayHistoryService {
   static const _historyKey = 'play_history';
   static const _songsKey = 'known_songs';
@@ -13,6 +10,8 @@ class PlayHistoryService {
   static const _queueIndexKey = 'saved_queue_index';
   static const _searchHistoryKey = 'search_history';
   static const _vibeStateKey = 'saved_vibe_state';
+  static const _vibeQueueKey = 'saved_vibe_queue';
+  static const _vibeQueueIndexKey = 'saved_vibe_queue_index';
 
   Future<SharedPreferences> get _prefs => SharedPreferences.getInstance();
 
@@ -55,7 +54,6 @@ class PlayHistoryService {
     if (isLiked) {
       entry['likedCount'] = (entry['likedCount'] as int? ?? 0) + 1;
     } else if (listenedSeconds > 5) {
-      // Skipped after >5s but didn't meet like threshold = unliked
       entry['unlikedCount'] = (entry['unlikedCount'] as int? ?? 0) + 1;
     }
 
@@ -64,7 +62,6 @@ class PlayHistoryService {
     await _saveSongMetadata(song);
   }
 
-  /// Save current position without recording a full play event
   Future<void> savePosition(Song song, int positionSeconds) async {
     final data = await _loadHistory();
     final entry = data[song.id] ?? {'playCount': 0, 'likedCount': 0};
@@ -86,7 +83,6 @@ class PlayHistoryService {
     final current = (entry['manualLike'] as bool?) ?? false;
     entry['manualLike'] = !current;
     if (!current) {
-      // Liking manually also counts as a like
       entry['likedCount'] = (entry['likedCount'] as int? ?? 0) + 1;
     }
     data[song.id] = entry;
@@ -111,47 +107,54 @@ class PlayHistoryService {
         .toList();
   }
 
-  Future<({Song song, int lastPositionSeconds})?> loadLastSong() async {
-    final recent = await getRecentSongs(limit: 1);
-    if (recent.isEmpty) return null;
-    final song = recent.first;
-    final data = await _loadHistory();
-    final pos = data[song.id]?['lastPosition'] as int? ?? 0;
-    song.audioUrl = ''; // always fetch fresh URL
-    return (song: song, lastPositionSeconds: pos);
-  }
-
-  Future<List<Song>> getMostLikedSongs() async {
+  /// Return the most liked songs from history (sorted by likedCount desc, then playCount desc).
+  /// Only songs that have at least one like are returned.
+  Future<List<Song>> getMostLikedSongs({int limit = 20}) async {
     final p = await _prefs;
     final songsRaw = p.getString(_songsKey);
     if (songsRaw == null) return [];
     final songsMap = Map<String, dynamic>.from(jsonDecode(songsRaw));
     final data = await _loadHistory();
-    final results = songsMap.entries
-        .where((e) => (data[e.key]?['likedCount'] as int? ?? 0) > 0)
-        .map((e) => (song: Song.fromJson(e.value), likedCount: data[e.key]!['likedCount'] as int))
-        .toList()
-      ..sort((a, b) => b.likedCount.compareTo(a.likedCount));
-    return results.map((e) => e.song).toList();
+
+    final stats = <({Song song, int likedCount, int playCount})>[];
+    for (final e in songsMap.entries) {
+      final id = e.key;
+      final entry = data[id];
+      if (entry == null) continue;
+      final song = Song.fromJson(e.value);
+      final liked = (entry['likedCount'] as int?) ?? ((entry['manualLike'] as bool?) == true ? 1 : 0);
+      final play = (entry['playCount'] as int?) ?? 0;
+      stats.add((song: song, likedCount: liked, playCount: play));
+    }
+
+    stats.sort((a, b) {
+      final byLiked = b.likedCount.compareTo(a.likedCount);
+      if (byLiked != 0) return byLiked;
+      return b.playCount.compareTo(a.playCount);
+    });
+
+    return stats.where((s) => s.likedCount > 0).map((s) => s.song).take(limit).toList();
   }
 
-  /// Legacy — kept for backward compat with provider
+  /// Given a list of known songs, return a list of records with their liked and play counts
+  /// using the stored history. The returned list is sorted by likedCount desc then playCount desc.
   Future<List<({Song song, int likedCount, int playCount})>> getMostLiked(List<Song> knownSongs) async {
     final data = await _loadHistory();
-    return knownSongs
-        .where((s) => (data[s.id]?['likedCount'] as int? ?? 0) > 0)
-        .map((s) => (
-              song: s,
-              likedCount: data[s.id]!['likedCount'] as int,
-              playCount: data[s.id]!['playCount'] as int? ?? 0,
-            ))
-        .toList()
-      ..sort((a, b) => b.likedCount.compareTo(a.likedCount));
-  }
+    final stats = knownSongs.map((song) {
+      final entry = data[song.id];
+      final liked = (entry?['likedCount'] as int?) ?? ((entry?['manualLike'] as bool?) == true ? 1 : 0);
+      final play = (entry?['playCount'] as int?) ?? 0;
+      return (song: song, likedCount: liked, playCount: play);
+    }).toList();
 
-  static const _playlistsKey = 'saved_playlists';
-  static const _trendingCacheKey = 'cached_trending';
-  static const _suggestedCacheKey = 'cached_suggested';
+    stats.sort((a, b) {
+      final byLiked = b.likedCount.compareTo(a.likedCount);
+      if (byLiked != 0) return byLiked;
+      return b.playCount.compareTo(a.playCount);
+    });
+
+    return stats;
+  }
 
   Future<void> cacheTrending(List<Song> songs) async {
     final p = await _prefs;
@@ -190,7 +193,6 @@ class PlayHistoryService {
         ? List<Map<String, dynamic>>.from(jsonDecode(raw))
         : <Map<String, dynamic>>[];
 
-    // Replace existing playlist with same name, otherwise prepend
     playlists.removeWhere((pl) => pl['name'] == name);
     playlists.insert(0, {
       'id': DateTime.now().millisecondsSinceEpoch.toString(),
@@ -239,12 +241,28 @@ class PlayHistoryService {
     return (queue: list, currentIndex: index.clamp(0, list.length - 1));
   }
 
+  Future<void> saveVibeQueue(List<Song> queue, int currentIndex) async {
+    final p = await _prefs;
+    await p.setString(_vibeQueueKey, jsonEncode(queue.map(_songToMap).toList()));
+    await p.setInt(_vibeQueueIndexKey, currentIndex);
+  }
+
+  Future<({List<Song> queue, int currentIndex})?> loadVibeQueue() async {
+    final p = await _prefs;
+    final raw = p.getString(_vibeQueueKey);
+    if (raw == null) return null;
+    final index = p.getInt(_vibeQueueIndexKey) ?? 0;
+    final list = (jsonDecode(raw) as List).map((e) => Song.fromJson(e)).toList();
+    if (list.isEmpty) return null;
+    return (queue: list, currentIndex: index.clamp(0, list.length - 1));
+  }
+
   Future<void> saveSearch(String query) async {
     if (query.trim().isEmpty) return;
     final p = await _prefs;
     final raw = p.getString(_searchHistoryKey);
     final searches = raw != null ? List<String>.from(jsonDecode(raw)) : <String>[];
-    searches.remove(query); // avoid duplicates
+    searches.remove(query); 
     searches.insert(0, query);
     await p.setString(_searchHistoryKey, jsonEncode(searches.take(50).toList()));
   }
@@ -263,19 +281,6 @@ class PlayHistoryService {
     final raw = p.getString(_searchHistoryKey);
     if (raw == null) return [];
     return List<String>.from(jsonDecode(raw));
-  }
-
-  Future<List<Song>> getUnlikedSongs({int limit = 20}) async {
-    final p = await _prefs;
-    final songsRaw = p.getString(_songsKey);
-    if (songsRaw == null) return [];
-    final songsMap = Map<String, dynamic>.from(jsonDecode(songsRaw));
-    final data = await _loadHistory();
-    return songsMap.entries
-        .where((e) => (data[e.key]?['unlikedCount'] as int? ?? 0) > 0)
-        .map((e) => Song.fromJson(e.value))
-        .take(limit)
-        .toList();
   }
 
   Future<void> saveVibeState(String vibeId, String? subCategoryId) async {
@@ -301,5 +306,11 @@ class PlayHistoryService {
   Future<void> clearVibeState() async {
     final p = await _prefs;
     await p.remove(_vibeStateKey);
+    await p.remove(_vibeQueueKey);
+    await p.remove(_vibeQueueIndexKey);
   }
+
+  static const _playlistsKey = 'saved_playlists';
+  static const _trendingCacheKey = 'cached_trending';
+  static const _suggestedCacheKey = 'cached_suggested';
 }

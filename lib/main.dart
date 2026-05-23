@@ -23,6 +23,7 @@ import 'services/profile_service.dart';
 import 'widgets/youtube_login_webview.dart';
 import 'widgets/mini_equalizer.dart';
 import 'widgets/mesh_gradient.dart';
+import 'package:audio_session/audio_session.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,6 +32,10 @@ void main() async {
   if (defaultTargetPlatform == TargetPlatform.android) {
     JustAudioMediaKit.ensureInitialized(android: true);
   }
+
+  // Configure audio session for music playback (Bluetooth, notification, audio focus)
+  final session = await AudioSession.instance;
+  await session.configure(const AudioSessionConfiguration.music());
   
   if (defaultTargetPlatform == TargetPlatform.android) {
     try {
@@ -196,6 +201,11 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Future<bool> _onWillPop() async {
+    final player = context.read<MusicPlayerProvider>();
+    if (player.isFastModeActive) {
+      player.exitFastMode();
+      return false;
+    }
     if (_currentIndex != 0) {
       _jumpToPage(0);
       return false;
@@ -232,15 +242,11 @@ class _MainScreenState extends State<MainScreen> {
     final theme = context.watch<ThemeProvider>();
     final player = context.watch<MusicPlayerProvider>();
     final isFastMode = player.isFastModeActive;
-
+    
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
-        if (isFastMode) {
-          player.exitFastMode();
-          return;
-        }
         final shouldPop = await _onWillPop();
         if (shouldPop && context.mounted) Navigator.of(context).pop();
       },
@@ -248,7 +254,7 @@ class _MainScreenState extends State<MainScreen> {
         extendBody: true,
         body: Stack(
           children: [
-            // Global Mesh Aura - Hide if Fast Mode is active (it will have its own)
+            // Global Mesh Aura
             if (!isFastMode) MeshGradient(color: theme.accentColor),
             
             Column(
@@ -301,9 +307,8 @@ class _MainScreenState extends State<MainScreen> {
                 ),
               ],
             ),
-            
-            // Floating Mini Player & NavBar - HIDE IF FAST MODE IS ACTIVE
-            if (!isFastMode) ...[
+            // Floating Mini Player (Glassmorphic)
+            if (!isFastMode)
               Positioned(
                 left: 12, right: 12, bottom: 95,
                 child: Consumer<MusicPlayerProvider>(
@@ -313,11 +318,12 @@ class _MainScreenState extends State<MainScreen> {
                   },
                 ),
               ),
+            // Floating Glass Navigation Pill
+            if (!isFastMode)
               Positioned(
                 left: 20, right: 20, bottom: 20,
                 child: _buildFloatingNavBar(theme),
               ),
-            ],
           ],
         ),
       ),
@@ -379,7 +385,7 @@ class _MainScreenState extends State<MainScreen> {
 
   Widget _navItem(int index, IconData activeIcon, IconData inactiveIcon) {
     final isSelected = _currentIndex == index;
-    final color = isSelected ? Theme.of(context).primaryColor : Colors.white54;
+    final color = isSelected ? Theme.of(context).colorScheme.primary : Colors.white54;
     
     return Expanded(
       child: GestureDetector(
@@ -449,8 +455,8 @@ class _MainScreenState extends State<MainScreen> {
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
-                              theme.primaryColor.withValues(alpha: 0.15),
-                              theme.primaryColor.withValues(alpha: 0.05),
+                              theme.colorScheme.primary.withValues(alpha: 0.15),
+                              theme.colorScheme.primary.withValues(alpha: 0.05),
                             ],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
@@ -499,7 +505,7 @@ class _MainScreenState extends State<MainScreen> {
                         if (player.isPlaying) 
                           Padding(
                             padding: const EdgeInsets.only(right: 12),
-                            child: MiniEqualizer(isPlaying: true, color: theme.primaryColor),
+                            child: MiniEqualizer(isPlaying: true, color: theme.colorScheme.primary),
                           ),
                         IconButton(
                           icon: Icon(player.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded, size: 34),
@@ -522,9 +528,9 @@ class _MainScreenState extends State<MainScreen> {
                       child: Container(
                         height: 3,
                         decoration: BoxDecoration(
-                          color: theme.primaryColor,
+                          color: theme.colorScheme.primary,
                           boxShadow: [
-                            BoxShadow(color: theme.primaryColor.withValues(alpha: 0.6), blurRadius: 6),
+                            BoxShadow(color: theme.colorScheme.primary.withValues(alpha: 0.6), blurRadius: 6),
                           ],
                         ),
                       ),

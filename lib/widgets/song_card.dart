@@ -25,74 +25,77 @@ class SongCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // High-End Glass Container
-            AspectRatio(
-              aspectRatio: 1,
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.4),
-                      blurRadius: 15,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      // Image with subtle gradient darkening
-                      Image.network(
-                        song.imageUrl,
-                        width: double.infinity,
-                        height: double.infinity,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => _defaultCover(),
-                      ),
-                      Positioned.fill(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Colors.white.withValues(alpha: 0.05),
-                                Colors.transparent,
-                                Colors.black.withValues(alpha: 0.3),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      if (isLoading)
-                        Container(
-                          color: Colors.black54,
-                          child: const Center(
-                            child: SizedBox(
-                              width: 32, height: 32,
-                              child: CircularProgressIndicator(strokeWidth: 3, color: Colors.white),
-                            ),
-                          ),
-                        ),
-                      // Floating Action Button
-                      Positioned(
-                        bottom: 12,
-                        right: 12,
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).primaryColor,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 2)),
-                            ],
-                          ),
-                          child: const Icon(Icons.play_arrow_rounded, color: Colors.black, size: 22),
-                        ),
+            Flexible(
+              // allow the artwork to shrink when vertical space is limited
+              child: AspectRatio(
+                aspectRatio: 1,
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.4),
+                        blurRadius: 15,
+                        offset: const Offset(0, 8),
                       ),
                     ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // Image with subtle gradient darkening
+                        Image.network(
+                          song.imageUrl,
+                          width: double.infinity,
+                          height: double.infinity,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => _defaultCover(),
+                        ),
+                        Positioned.fill(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.white.withValues(alpha: 0.05),
+                                  Colors.transparent,
+                                  Colors.black.withValues(alpha: 0.3),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (isLoading)
+                          Container(
+                            color: Colors.black54,
+                            child: const Center(
+                              child: SizedBox(
+                                width: 32, height: 32,
+                                child: CircularProgressIndicator(strokeWidth: 3, color: Colors.white),
+                              ),
+                            ),
+                          ),
+                        // Floating Action Button
+                        Positioned(
+                          bottom: 12,
+                          right: 12,
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.primary,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(color: Colors.black26, blurRadius: 6, offset: Offset(0, 2)),
+                              ],
+                            ),
+                            child: const Icon(Icons.play_arrow_rounded, color: Colors.black, size: 22),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),

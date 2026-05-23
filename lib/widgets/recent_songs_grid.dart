@@ -120,7 +120,7 @@ class RecentPlaylistsGrid extends StatelessWidget {
                       context.read<MusicPlayerProvider>().playSong(playlist.songs.first, queue: playlist.songs, fromQueue: true);
                     },
                     icon: const Icon(Icons.play_arrow_rounded, color: Colors.black),
-                    style: IconButton.styleFrom(backgroundColor: Theme.of(context).primaryColor),
+                    style: IconButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.primary),
                   ),
                 ],
               ),

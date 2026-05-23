@@ -67,10 +67,14 @@ class YoutubeExplodeGateway implements YoutubeGateway {
 
   @override
   Future<String> getAudioUrl(String videoId) async {
+    final clientSets = [
+      [YoutubeApiClient.ios, YoutubeApiClient.androidVr],
+      [YoutubeApiClient.tv, YoutubeApiClient.safari],
+    ];
     for (int attempt = 0; attempt < 2; attempt++) {
       try {
         final manifest = await _yt.videos.streamsClient
-            .getManifest(videoId, ytClients: [YoutubeApiClient.ios, YoutubeApiClient.androidVr])
+            .getManifest(videoId, ytClients: clientSets[attempt])
             .timeout(const Duration(seconds: 80));
         final streams = manifest.audioOnly
             .where((s) => s.codec.mimeType.startsWith('audio/'))
@@ -249,6 +253,7 @@ class YouTubeService {
     } on YouTubeRateLimitException {
       rethrow;
     } catch (e) {
+      print('[YouTubeService.getAudioUrl] Error for $videoId: $e');
       return '';
     }
   }

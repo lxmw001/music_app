@@ -67,7 +67,7 @@ class _SongListTileState extends State<SongListTile> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor = Theme.of(context).primaryColor;
+    final primaryColor = Theme.of(context).colorScheme.primary;
     final l10n = AppLocalizations.of(context)!;
     final player = context.read<MusicPlayerProvider>();
     

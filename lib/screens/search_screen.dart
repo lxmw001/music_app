@@ -263,7 +263,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 itemBuilder: (context, i) {
                   final chip = chips[i];
                   final active = _activeFilter == chip.toLowerCase();
-                  final primary = Theme.of(context).primaryColor;
+                  final primary = Theme.of(context).colorScheme.primary;
                   return Padding(
                     padding: const EdgeInsets.only(right: 10),
                     child: ChoiceChip(
@@ -403,7 +403,7 @@ class _SearchScreenState extends State<SearchScreen> {
     alignment: Alignment.centerRight,
     child: TextButton(
       onPressed: onTap,
-      child: Text('See all $label', style: TextStyle(color: Theme.of(context).primaryColor, fontWeight: FontWeight.bold)),
+      child: Text('See all $label', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
     ),
   );
 
