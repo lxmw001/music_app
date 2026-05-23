@@ -72,6 +72,11 @@ class PlayHistoryService {
     await _saveSongMetadata(song);
   }
 
+  Future<int> getLastPosition(String songId) async {
+    final data = await _loadHistory();
+    return (data[songId]?['lastPosition'] as int?) ?? 0;
+  }
+
   Future<bool> isLiked(String songId) async {
     final data = await _loadHistory();
     return (data[songId]?['manualLike'] as bool?) ?? false;

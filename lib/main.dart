@@ -313,7 +313,7 @@ class _MainScreenState extends State<MainScreen> {
                 left: 12, right: 12, bottom: 95,
                 child: Consumer<MusicPlayerProvider>(
                   builder: (context, player, child) {
-                    if (player.currentSong == null) return const SizedBox.shrink();
+                    if (player.currentSong == null || player.isFastModeActive) return const SizedBox.shrink();
                     return _buildMiniPlayer(player);
                   },
                 ),
@@ -443,7 +443,7 @@ class _MainScreenState extends State<MainScreen> {
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
             child: Container(
-              color: Colors.white.withValues(alpha: 0.08),
+              color: Colors.white.withValues(alpha: 0.12),
               child: Stack(
                 children: [
                   // LIQUID PROGRESS FILL
@@ -508,7 +508,7 @@ class _MainScreenState extends State<MainScreen> {
                             child: MiniEqualizer(isPlaying: true, color: theme.colorScheme.primary),
                           ),
                         IconButton(
-                          icon: Icon(player.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded, size: 34),
+                          icon: Icon(player.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded, size: 34, color: Colors.white),
                           onPressed: () {
                             HapticFeedback.lightImpact();
                             player.isPlaying ? player.pause() : player.resume();
@@ -528,7 +528,8 @@ class _MainScreenState extends State<MainScreen> {
                       child: Container(
                         height: 3,
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.primary,
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(2),
                           boxShadow: [
                             BoxShadow(color: theme.colorScheme.primary.withValues(alpha: 0.6), blurRadius: 6),
                           ],

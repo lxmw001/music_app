@@ -296,6 +296,9 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       if (savedNormal != null) {
         _normalQueue = savedNormal.queue;
         _normalIndex = savedNormal.currentIndex;
+        final songId = _normalQueue[_normalIndex].id;
+        final pos = await _historyService.getLastPosition(songId);
+        if (pos > 0) _lastRestoredPosition = Duration(seconds: pos);
       }
       if (savedVibeQueue != null) {
         _vibeQueue = savedVibeQueue.queue;
@@ -690,13 +693,16 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     _isFastModeActive = false;
     _activeVibeId = null;
     _activeSubCategoryId = null;
-    _lastSavedVibe = null;
-    _historyService.clearVibeState();
+    // Keep _lastSavedVibe so "Continue Vibe" card shows in fast mode section
     
+    // Stop fast mode playback
+    _audioHandler.stop();
+    
+    // Restore normal song in UI without playing
     if (_normalQueue.isNotEmpty) {
-      playSong(_normalQueue[_normalIndex], fromQueue: true);
+      _currentSong = _normalQueue[_normalIndex];
     } else {
-      stop();
+      _currentSong = null;
     }
     notifyListeners();
   }

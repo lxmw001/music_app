@@ -77,7 +77,10 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
         NetworkImage(imageUrl),
         size: const Size(100, 100),
       );
-      final color = generator.dominantColor?.color ?? Colors.grey.shade900;
+      final raw = generator.dominantColor?.color ?? Colors.grey.shade900;
+      // Ensure minimum brightness so gradient provides contrast for white text
+      final hsl = HSLColor.fromColor(raw);
+      final color = hsl.lightness < 0.15 ? hsl.withLightness(0.2).toColor() : raw;
       if (mounted) {
         setState(() => _dominantColor = color);
         context.read<ThemeProvider>().updateAdaptiveColor(color);
@@ -170,11 +173,26 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          _dominantColor.withValues(alpha: 0.6),
-                          Colors.black.withValues(alpha: 0.8),
-                          Colors.black,
+                          Colors.black.withValues(alpha: 0.5),
+                          Colors.black.withValues(alpha: 0.75),
+                          Colors.black.withValues(alpha: 0.95),
                         ],
                       ),
+                    ),
+                  ),
+                ),
+              ),
+              // Color tint layer
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        _dominantColor.withValues(alpha: 0.3),
+                        Colors.transparent,
+                      ],
                     ),
                   ),
                 ),
