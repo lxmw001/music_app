@@ -53,16 +53,20 @@ class _SongListTileState extends State<SongListTile> with SingleTickerProviderSt
 
   Future<void> _checkDownloaded() async {
     final path = await _downloadService.getDownloadedPathById(widget.song.id);
-    if (mounted) setState(() => _isDownloaded = path != null);
+    if (mounted) {
+      setState(() => _isDownloaded = path != null);
+    }
   }
 
   Future<void> _download() async {
     setState(() => _isDownloading = true);
     final path = await _downloadService.downloadSong(widget.song);
-    if (mounted) setState(() { 
-      _isDownloading = false; 
-      _isDownloaded = path != null; 
-    });
+    if (mounted) {
+      setState(() {
+        _isDownloading = false;
+        _isDownloaded = path != null;
+      });
+    }
   }
 
   @override

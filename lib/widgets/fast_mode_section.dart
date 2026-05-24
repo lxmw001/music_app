@@ -1,11 +1,9 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../models/vibe.dart';
 import '../providers/music_player_provider.dart';
 import '../screens/fast_mode_picker_screen.dart';
-import 'mini_equalizer.dart';
 
 class FastModeSection extends StatelessWidget {
   const FastModeSection({super.key});

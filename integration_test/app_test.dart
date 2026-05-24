@@ -6,6 +6,8 @@ import 'package:youtube_explode_dart/youtube_explode_dart.dart' hide Playlist;
 
 import 'package:music_app/main.dart';
 import 'package:music_app/models/music_models.dart';
+import 'package:music_app/models/user_profile.dart';
+import 'package:music_app/models/vibe.dart';
 import 'package:music_app/providers/music_player_provider.dart';
 import 'package:music_app/services/youtube_service.dart';
 
@@ -59,6 +61,14 @@ class FakeMusicPlayerProvider extends ChangeNotifier implements MusicPlayerProvi
   @override bool get isInitialized => true;
   @override bool get autoAddSuggestions => false;
   @override bool get isFetchingSuggestions => false;
+  @override bool get isFetchingVibe => false;
+  @override bool get isFastModeActive => false;
+  @override String? get activeVibeId => null;
+  @override String? get activeSubCategoryId => null;
+  @override ({String vibeId, String? subCategoryId})? get lastSavedVibe => null;
+  @override Color? get dominantColor => null;
+  @override UserProfile? get userProfile => null;
+  @override List<Vibe> get vibes => [];
   @override List<Song> get suggestedSongs => [];
   @override List<Song> get queue => _queue;
   @override int get currentIndex => 0;
@@ -86,6 +96,9 @@ class FakeMusicPlayerProvider extends ChangeNotifier implements MusicPlayerProvi
   @override void addSuggestedToQueue(Song song) {}
   @override void clearSuggestions() {}
   @override Future<void> saveSearch(String query) async {}
+  @override Future<void> deleteSearch(String query) async {}
+  @override Future<List<String>> getSearchHistory() async => [];
+  @override Future<void> clearSearchHistory() async {}
   @override Future<List<Song>> getMostLikedFromHistory() async => [];
   @override Future<List<Song>> getRecentSongs() async => [];
   @override Future<bool> isLiked(String songId) async => false;
@@ -93,6 +106,10 @@ class FakeMusicPlayerProvider extends ChangeNotifier implements MusicPlayerProvi
   @override Future<List<({Song song, int likedCount, int playCount})>> getMostLiked(List<Song> knownSongs) async => [];
   @override Future<List<Playlist>> loadPlaylists() async => [];
   @override Future<void> deletePlaylist(String id) async {}
+  @override Future<void> playFastMode({required String vibeId, String? subCategoryId}) async {}
+  @override Future<void> resumeLastVibe() async {}
+  @override void exitFastMode() {}
+  @override Future<void> refreshVibes() async {}
 }
 
 // --- Test app ---

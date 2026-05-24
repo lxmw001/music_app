@@ -1,3 +1,4 @@
+import "package:music_app/utils/logger.dart";
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
@@ -24,7 +25,7 @@ class _YouTubeLoginWebViewState extends State<YouTubeLoginWebView> {
     if (cookies.length < 2) return;
 
     _saving = true;
-    print('[YouTubeLogin] saving cookies: ${cookies.keys.toList()}');
+    rlog('[YouTubeLogin] saving cookies: ${cookies.keys.toList()}');
     await YoutubeCookieAuth.saveCookies(cookies);
     if (mounted) Navigator.of(context).pop(true);
   }

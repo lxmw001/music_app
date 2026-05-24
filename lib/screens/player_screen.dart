@@ -23,7 +23,6 @@ class PlayerScreen extends StatefulWidget {
 class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMixin {
   final _downloadService = DownloadService();
   bool _isDownloading = false;
-  double _downloadProgress = 0;
   String? _downloadedPath;
 
   Color _dominantColor = Colors.grey.shade900;
@@ -110,9 +109,9 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
     final song = context.read<MusicPlayerProvider>().currentSong;
     if (song == null) return;
     HapticFeedback.lightImpact();
-    setState(() { _isDownloading = true; _downloadProgress = 0; });
+    setState(() { _isDownloading = true; });
     final path = await _downloadService.downloadSong(song, onProgress: (received, total) {
-      if (total > 0 && mounted) setState(() => _downloadProgress = received / total);
+      // progress unused in UI currently
     });
     if (mounted) setState(() { _isDownloading = false; _downloadedPath = path; });
     if (mounted) {

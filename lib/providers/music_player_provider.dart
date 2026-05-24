@@ -10,7 +10,6 @@ import '../models/vibe.dart';
 import '../services/audio_handler.dart';
 import '../services/youtube_service.dart';
 import '../services/play_history_service.dart';
-import '../services/lastfm_service.dart';
 import '../services/download_service.dart';
 import '../services/youtube_service.dart' show YouTubeService, YouTubeRateLimitException;
 import '../services/music_server_service.dart';
@@ -81,7 +80,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   final DownloadService _downloadService = DownloadService();
   final MusicServerService _serverService = MusicServerService();
   final ProfileService _profileService = ProfileService();
-  final LastFmService _lastFmService = LastFmService();
 
   YouTubeService get youtubeService => _youtubeService;
 
@@ -371,7 +369,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         notifyListeners();
       }
     } catch (e) {
-      print('[MusicPlayerProvider] refreshVibes error: $e');
+      rlog('[MusicPlayerProvider] refreshVibes error: $e');
     }
   }
 
@@ -561,7 +559,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     }
     
     if (audioUrl.isEmpty) {
-      print('[MusicPlayerProvider] stream URL empty for ${song.title} (id=${song.id})');
       rlog('[MusicPlayerProvider] stream URL empty for ${song.title} (id=${song.id})');
       _onStreamError?.call(song.title);
       notifyListeners();
@@ -584,7 +581,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       }
       await _audioHandler.play();
     } catch (e) {
-      print('[MusicPlayerProvider] setAudioSource failed for ${song.title}: $e');
       rlog('[MusicPlayerProvider] setAudioSource failed for ${song.title}: $e');
       _loadingAudioIds.remove(song.id);
       _onStreamError?.call(song.title);
@@ -594,7 +590,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       _isSwitchingSong = false;
     }
     
-    _consecutiveSkips = 0;
     _historyService.savePosition(song, 0);
     _startPositionSaveTimer(song);
     notifyListeners();
@@ -627,9 +622,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
 
   @override
   Future<void> playFastMode({required String vibeId, String? subCategoryId}) async {
-    if (_userProfile == null) {
-      _userProfile = await _profileService.getProfile();
-    }
+    _userProfile ??= await _profileService.getProfile();
 
     _isFetchingVibe = true;
     _activeVibeId = vibeId;
@@ -708,10 +701,9 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   }
 
   bool _isSeeding = false;
-  int _consecutiveSkips = 0;
 
   void _addToQueue(List<Song> songs, String excludeId) {
-    final currentQueue = this.queue;
+    final currentQueue = queue;
     final existing = currentQueue.map((s) => s.id).toSet();
     final toAdd = songs.where((s) =>
       s.id != excludeId &&
@@ -780,11 +772,10 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
 
   Future<void> _nextSongAsync() async {
     if (!_isInitialized) return;
-    final currentQueue = this.queue;
+    final currentQueue = queue;
     var index = currentIndex;
     
     if (currentQueue.isNotEmpty && index < currentQueue.length - 1) {
-      _consecutiveSkips = 0;
       index++;
       if (_isFastModeActive) {
         _vibeIndex = index;
@@ -795,7 +786,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       }
       playSong(currentQueue[index], fromQueue: true);
     } else if (_suggestedSongs.isNotEmpty) {
-      _consecutiveSkips = 0;
       final next = _suggestedSongs.first;
       _suggestedSongs = [];
       if (_isFastModeActive) {
@@ -822,7 +812,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
           _usedSeedQueries.add(query);
           final songs = await _youtubeService.searchByQuery(query, maxResults: 20);
           _addToQueue(songs, _currentSong!.id);
-          final currentQueue = this.queue;
+          final currentQueue = queue;
           final index = currentIndex;
           if (currentQueue.isNotEmpty && index < currentQueue.length - 1) {
             final nextIndex = index + 1;
@@ -859,7 +849,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   @override
   void previousSong() {
     if (!_isInitialized) return;
-    final currentQueue = this.queue;
+    final currentQueue = queue;
     var index = currentIndex;
     
     if (currentQueue.isNotEmpty && index > 0) {
@@ -900,7 +890,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     try {
       _suggestedSongs = await _youtubeService.getSuggestedSongs(_currentSong!.id, maxResults: 5);
     } catch (e) {
-      print('Error fetching suggestions: $e');
+      rlog('Error fetching suggestions: $e');
     } finally {
       _isFetchingSuggestions = false;
       notifyListeners();
