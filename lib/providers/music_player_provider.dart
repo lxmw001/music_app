@@ -119,6 +119,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   int _normalIndex = 0;
   List<Song> _vibeQueue = [];
   int _vibeIndex = 0;
+  final Set<String> _vibePlayedIds = {};
 
   bool _isShuffled = false;
   bool _isRepeating = false;
@@ -624,36 +625,68 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   Future<void> playFastMode({required String vibeId, String? subCategoryId}) async {
     _userProfile ??= await _profileService.getProfile();
 
-    _isFetchingVibe = true;
     _activeVibeId = vibeId;
     _activeSubCategoryId = subCategoryId;
     _isFastModeActive = true;
     _lastSavedVibe = (vibeId: vibeId, subCategoryId: subCategoryId);
     _historyService.saveVibeState(vibeId, subCategoryId);
-    notifyListeners();
 
+    // If we already have songs for this vibe, play one immediately
+    final hasPreviousSongs = _vibeQueue.isNotEmpty;
+    if (hasPreviousSongs) {
+      _vibePlayedIds.clear(); // reload — allow repeats from fresh pick
+      final song = _pickVibeSong();
+      _vibeIndex = 0;
+      notifyListeners();
+      playSong(song, queue: List.from(_vibeQueue), fromQueue: true);
+    } else {
+      _isFetchingVibe = true;
+      notifyListeners();
+    }
+
+    // Fetch new songs in background
+    _fetchVibeInBackground(vibeId, subCategoryId, playImmediately: !hasPreviousSongs);
+  }
+
+  Song _pickVibeSong() {
+    final unplayed = _vibeQueue.where((s) => !_vibePlayedIds.contains(s.id)).toList();
+    if (unplayed.isEmpty) {
+      // All played — reset and pick from full queue
+      _vibePlayedIds.clear();
+      return (_vibeQueue.toList()..shuffle()).first;
+    }
+    unplayed.shuffle();
+    return unplayed.first;
+  }
+
+  Future<void> _fetchVibeInBackground(String vibeId, String? subCategoryId, {bool playImmediately = false}) async {
     try {
+      _isFetchingVibe = true;
+      notifyListeners();
       final songs = await _serverService.fetchAIVibe(
         vibeId: vibeId,
         subCategoryId: subCategoryId,
         profile: _userProfile ?? UserProfile(favoriteGenres: ['Pop', 'Rock']),
       );
-
       if (songs.isNotEmpty) {
         _vibeQueue = songs;
+        _vibePlayedIds.clear(); // fresh batch — reset played tracking
         _vibeIndex = 0;
         _historyService.saveVibeQueue(_vibeQueue, _vibeIndex);
-        notifyListeners();
-        await playSong(songs.first, queue: songs, fromQueue: true);
-      } else {
+        if (playImmediately) {
+          final song = _pickVibeSong();
+          notifyListeners();
+          await playSong(song, queue: songs, fromQueue: true);
+        }
+      } else if (playImmediately) {
         _isFastModeActive = false;
         _lastSavedVibe = null;
-        _historyService.clearVibeState();
       }
     } catch (e) {
-      _isFastModeActive = false;
-      _lastSavedVibe = null;
-      _historyService.clearVibeState();
+      if (playImmediately) {
+        _isFastModeActive = false;
+        _lastSavedVibe = null;
+      }
       rethrow;
     } finally {
       _isFetchingVibe = false;
@@ -774,7 +807,20 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     if (!_isInitialized) return;
     final currentQueue = queue;
     var index = currentIndex;
+
+    // Mark current song as played in fast mode
+    if (_isFastModeActive && _currentSong != null) {
+      _vibePlayedIds.add(_currentSong!.id);
+    }
     
+    if (_isFastModeActive && _vibeQueue.isNotEmpty) {
+      // Pick next unplayed song
+      final song = _pickVibeSong();
+      _vibePlayedIds.add(song.id);
+      playSong(song, fromQueue: true);
+      return;
+    }
+
     if (currentQueue.isNotEmpty && index < currentQueue.length - 1) {
       index++;
       if (_isFastModeActive) {
