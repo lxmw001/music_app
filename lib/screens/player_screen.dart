@@ -23,6 +23,7 @@ class PlayerScreen extends StatefulWidget {
 class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMixin {
   final _downloadService = DownloadService();
   bool _isDownloading = false;
+  double _downloadProgress = 0;
   String? _downloadedPath;
 
   Color _dominantColor = Colors.grey.shade900;
@@ -109,9 +110,14 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
     final song = context.read<MusicPlayerProvider>().currentSong;
     if (song == null) return;
     HapticFeedback.lightImpact();
-    setState(() { _isDownloading = true; });
+    setState(() {
+      _isDownloading = true;
+      _downloadProgress = 0;
+    });
     final path = await _downloadService.downloadSong(song, onProgress: (received, total) {
-      // progress unused in UI currently
+      if (total > 0 && mounted) {
+        setState(() => _downloadProgress = received / total);
+      }
     });
     if (mounted) setState(() { _isDownloading = false; _downloadedPath = path; });
     if (mounted) {
@@ -473,7 +479,13 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
           ),
           const Spacer(),
           if (_isDownloading)
-            const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 3))
+            SizedBox(
+              width: 24, height: 24,
+              child: CircularProgressIndicator(
+                value: _downloadProgress > 0 ? _downloadProgress : null,
+                strokeWidth: 3,
+              ),
+            )
           else if (context.watch<AuthProvider>().canDownload)
             IconButton(
               icon: Icon(_downloadedPath != null ? Icons.download_done_rounded : Icons.download_rounded,
