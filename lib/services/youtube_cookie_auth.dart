@@ -1,3 +1,4 @@
+import "package:music_app/utils/logger.dart";
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -11,11 +12,11 @@ class YoutubeCookieAuth {
     final needed = {'SID', 'HSID', 'SSID', 'APISID', 'SAPISID', '__Secure-3PSID'};
     final result = <String, String>{};
     final cookies = await _cookieManager.getCookies(url: WebUri('https://www.youtube.com'), iosBelow11WebViewController: null);
-    print('[YoutubeCookieAuth] total cookies: ${cookies.length}, names: ${cookies.map((c) => c.name).toList()}');
+    rlog('[YoutubeCookieAuth] total cookies: ${cookies.length}, names: ${cookies.map((c) => c.name).toList()}');
     for (final c in cookies) {
       if (needed.contains(c.name)) result[c.name] = c.value.toString();
     }
-    print('[YoutubeCookieAuth] matched: ${result.keys.toList()}');
+    rlog('[YoutubeCookieAuth] matched: ${result.keys.toList()}');
     return result;
   }
 

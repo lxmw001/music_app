@@ -1,3 +1,4 @@
+import "package:music_app/utils/logger.dart";
 import 'dart:async';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:http/http.dart' as http;
@@ -9,7 +10,6 @@ import 'audio_cache_service.dart';
 import 'download_service.dart';
 import 'music_server_service.dart';
 import 'stream_url_cache.dart';
-import 'cookie_http_client.dart';
 import 'auth_http_client.dart';
 import 'youtube_cookie_auth.dart';
 
@@ -196,7 +196,6 @@ class YouTubeService {
   final http.Client _httpClient;
   final GeminiService _gemini;
   final AudioCacheService _audioCache = AudioCacheService();
-  final LastFmService _lastFm;
   final MusicServerService _server;
   final StreamUrlCache _streamUrlCache = StreamUrlCache();
   late final DownloadService _downloadService;
@@ -205,7 +204,6 @@ class YouTubeService {
       : _gateway = gateway ?? YoutubeExplodeGateway(),
         _httpClient = httpClient ?? http.Client(),
         _gemini = gemini ?? GeminiService(),
-        _lastFm = lastFm ?? LastFmService(),
         _server = server ?? MusicServerService() {
     _downloadService = downloadService ?? DownloadService();
     if (_gateway is YoutubeExplodeGateway) {
@@ -253,7 +251,7 @@ class YouTubeService {
     } on YouTubeRateLimitException {
       rethrow;
     } catch (e) {
-      print('[YouTubeService.getAudioUrl] Error for $videoId: $e');
+      rlog('[YouTubeService.getAudioUrl] Error for $videoId: $e');
       return '';
     }
   }

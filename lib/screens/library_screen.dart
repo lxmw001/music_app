@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
 import '../models/music_models.dart';
 import '../providers/music_player_provider.dart';
-import '../providers/theme_provider.dart';
 import '../services/download_service.dart';
 import '../widgets/song_list_tile.dart';
 import '../widgets/animated_list_item.dart';
@@ -63,17 +62,7 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
   }
 
   List<Song> get _displaySongs {
-    final Map<String, Song> uniqueSongs = {};
-    for (var s in _likedSongs) uniqueSongs[s.id] = s;
-    for (var s in _downloadedSongs) uniqueSongs[s.id] = s;
-    for (var p in _playlists) {
-      for (var s in p.songs) uniqueSongs[s.id] = s;
-    }
-    
-    var songs = uniqueSongs.values.toList();
-    if (_offlineOnly) {
-      songs = songs.where((s) => _downloadedSongs.any((d) => d.id == s.id)).toList();
-    }
+    var songs = _allSongsBase;
     if (_selectedType != null) {
       songs = songs.where((s) => s.type == _selectedType).toList();
     }
@@ -434,9 +423,17 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
 
   List<Song> get _allSongsBase {
     final Map<String, Song> uniqueSongs = {};
-    for (var s in _likedSongs) uniqueSongs[s.id] = s;
-    for (var s in _downloadedSongs) uniqueSongs[s.id] = s;
-    for (var p in _playlists) for (var s in p.songs) uniqueSongs[s.id] = s;
+    for (var s in _likedSongs) {
+      uniqueSongs[s.id] = s;
+    }
+    for (var s in _downloadedSongs) {
+      uniqueSongs[s.id] = s;
+    }
+    for (var p in _playlists) {
+      for (var s in p.songs) {
+        uniqueSongs[s.id] = s;
+      }
+    }
     var songs = uniqueSongs.values.toList();
     if (_offlineOnly) {
       songs = songs.where((s) => _downloadedSongs.any((d) => d.id == s.id)).toList();

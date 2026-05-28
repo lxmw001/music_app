@@ -17,23 +17,23 @@ class AudioPlayerHandler extends BaseAudioHandler {
 
   void _init() {
     // Throttle playbackState updates to ~4/sec to avoid Android notification rate limit
-    DateTime _lastEmit = DateTime.fromMillisecondsSinceEpoch(0);
-    PlaybackState? _pending;
-    Timer? _throttleTimer;
+    DateTime lastEmit = DateTime.fromMillisecondsSinceEpoch(0);
+    PlaybackState? pending;
+    Timer? throttleTimer;
 
     void emit(PlaybackState state) {
       final now = DateTime.now();
-      if (now.difference(_lastEmit).inMilliseconds >= 250) {
-        _lastEmit = now;
+      if (now.difference(lastEmit).inMilliseconds >= 250) {
+        lastEmit = now;
         playbackState.add(state);
       } else {
-        _pending = state;
-        _throttleTimer ??= Timer(const Duration(milliseconds: 250), () {
-          _throttleTimer = null;
-          if (_pending != null) {
-            _lastEmit = DateTime.now();
-            playbackState.add(_pending!);
-            _pending = null;
+        pending = state;
+        throttleTimer ??= Timer(const Duration(milliseconds: 250), () {
+          throttleTimer = null;
+          if (pending != null) {
+            lastEmit = DateTime.now();
+            playbackState.add(pending!);
+            pending = null;
           }
         });
       }
@@ -114,7 +114,7 @@ class AudioPlayerHandler extends BaseAudioHandler {
   }
 
   Future<void> setAudioSource(String url, MediaItem item) async {
-    this.mediaItem.add(item);
+    mediaItem.add(item);
     final isLocal = url.startsWith('/') || url.startsWith('file://');
     final uri = isLocal ? Uri.file(url) : Uri.parse(url);
     final headers = isLocal ? null : (_isWebm(url) ? null : _headersForUrl(url));

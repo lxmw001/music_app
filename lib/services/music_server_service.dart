@@ -1,3 +1,4 @@
+import "package:music_app/utils/logger.dart";
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -7,11 +8,9 @@ import '../models/vibe.dart';
 import 'api_service.dart';
 
 class MusicServerService {
-  static const _base = 'https://music-app-server-lupbg4y2ha-uc.a.run.app';
-  final http.Client _client;
   final ApiService _api = ApiService();
 
-  MusicServerService({http.Client? client}) : _client = client ?? http.Client();
+  MusicServerService({http.Client? client});
 
   Future<MusicSearchResult> searchSongs(String query) async {
     try {
@@ -25,7 +24,7 @@ class MusicServerService {
         hasMoreSongs: data['hasMore'] as bool? ?? false,
       );
     } catch (e) {
-      print('[MusicServer] search error: $e');
+      rlog('[MusicServer] search error: $e');
       return const MusicSearchResult();
     }
   }
@@ -47,7 +46,7 @@ class MusicServerService {
       
       return result;
     } catch (e) {
-      print('[MusicServer] trending error: $e');
+      rlog('[MusicServer] trending error: $e');
       return getCachedTrending();
     }
   }
@@ -106,7 +105,7 @@ class MusicServerService {
       final path = isMix ? '/songs/mixes/$id/stream-url' : '/songs/$id/stream-url';
       await _api.post(path, body: {'streamUrl': streamUrl, 'expiresAt': expiresAt});
     } catch (e) {
-      print('[MusicServer] pushStreamUrl error: $e');
+      rlog('[MusicServer] pushStreamUrl error: $e');
     }
   }
 
@@ -119,7 +118,7 @@ class MusicServerService {
       final List songs = data is List ? data : (data['songs'] as List? ?? []);
       return _mapSongs(songs);
     } catch (e) {
-      print('[MusicServer] generate-playlist error: $e');
+      rlog('[MusicServer] generate-playlist error: $e');
       return [];
     }
   }
@@ -139,7 +138,7 @@ class MusicServerService {
       
       return vibes;
     } catch (e) {
-      print('[MusicServer] getVibes error: $e');
+      rlog('[MusicServer] getVibes error: $e');
       return getCachedVibes();
     }
   }
@@ -173,7 +172,7 @@ class MusicServerService {
       'dayOfWeek': _getDayName(now.weekday),
     };
 
-    print('[MusicServer] Requesting AI Vibe: $vibeId');
+    rlog('[MusicServer] Requesting AI Vibe: $vibeId');
     try {
       // AI generation involves LLM processing and searches, so we use a longer timeout (60s)
       final data = await _api.post('/vibe/generate', body: payload, timeout: const Duration(seconds: 60));
@@ -182,7 +181,7 @@ class MusicServerService {
       final List songsData = data is List ? data : (data['songs'] as List? ?? []);
       return _mapSongs(songsData);
     } catch (e) {
-      print('[MusicServer] AI Vibe error: $e');
+      rlog('[MusicServer] AI Vibe error: $e');
       return [];
     }
   }

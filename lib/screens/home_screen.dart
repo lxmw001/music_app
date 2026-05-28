@@ -12,7 +12,6 @@ import '../services/play_history_service.dart';
 import '../widgets/song_card_list.dart';
 import '../widgets/recent_songs_grid.dart';
 import '../widgets/shimmer.dart';
-import '../widgets/animated_list_item.dart';
 import '../widgets/fast_mode_section.dart';
 import 'login_screen.dart';
 
