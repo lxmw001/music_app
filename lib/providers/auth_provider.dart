@@ -1,3 +1,4 @@
+import "package:music_app/utils/logger.dart";
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -15,7 +16,7 @@ class AuthProvider extends ChangeNotifier {
     if (_youtubeService == s) return; // already set, don't reload
     _youtubeService = s;
     s.reloadAuthCookies();
-    print('[Auth] YouTubeService set');
+    rlog('[Auth] YouTubeService set');
   }
 
   User? get user => _auth.currentUser;
@@ -52,10 +53,10 @@ class AuthProvider extends ChangeNotifier {
       final perms = result?.claims?['permissions'] as List<dynamic>? ?? [];
       _permissions = perms.map((e) => e.toString()).toSet();
       await prefs.setStringList(_permsCacheKey, _permissions.toList());
-      print('[Auth] permissions refreshed: $_permissions');
+      rlog('[Auth] permissions refreshed: $_permissions');
       notifyListeners();
     } catch (e) {
-      print('[Auth] using cached permissions: $_permissions');
+      rlog('[Auth] using cached permissions: $_permissions');
     }
   }
 
@@ -74,7 +75,7 @@ class AuthProvider extends ChangeNotifier {
       await _refreshPermissions();
       return true;
     } catch (e) {
-      print('[Auth] signInWithGoogle error: $e');
+      rlog('[Auth] signInWithGoogle error: $e');
       return false;
     } finally {
       _loading = false;
@@ -100,12 +101,12 @@ class AuthProvider extends ChangeNotifier {
     if (!isSignedIn || serverId.isEmpty) return;
     if (liked) {
       _api.post('/users/me/liked-songs/$serverId').catchError((e) {
-        print('[Auth] syncLike error: $e');
+        rlog('[Auth] syncLike error: $e');
         return null;
       });
     } else {
       _api.delete('/users/me/liked-songs/$serverId').catchError((e) {
-        print('[Auth] syncUnlike error: $e');
+        rlog('[Auth] syncUnlike error: $e');
       });
     }
   }
@@ -115,12 +116,12 @@ class AuthProvider extends ChangeNotifier {
     if (!isSignedIn || serverId.isEmpty) return;
     if (downloaded) {
       _api.post('/users/me/downloads/$serverId').catchError((e) {
-        print('[Auth] syncDownload error: $e');
+        rlog('[Auth] syncDownload error: $e');
         return null;
       });
     } else {
       _api.delete('/users/me/downloads/$serverId').catchError((e) {
-        print('[Auth] syncDeleteDownload error: $e');
+        rlog('[Auth] syncDeleteDownload error: $e');
       });
     }
   }

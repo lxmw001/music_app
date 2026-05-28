@@ -1,3 +1,4 @@
+import "package:music_app/utils/logger.dart";
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -20,18 +21,18 @@ class LastFmService {
 
   Future<dynamic> _get(String method, Map<String, String> extra) async {
     if (!_hasApiKey) {
-      print('[LastFm] no API key set, skipping $method');
+      rlog('[LastFm] no API key set, skipping $method');
       return null;
     }
-    print('[LastFm] calling $method');
+    rlog('[LastFm] calling $method');
     try {
       final uri = Uri.parse(_base).replace(queryParameters: _params(method, extra));
       final response = await _client.get(uri).timeout(const Duration(seconds: 10));
-      print('[LastFm] $method response: ${response.statusCode}');
+      rlog('[LastFm] $method response: ${response.statusCode}');
       if (response.statusCode != 200) return null;
       return jsonDecode(response.body);
     } catch (e) {
-      print('[LastFm] $method error: $e');
+      rlog('[LastFm] $method error: $e');
       return null;
     }
   }
@@ -47,7 +48,7 @@ class LastFmService {
       artist: t['artist'] as String,
       imageUrl: _bestImage(t['image'] as List?),
     )).toList();
-    print('[LastFm] search "$query": ${result.length} results');
+    rlog('[LastFm] search "$query": ${result.length} results');
     return result;
   }
 
@@ -60,22 +61,22 @@ class LastFmService {
 
   Future<List<String>> getArtistTopTracks(String artist, {int limit = 10}) async {
     final data = await _get('artist.getTopTracks', {'artist': artist, 'limit': '$limit'});
-    if (data == null) { print('[LastFm] no API key or error for top tracks: $artist'); return []; }
+    if (data == null) { rlog('[LastFm] no API key or error for top tracks: $artist'); return []; }
     final tracks = data['toptracks']?['track'] as List?;
     if (tracks == null) return [];
     final result = tracks.map((t) => '$artist - ${t['name']}').toList();
-    print('[LastFm] top tracks for "$artist": $result');
+    rlog('[LastFm] top tracks for "$artist": $result');
     return result;
   }
 
   /// Get similar artists — replaces Gemini for artist-based suggestions
   Future<List<String>> getSimilarArtists(String artist, {int limit = 5}) async {
     final data = await _get('artist.getSimilar', {'artist': artist, 'limit': '$limit'});
-    if (data == null) { print('[LastFm] no API key or error for similar artists: $artist'); return []; }
+    if (data == null) { rlog('[LastFm] no API key or error for similar artists: $artist'); return []; }
     final artists = data['similarartists']?['artist'] as List?;
     if (artists == null) return [];
     final result = artists.map((a) => a['name'] as String).toList();
-    print('[LastFm] similar artists for "$artist": $result');
+    rlog('[LastFm] similar artists for "$artist": $result');
     return result;
   }
 
@@ -88,13 +89,13 @@ class LastFmService {
     if (data == null) {
       // Offline — return cached tags if available
       final cached = prefs.getStringList(cacheKey);
-      if (cached != null) print('[LastFm] tags for "$artist" from cache: $cached');
+      if (cached != null) rlog('[LastFm] tags for "$artist" from cache: $cached');
       return cached ?? [];
     }
     final tags = data['toptags']?['tag'] as List?;
     if (tags == null) return [];
     final result = tags.map((t) => t['name'] as String).toList();
-    print('[LastFm] tags for "$artist": $result');
+    rlog('[LastFm] tags for "$artist": $result');
     await prefs.setStringList(cacheKey, result); // cache for offline use
     return result;
   }

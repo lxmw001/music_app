@@ -1,3 +1,4 @@
+import "package:music_app/utils/logger.dart";
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
@@ -29,9 +30,9 @@ class AudioCacheService {
     final file = await getCachedFile(videoId);
     final exists = await file.exists();
     if (exists) {
-      print('[AudioCacheService] Song $videoId is cached at: ${file.path}');
+      rlog('[AudioCacheService] Song $videoId is cached at: ${file.path}');
     } else {
-      print('[AudioCacheService] Song $videoId is not cached.');
+      rlog('[AudioCacheService] Song $videoId is not cached.');
     }
     return exists;
   }
@@ -40,10 +41,10 @@ class AudioCacheService {
   Future<String?> getCachedAudioPath(String videoId) async {
     final file = await getCachedFile(videoId);
     if (await file.exists()) {
-      print('[AudioCacheService] Song $videoId is cached at: \\${file.path}');
+      rlog('[AudioCacheService] Song $videoId is cached at: \\${file.path}');
       return file.path;
     } else {
-      print('[AudioCacheService] Song $videoId is not cached.');
+      rlog('[AudioCacheService] Song $videoId is not cached.');
       return null;
     }
   }
@@ -53,17 +54,17 @@ class AudioCacheService {
   Future<String> downloadAndCacheAudio(String videoId, YoutubeExplode yt) async {
     final file = await getCachedFile(videoId);
     if (await file.exists()) {
-      print('[AudioCacheService] Song $videoId is already cached at: ${file.path}');
+      rlog('[AudioCacheService] Song $videoId is already cached at: ${file.path}');
       return file.path;
     }
-    print('[AudioCacheService] Downloading and caching song $videoId...');
+    rlog('[AudioCacheService] Downloading and caching song $videoId...');
     final manifest = await yt.videos.streamsClient.getManifest(videoId);
     final streamInfo = manifest.audioOnly.withHighestBitrate();
     final stream = yt.videos.streamsClient.get(streamInfo);
     final output = file.openWrite();
     await stream.pipe(output);
     await output.close();
-    print('[AudioCacheService] Song $videoId cached at: ${file.path}');
+    rlog('[AudioCacheService] Song $videoId cached at: ${file.path}');
     await _enforceCacheLimit();
     return file.path;
   }
