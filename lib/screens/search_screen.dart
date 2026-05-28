@@ -8,6 +8,7 @@ import '../services/music_server_service.dart';
 import '../models/music_models.dart';
 import '../providers/music_player_provider.dart';
 import '../providers/theme_provider.dart';
+import '../providers/auth_provider.dart';
 import '../widgets/song_list_tile.dart';
 import '../widgets/mesh_gradient.dart';
 import '../widgets/animated_list_item.dart';
@@ -33,6 +34,7 @@ class _SearchScreenState extends State<SearchScreen> {
   String _currentQuery = '';
   String? _activeFilter; 
   bool _showRecentAndPopular = false;
+  bool _forceRefresh = false;
 
   bool get _hasResults => !_result.isEmpty;
 
@@ -80,7 +82,7 @@ class _SearchScreenState extends State<SearchScreen> {
       _activeFilter = null; 
       _showRecentAndPopular = false;
     });
-    final result = await _youtubeService.searchSongs(query);
+    final result = await _youtubeService.searchSongs(query, force: _forceRefresh);
     setState(() { 
       _result = result; 
       isLoading = false; 
@@ -133,6 +135,29 @@ class _SearchScreenState extends State<SearchScreen> {
               child: Column(
                 children: [
                   _buildSearchBar(),
+                  Consumer<AuthProvider>(
+                    builder: (context, auth, _) {
+                      if (!auth.isAdmin) return const SizedBox.shrink();
+                      return Padding(
+                        padding: const EdgeInsets.only(left: 16, right: 16, bottom: 4),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              height: 24, width: 24,
+                              child: Checkbox(
+                                value: _forceRefresh,
+                                onChanged: (v) => setState(() => _forceRefresh = v ?? false),
+                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                visualDensity: VisualDensity.compact,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Text('Force refresh', style: TextStyle(fontSize: 13, color: Colors.white70)),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
                   Expanded(
                     child: isLoading
                         ? const Center(child: CircularProgressIndicator())

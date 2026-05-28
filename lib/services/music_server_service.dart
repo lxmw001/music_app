@@ -12,9 +12,11 @@ class MusicServerService {
 
   MusicServerService({http.Client? client});
 
-  Future<MusicSearchResult> searchSongs(String query) async {
+  Future<MusicSearchResult> searchSongs(String query, {bool force = false}) async {
     try {
-      final data = await _api.get('/songs/search-youtube?query=${Uri.encodeComponent(query)}');
+      var path = '/songs/search-youtube?query=${Uri.encodeComponent(query)}';
+      if (force) path += '&force=true';
+      final data = await _api.get(path);
       
       return MusicSearchResult(
         songs: _mapSongs(data['songs'] as List? ?? []),
