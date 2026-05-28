@@ -24,6 +24,8 @@ class AuthProvider extends ChangeNotifier {
   bool _loading = false;
   bool get loading => _loading;
 
+  bool get isAdmin => user?.email == 'lx.mw001@gmail.com';
+
   // Cached permissions from token claims
   Set<String> _permissions = {};
   bool hasPermission(String permission) => _permissions.contains(permission);

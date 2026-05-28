@@ -228,9 +228,9 @@ class YouTubeService {
     }
   }
 
-  Future<MusicSearchResult> searchSongs(String query) =>
+  Future<MusicSearchResult> searchSongs(String query, {bool force = false}) =>
       safeCall(() async {
-        final result = await _server.searchSongs(query);
+        final result = await _server.searchSongs(query, force: force);
         if (!result.isEmpty) return result;
 
         final videos = await _gateway.search(query, limit: 30);
