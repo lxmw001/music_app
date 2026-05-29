@@ -14,6 +14,7 @@ class SongListTile extends StatefulWidget {
   final List<Song>? queue;
   final VoidCallback? onTap;
   final bool showDownload;
+  final bool isDownloading;
 
   const SongListTile({
     super.key, 
@@ -23,6 +24,7 @@ class SongListTile extends StatefulWidget {
     this.queue, 
     this.onTap, 
     this.showDownload = true,
+    this.isDownloading = false,
   });
 
   @override
@@ -191,7 +193,7 @@ class _SongListTileState extends State<SongListTile> with SingleTickerProviderSt
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (_isDownloading)
+                      if (_isDownloading || widget.isDownloading)
                         const SizedBox(
                           width: 20, height: 20,
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),

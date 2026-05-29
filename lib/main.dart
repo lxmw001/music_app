@@ -181,14 +181,6 @@ class _MainScreenState extends State<MainScreen> {
           behavior: SnackBarBehavior.floating,
         ));
       });
-      player.setOnStreamError((title) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Could not load "$title"'),
-          duration: const Duration(seconds: 3),
-          behavior: SnackBarBehavior.floating,
-        ));
-      });
     });
   }
 

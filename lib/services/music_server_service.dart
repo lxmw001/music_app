@@ -201,6 +201,20 @@ class MusicServerService {
     }
   }
 
+  // ── Find Alternative ────────────────────────────────────────────────────────
+
+  Future<Song?> findAlternative(String videoId) async {
+    try {
+      final data = await _api.post('/songs/$videoId/find-alternative', timeout: const Duration(seconds: 15));
+      final songData = data is Map<String, dynamic> ? data : null;
+      if (songData == null || songData.isEmpty) return null;
+      return _mapSongs([songData]).firstOrNull;
+    } catch (e) {
+      rlog('[MusicServer] findAlternative error: $e');
+      return null;
+    }
+  }
+
   // ── Songs ──────────────────────────────────────────────────────────────────
 
   List<Song> _mapSongs(List songs) => songs.map((s) => Song(

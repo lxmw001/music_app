@@ -16,7 +16,7 @@ class PlayHistoryService {
   Future<SharedPreferences> get _prefs => SharedPreferences.getInstance();
 
   Map<String, dynamic> _songToMap(Song song) => {
-    'id': song.id, 'title': song.title, 'artist': song.artist,
+    'id': song.id, 'serverId': song.serverId, 'title': song.title, 'artist': song.artist,
     'album': song.album, 'imageUrl': song.imageUrl,
     'audioUrl': '', 'duration': song.duration.inSeconds,
   };
@@ -219,6 +219,27 @@ class PlayHistoryService {
       imageUrl: pl['imageUrl'] ?? '',
       songs: (pl['songs'] as List).map((s) => Song.fromJson(s)).toList(),
     )).toList();
+  }
+
+  Future<void> updatePlaylistSong(String serverId, String newId, String newAudioUrl) async {
+    final p = await _prefs;
+    final raw = p.getString(_playlistsKey);
+    if (raw == null) return;
+    final playlists = List<Map<String, dynamic>>.from(jsonDecode(raw));
+    bool changed = false;
+    for (final pl in playlists) {
+      final songs = pl['songs'] as List;
+      for (final s in songs) {
+        if (s is Map<String, dynamic> && s['serverId'] == serverId) {
+          s['id'] = newId;
+          s['audioUrl'] = newAudioUrl;
+          changed = true;
+        }
+      }
+    }
+    if (changed) {
+      await p.setString(_playlistsKey, jsonEncode(playlists));
+    }
   }
 
   Future<void> deletePlaylist(String id) async {

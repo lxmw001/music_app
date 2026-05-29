@@ -1,3 +1,4 @@
+import "package:music_app/utils/logger.dart";
 import 'dart:convert';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
@@ -56,6 +57,7 @@ class DownloadService {
       await _saveMeta(song, file.path);
       return file.path;
     } catch (e) {
+      rlog('[DownloadService] downloadSong error for ${song.id}: $e');
       return null;
     }
   }
