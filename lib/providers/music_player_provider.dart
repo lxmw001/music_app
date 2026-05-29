@@ -103,8 +103,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   void setOnRateLimit(VoidCallback cb) => _onRateLimit = cb;
   bool _isRateLimited = false;
   bool _isSwitchingSong = false;
-  void Function(String title)? _onStreamError;
-  void setOnStreamError(void Function(String title) cb) => _onStreamError = cb;
 
   Timer? _positionSaveTimer;
   Timer? _stallTimer;
@@ -249,14 +247,9 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       });
 
       _audioHandler.playbackState.listen((state) {
-        if (state.processingState == AudioProcessingState.completed && !_isFetchingSuggestions && !_isSwitchingSong) {
+        if (state.processingState == AudioProcessingState.completed && !_isSwitchingSong) {
           final completedSongId = _currentSong?.id;
-          final duration = totalDuration;
-          final wasPlaying = _lastPosition.inSeconds >= 5;
-          final nearEnd = duration.inSeconds > 0
-              ? _lastPosition.inSeconds >= (duration.inSeconds - 20)
-              : _lastPosition.inSeconds >= 30;
-          if (completedSongId != null && wasPlaying && nearEnd) {
+          if (completedSongId != null) {
             _historyService.recordPlay(_currentSong!, _lastPosition.inSeconds);
             Future.delayed(const Duration(milliseconds: 300), () {
               if (_currentSong?.id != completedSongId) return;
@@ -453,6 +446,92 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     Future.microtask(() => playSong(offlineQueue.first, queue: offlineQueue));
   }
 
+  Future<void> _handleStreamUrlFailure(Song song) async {
+    if (_isHandlingStreamFailure) return;
+    _isHandlingStreamFailure = true;
+
+    _consecutiveFailures++;
+    if (_consecutiveFailures > 3) {
+      _consecutiveFailures = 0;
+      _isHandlingStreamFailure = false;
+      rlog('[MusicPlayerProvider] too many consecutive failures, stopping');
+      return;
+    }
+
+    try {
+      _removeFromQueue(song);
+      await _youtubeService.clearStreamUrlCache(song.id);
+    } finally {
+      _isHandlingStreamFailure = false;
+    }
+
+    _fetchAlternative(song);
+
+    Future.microtask(() {
+      final currentQueue = queue;
+      final index = currentIndex;
+      if (currentQueue.isNotEmpty && index < currentQueue.length) {
+        playSong(currentQueue[index], fromQueue: true);
+      } else {
+        nextSong();
+      }
+    });
+  }
+
+  void _removeFromQueue(Song song) {
+    if (_isFastModeActive) {
+      _vibeQueue.removeWhere((s) => s.id == song.id);
+      if (_vibeIndex >= _vibeQueue.length) _vibeIndex = _vibeQueue.length.clamp(0, _vibeQueue.length - 1);
+    } else {
+      _normalQueue.removeWhere((s) => s.id == song.id);
+      if (_normalIndex >= _normalQueue.length) _normalIndex = _normalQueue.length.clamp(0, _normalQueue.length - 1);
+    }
+    notifyListeners();
+  }
+
+  Future<void> _fetchAlternative(Song failedSong) async {
+    try {
+      final id = failedSong.serverId.isNotEmpty ? failedSong.serverId : failedSong.id;
+      var alternative = await _serverService.findAlternative(id);
+      if (alternative == null) return;
+      if (alternative.id.isEmpty && alternative.serverId.isNotEmpty) {
+        alternative = alternative.copyWith(id: alternative.serverId);
+      }
+
+      final currentQueue = _isFastModeActive ? _vibeQueue : _normalQueue;
+
+      final existingIdx = currentQueue.indexWhere((s) => s.serverId.isNotEmpty && s.serverId == alternative!.serverId);
+      if (existingIdx >= 0) {
+        await _youtubeService.clearStreamUrlCache(currentQueue[existingIdx].id);
+        currentQueue[existingIdx] = alternative;
+        if (_isFastModeActive) {
+          _historyService.saveVibeQueue(_vibeQueue, _vibeIndex);
+        } else {
+          _historyService.saveQueue(_normalQueue, _normalIndex);
+        }
+        notifyListeners();
+      } else {
+        final insertIndex = currentIndex + 1;
+        if (insertIndex <= currentQueue.length) {
+          if (_isFastModeActive) {
+            _vibeQueue.insert(insertIndex, alternative);
+            _historyService.saveVibeQueue(_vibeQueue, _vibeIndex);
+          } else {
+            _normalQueue.insert(insertIndex, alternative);
+            _historyService.saveQueue(_normalQueue, _normalIndex);
+          }
+          notifyListeners();
+        }
+      }
+
+      if (alternative.serverId.isNotEmpty) {
+        await _historyService.updatePlaylistSong(alternative.serverId, alternative.id, alternative.audioUrl);
+      }
+    } catch (e) {
+      rlog('[MusicPlayerProvider] fetchAlternative error: $e');
+    }
+  }
+
   @override
   Future<void> playSong(Song song, {List<Song>? queue, Duration? seekTo, bool fromQueue = false, String? searchQuery}) async {
     if (!_isInitialized) {
@@ -514,7 +593,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         _usedSeedQueries.clear();
 
         Future.delayed(const Duration(seconds: 5), () {
-          if (!_isFastModeActive && _currentSong?.id == song.id) {
+          if (!_isFastModeActive && !_isHandlingStreamFailure && _currentSong?.id == song.id) {
             _youtubeService.generatePlaylist(song, search: searchQuery).then((playlist) {
               if (playlist.isEmpty) return;
               if (!_isFastModeActive && _currentSong?.id == song.id) {
@@ -561,8 +640,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     
     if (audioUrl.isEmpty) {
       rlog('[MusicPlayerProvider] stream URL empty for ${song.title} (id=${song.id})');
-      _onStreamError?.call(song.title);
-      notifyListeners();
+      await _handleStreamUrlFailure(song);
       return;
     }
     
@@ -581,11 +659,11 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         await _audioHandler.seek(seekTo);
       }
       await _audioHandler.play();
+      _consecutiveFailures = 0;
     } catch (e) {
       rlog('[MusicPlayerProvider] setAudioSource failed for ${song.title}: $e');
       _loadingAudioIds.remove(song.id);
-      _onStreamError?.call(song.title);
-      notifyListeners();
+      await _handleStreamUrlFailure(song);
       return;
     } finally {
       _isSwitchingSong = false;
@@ -734,6 +812,8 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   }
 
   bool _isSeeding = false;
+  bool _isHandlingStreamFailure = false;
+  int _consecutiveFailures = 0;
 
   void _addToQueue(List<Song> songs, String excludeId) {
     final currentQueue = queue;

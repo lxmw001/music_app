@@ -382,5 +382,9 @@ class YouTubeService {
     _audioCache.cacheFromUrl(videoId, url);
   }
 
+  Future<void> clearStreamUrlCache(String videoId) async {
+    await _streamUrlCache.remove(videoId);
+  }
+
   void dispose() {}
 }

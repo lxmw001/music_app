@@ -1,3 +1,4 @@
+import "package:music_app/utils/logger.dart";
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -343,12 +344,45 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
     );
   }
 
+  List<String> _splitArtists(String artistStr) {
+    if (artistStr.isEmpty) return [];
+    return artistStr
+        .split(RegExp(r'\s*[,&]\s*|\s+(?:feat|ft)\.?\s+|\s+y\s+|\s+&\s+', caseSensitive: false))
+        .map((a) => a.trim())
+        .where((a) => a.isNotEmpty)
+        .toList();
+  }
+
   Widget _buildArtistsTab() {
     final songs = _allSongsBase;
-    final Map<String, List<Song>> artistMap = {};
-    for (var s in songs) {
-      artistMap.putIfAbsent(s.artist, () => []).add(s);
+
+    // First pass: count solo songs for each individual artist
+    final soloCounts = <String, int>{};
+    final fullToIndividuals = <String, List<String>>{};
+    for (final s in songs) {
+      final individuals = _splitArtists(s.artist);
+      fullToIndividuals[s.artist] = individuals;
+      if (individuals.length == 1) {
+        soloCounts[individuals.first] = (soloCounts[individuals.first] ?? 0) + 1;
+      }
     }
+
+    // Second pass: build groups
+    final artistMap = <String, List<Song>>{};
+    for (final s in songs) {
+      final individuals = fullToIndividuals[s.artist]!;
+      final hasSoloGroup = individuals.any((a) => soloCounts.containsKey(a));
+      if (hasSoloGroup) {
+        for (final a in individuals) {
+          if (soloCounts.containsKey(a)) {
+            artistMap.putIfAbsent(a, () => []).add(s);
+          }
+        }
+      } else {
+        artistMap.putIfAbsent(s.artist, () => []).add(s);
+      }
+    }
+
     var artists = artistMap.keys.toList()..sort();
     if (_searchQuery.isNotEmpty) {
       artists = artists.where((a) => a.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
@@ -493,23 +527,44 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
     );
   }
 
-  void _showPlaylistDetail(Playlist playlist) {
-    showModalBottomSheet(
+  Future<void> _showPlaylistDetail(Playlist playlist) async {
+    await showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (context) => _PlaylistDetailSheet(playlist: playlist, downloadService: _downloadService),
     );
+    _loadAll();
   }
 }
 
-class _PlaylistDetailSheet extends StatelessWidget {
+class _PlaylistDetailSheet extends StatefulWidget {
   final Playlist playlist;
   final DownloadService downloadService;
   const _PlaylistDetailSheet({required this.playlist, required this.downloadService});
 
   @override
+  State<_PlaylistDetailSheet> createState() => _PlaylistDetailSheetState();
+}
+
+class _PlaylistDetailSheetState extends State<_PlaylistDetailSheet> {
+  final Set<String> _downloadingIds = {};
+  int _downloadVersion = 0;
+
+  void _onDownloadingChanged(String songId, bool isDownloading) {
+    setState(() {
+      if (isDownloading) {
+        _downloadingIds.add(songId);
+      } else {
+        _downloadingIds.remove(songId);
+        _downloadVersion++;
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final playlist = widget.playlist;
     return BackdropFilter(
       filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
       child: Container(
@@ -551,6 +606,27 @@ class _PlaylistDetailSheet extends StatelessWidget {
                     icon: const Icon(Icons.play_arrow_rounded, color: Colors.black, size: 32),
                     style: IconButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.primary, padding: const EdgeInsets.all(12)),
                   ),
+                  const SizedBox(width: 8),
+                  _DownloadAllButton(
+                    playlist: playlist,
+                    downloadService: widget.downloadService,
+                    onDownloadingChanged: _onDownloadingChanged,
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    height: 48,
+                    child: IconButton.filled(
+                      onPressed: () {
+                        context.read<MusicPlayerProvider>().deletePlaylist(playlist.id);
+                        Navigator.pop(context);
+                      },
+                      icon: const Icon(Icons.delete_rounded, size: 22),
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.red.withValues(alpha: 0.2),
+                        padding: const EdgeInsets.all(12),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -559,10 +635,104 @@ class _PlaylistDetailSheet extends StatelessWidget {
               child: ListView.builder(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 itemCount: playlist.songs.length,
-                itemBuilder: (context, i) => SongListTile(song: playlist.songs[i], queue: playlist.songs),
+                itemBuilder: (context, i) {
+                  final song = playlist.songs[i];
+                  return SongListTile(
+                    key: ValueKey('${song.id}_v$_downloadVersion'),
+                    song: song,
+                    queue: playlist.songs,
+                    isDownloading: _downloadingIds.contains(song.id),
+                  );
+                },
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DownloadAllButton extends StatefulWidget {
+  final Playlist playlist;
+  final DownloadService downloadService;
+  final void Function(String songId, bool isDownloading) onDownloadingChanged;
+  const _DownloadAllButton({required this.playlist, required this.downloadService, required this.onDownloadingChanged});
+
+  @override
+  State<_DownloadAllButton> createState() => _DownloadAllButtonState();
+}
+
+class _DownloadAllButtonState extends State<_DownloadAllButton> {
+  bool _isDownloading = false;
+  bool _allDownloaded = false;
+  int _completed = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAllDownloaded();
+  }
+
+  Future<void> _checkAllDownloaded() async {
+    for (final song in widget.playlist.songs) {
+      final existing = await widget.downloadService.getDownloadedPathById(song.id);
+      if (existing == null) return;
+    }
+    if (mounted) setState(() => _allDownloaded = true);
+  }
+
+  Future<void> _downloadAll() async {
+    setState(() { _isDownloading = true; _completed = 0; _allDownloaded = false; });
+    final songs = widget.playlist.songs;
+    for (int i = 0; i < songs.length; i++) {
+      final song = songs[i];
+      widget.onDownloadingChanged(song.id, true);
+      final existing = await widget.downloadService.getDownloadedPathById(song.id);
+      if (existing == null) {
+        final result = await widget.downloadService.downloadSong(song);
+        if (result == null) {
+          rlog('[Library] download failed for ${song.title} (id=${song.id})');
+        }
+      }
+      widget.onDownloadingChanged(song.id, false);
+      if (mounted) setState(() => _completed = i + 1);
+    }
+    if (mounted) {
+      HapticFeedback.heavyImpact();
+      setState(() {
+        _isDownloading = false;
+        _allDownloaded = _completed == songs.length;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Downloaded $_completed of ${songs.length} tracks'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 48,
+      child: IconButton.filled(
+        onPressed: _isDownloading || _allDownloaded ? null : _downloadAll,
+        icon: _isDownloading
+            ? SizedBox(
+                width: 20, height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Theme.of(context).colorScheme.onPrimary,
+                ),
+              )
+            : Icon(_allDownloaded ? Icons.check_circle_rounded : Icons.download_rounded, size: 22),
+        style: IconButton.styleFrom(
+          backgroundColor: _allDownloaded
+              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.2)
+              : Colors.white.withValues(alpha: 0.1),
+          padding: const EdgeInsets.all(12),
         ),
       ),
     );

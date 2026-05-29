@@ -33,6 +33,13 @@ class StreamUrlCache {
     return entry['url'] as String?;
   }
 
+  /// Removes a cached stream URL.
+  Future<void> remove(String videoId) async {
+    final cache = await _load();
+    cache.remove(videoId);
+    await _save(cache);
+  }
+
   /// Saves a stream URL with its expiry.
   Future<void> put(String videoId, String url, DateTime expiresAt) async {
     final cache = await _load();
