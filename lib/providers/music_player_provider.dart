@@ -36,6 +36,7 @@ abstract class MusicPlayerProvider extends ChangeNotifier {
   Color? get dominantColor;
   UserProfile? get userProfile;
   List<Vibe> get vibes;
+  bool get isTransitioning;
   bool isLoadingAudio(String songId);
   void prefetchAudioUrls(List<Song> songs);
   bool get isPlaying;
@@ -71,6 +72,8 @@ abstract class MusicPlayerProvider extends ChangeNotifier {
   Future<List<Playlist>> loadPlaylists();
   Future<void> deletePlaylist(String id);
   Future<void> refreshVibes();
+  String? get errorMessage;
+  void clearError();
 }
 
 class MusicPlayerProviderImpl extends MusicPlayerProvider {
@@ -103,6 +106,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   void setOnRateLimit(VoidCallback cb) => _onRateLimit = cb;
   bool _isRateLimited = false;
   bool _isSwitchingSong = false;
+  bool _isTransitioning = false;
 
   Timer? _positionSaveTimer;
   Timer? _stallTimer;
@@ -141,10 +145,18 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   List<Song>? _pendingQueue;
 
   @override
+  String? get errorMessage => _errorMessage;
+  @override
+  void clearError() { _errorMessage = null; notifyListeners(); }
+
+  @override
   Color? get dominantColor => _dominantColor;
 
   @override
   bool isLoadingAudio(String songId) => _loadingAudioIds.contains(songId);
+  @override
+  @override
+  bool get isTransitioning => _isTransitioning;
   @override
   bool get isFetchingSuggestions => _isFetchingSuggestions;
   @override
@@ -251,12 +263,18 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
           final completedSongId = _currentSong?.id;
           if (completedSongId != null) {
             _historyService.recordPlay(_currentSong!, _lastPosition.inSeconds);
+            _markPendingPlaylistLiked(_currentSong!, _lastPosition.inSeconds);
             Future.delayed(const Duration(milliseconds: 300), () {
               if (_currentSong?.id != completedSongId) return;
               if (_isRateLimited) {
                 _isRateLimited = false;
                 _onRateLimit?.call();
-                _playOfflineByGenre(_currentSong!);
+                _playOfflineByGenre(_currentSong!).then((_) {
+                  if (_currentSong?.id == completedSongId && !isPlaying) {
+                    _audioHandler.seek(Duration.zero);
+                    notifyListeners();
+                  }
+                });
               } else {
                 nextSong();
               }
@@ -446,7 +464,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     Future.microtask(() => playSong(offlineQueue.first, queue: offlineQueue));
   }
 
-  Future<void> _handleStreamUrlFailure(Song song) async {
+  Future<void> _handleStreamUrlFailure(Song song, {bool fromQueue = false}) async {
     if (_isHandlingStreamFailure) return;
     _isHandlingStreamFailure = true;
 
@@ -465,6 +483,12 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       _isHandlingStreamFailure = false;
     }
 
+    if (!fromQueue) {
+      _errorMessage = 'Could not play "${song.title}"';
+      notifyListeners();
+      return;
+    }
+
     _fetchAlternative(song);
 
     Future.microtask(() {
@@ -481,10 +505,10 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   void _removeFromQueue(Song song) {
     if (_isFastModeActive) {
       _vibeQueue.removeWhere((s) => s.id == song.id);
-      if (_vibeIndex >= _vibeQueue.length) _vibeIndex = _vibeQueue.length.clamp(0, _vibeQueue.length - 1);
+      if (_vibeIndex >= _vibeQueue.length) _vibeIndex = _vibeQueue.isEmpty ? 0 : _vibeQueue.length - 1;
     } else {
       _normalQueue.removeWhere((s) => s.id == song.id);
-      if (_normalIndex >= _normalQueue.length) _normalIndex = _normalQueue.length.clamp(0, _normalQueue.length - 1);
+      if (_normalIndex >= _normalQueue.length) _normalIndex = _normalQueue.isEmpty ? 0 : _normalQueue.length - 1;
     }
     notifyListeners();
   }
@@ -554,11 +578,14 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     _lastPosition = Duration.zero;
     if (previousSong != null && previousPosition > 0) {
       _historyService.recordPlay(previousSong, previousPosition);
+      _markPendingPlaylistLiked(previousSong, previousPosition);
     }
     
-    _currentSong = song;
-    _updateDominantColor(song.imageUrl);
-    
+    _isTransitioning = true;
+    notifyListeners();
+
+    _currentPlayRequestId = song.id;
+
     if (fromQueue) {
       if (_isFastModeActive) {
         if (queue != null) _vibeQueue = queue;
@@ -586,6 +613,9 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         _normalIndex = _normalQueue.indexWhere((s) => s.id == song.id);
         if (_normalIndex < 0) _normalIndex = 0;
       } else {
+        _pendingPlaylistName = null;
+        _pendingPlaylistSongs = null;
+        _pendingPlaylistLikedCount = 0;
         _normalQueue = [song];
         _normalIndex = 0;
         _isSeeding = false;
@@ -593,15 +623,17 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         _usedSeedQueries.clear();
 
         Future.delayed(const Duration(seconds: 5), () {
-          if (!_isFastModeActive && !_isHandlingStreamFailure && _currentSong?.id == song.id) {
-            _youtubeService.generatePlaylist(song, search: searchQuery).then((playlist) {
+            if (!_isFastModeActive && !_isHandlingStreamFailure && (_currentPlayRequestId == song.id || _currentSong?.id == song.id)) {
+              _youtubeService.generatePlaylist(song, search: searchQuery).then((playlist) {
               if (playlist.isEmpty) return;
               if (!_isFastModeActive && _currentSong?.id == song.id) {
                 _normalQueue = [song, ...playlist];
                 _normalIndex = 0;
                 _historyService.saveQueue(_normalQueue, _normalIndex);
                 final plName = searchQuery?.isNotEmpty == true ? searchQuery! : '${song.title} Radio';
-                _historyService.savePlaylist(plName, _normalQueue);
+                _pendingPlaylistName = plName;
+                _pendingPlaylistSongs = _normalQueue;
+                _pendingPlaylistLikedCount = 0;
                 notifyListeners();
               }
             });
@@ -623,6 +655,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         song.audioUrl = audioUrl;
       } on YouTubeRateLimitException {
         _isRateLimited = true;
+        _isTransitioning = false;
         _loadingAudioIds.remove(song.id);
         _audioHandler.nextEnabled = true;
         notifyListeners();
@@ -631,17 +664,17 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
           await _playOfflineByGenre(song);
         }
         return;
-      } finally {
+      }
+
+      if (audioUrl.isEmpty) {
+        _isTransitioning = false;
         _loadingAudioIds.remove(song.id);
         _audioHandler.nextEnabled = true;
         notifyListeners();
+        rlog('[MusicPlayerProvider] stream URL empty for ${song.title} (id=${song.id})');
+        await _handleStreamUrlFailure(song, fromQueue: fromQueue);
+        return;
       }
-    }
-    
-    if (audioUrl.isEmpty) {
-      rlog('[MusicPlayerProvider] stream URL empty for ${song.title} (id=${song.id})');
-      await _handleStreamUrlFailure(song);
-      return;
     }
     
     final mediaItem = MediaItem(
@@ -659,11 +692,20 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         await _audioHandler.seek(seekTo);
       }
       await _audioHandler.play();
+      _currentSong = song;
+      _updateDominantColor(song.imageUrl);
       _consecutiveFailures = 0;
+      _isTransitioning = false;
+      _loadingAudioIds.remove(song.id);
+      _audioHandler.nextEnabled = true;
+      notifyListeners();
     } catch (e) {
       rlog('[MusicPlayerProvider] setAudioSource failed for ${song.title}: $e');
+      _isTransitioning = false;
       _loadingAudioIds.remove(song.id);
-      await _handleStreamUrlFailure(song);
+      _audioHandler.nextEnabled = true;
+      notifyListeners();
+      await _handleStreamUrlFailure(song, fromQueue: fromQueue);
       return;
     } finally {
       _isSwitchingSong = false;
@@ -694,6 +736,11 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
             .then((url) {
               if (url.isNotEmpty) next.audioUrl = url;
               _loadingAudioIds.remove(next.id);
+            }).catchError((e) {
+              _loadingAudioIds.remove(next.id);
+              if (e is YouTubeRateLimitException) {
+                _isRateLimited = true;
+              }
             });
       }
     }
@@ -814,6 +861,11 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   bool _isSeeding = false;
   bool _isHandlingStreamFailure = false;
   int _consecutiveFailures = 0;
+  String? _pendingPlaylistName;
+  List<Song>? _pendingPlaylistSongs;
+  int _pendingPlaylistLikedCount = 0;
+  String? _errorMessage;
+  String? _currentPlayRequestId;
 
   void _addToQueue(List<Song> songs, String excludeId) {
     final currentQueue = queue;
@@ -930,7 +982,12 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   }
 
   Future<void> _fetchAndPlaySuggestion() async {
-    if (_currentSong == null || _isSeeding || _isRateLimited) return;
+    if (_currentSong == null || _isSeeding) return;
+    if (_isRateLimited) {
+      _audioHandler.pause();
+      notifyListeners();
+      return;
+    }
     try {
       if (_pendingSeedQueries.isNotEmpty) {
         final query = _pendingSeedQueries.removeAt(0);
@@ -962,12 +1019,14 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
           _normalIndex = _normalQueue.length - 1;
         }
         playSong(suggestions.first);
-      } else {
-        await _audioHandler.seek(Duration.zero);
-        notifyListeners();
       }
+    } on YouTubeRateLimitException {
+      _isRateLimited = true;
     } catch (e) {
-      await _audioHandler.seek(Duration.zero);
+      rlog('[MusicPlayerProvider] fetchAndPlaySuggestion error: $e');
+    }
+    if (!isPlaying) {
+      _audioHandler.pause();
       notifyListeners();
     }
   }
@@ -1032,6 +1091,12 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         _youtubeService.getPlayableAudioPath(song.id, serverId: song.serverId, song: song).then((url) {
           if (url.isNotEmpty) song.audioUrl = url;
           _loadingAudioIds.remove(song.id);
+          notifyListeners();
+        }).catchError((e) {
+          _loadingAudioIds.remove(song.id);
+          if (e is YouTubeRateLimitException) {
+            _isRateLimited = true;
+          }
           notifyListeners();
         });
       }
@@ -1134,4 +1199,29 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
 
   List<String> _pendingSeedQueries = [];
   final Set<String> _usedSeedQueries = {};
+
+  void _markPendingPlaylistLiked(Song song, int listenedSeconds) {
+    if (_pendingPlaylistSongs == null || _pendingPlaylistName == null) return;
+    final isSuggested = _pendingPlaylistSongs!.skip(1).any((s) => s.id == song.id);
+    if (!isSuggested) return;
+    final durationSeconds = song.duration.inSeconds;
+    final isLiked = durationSeconds >= 360
+        ? listenedSeconds >= 180
+        : listenedSeconds >= durationSeconds * 0.5;
+    if (isLiked) {
+      _pendingPlaylistLikedCount++;
+      _checkPendingPlaylistThreshold();
+    }
+  }
+
+  void _checkPendingPlaylistThreshold() {
+    if (_pendingPlaylistSongs == null || _pendingPlaylistName == null) return;
+    final suggested = _pendingPlaylistSongs!.skip(1).toList();
+    if (suggested.isEmpty) return;
+    if (_pendingPlaylistLikedCount / suggested.length >= 0.3) {
+      _historyService.savePlaylist(_pendingPlaylistName!, _pendingPlaylistSongs!);
+      _pendingPlaylistName = null;
+      _pendingPlaylistSongs = null;
+    }
+  }
 }

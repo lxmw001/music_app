@@ -143,7 +143,7 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
           if (_rotationController.isAnimating) _rotationController.stop();
         }
 
-        final isLoading = player.isLoadingAudio(song.id);
+        final isLoading = player.isLoadingAudio(song.id) || player.isTransitioning;
 
         return Scaffold(
           body: Stack(

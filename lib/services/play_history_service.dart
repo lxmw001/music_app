@@ -19,6 +19,7 @@ class PlayHistoryService {
     'id': song.id, 'serverId': song.serverId, 'title': song.title, 'artist': song.artist,
     'album': song.album, 'imageUrl': song.imageUrl,
     'audioUrl': '', 'duration': song.duration.inSeconds,
+    'genres': song.genres, 'type': song.type.name,
   };
 
   Future<Map<String, Map<String, dynamic>>> _loadHistory() async {

@@ -52,7 +52,8 @@ class ApiService {
       body: body != null ? jsonEncode(body) : null,
     ).timeout(timeout);
     if (res.statusCode >= 400) throw ApiException.fromResponse(res);
-    return res.statusCode == 204 ? null : jsonDecode(res.body);
+    if (res.statusCode == 204 || res.body.isEmpty) return null;
+    return jsonDecode(res.body);
   }
 
   Future<void> delete(String path, {bool requiresAuth = true, Duration timeout = const Duration(seconds: 15)}) async {
