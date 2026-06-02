@@ -110,6 +110,8 @@ class FakeMusicPlayerProvider extends ChangeNotifier implements MusicPlayerProvi
   @override Future<void> resumeLastVibe() async {}
   @override void exitFastMode() {}
   @override Future<void> refreshVibes() async {}
+  @override String? get errorMessage => null;
+  @override void clearError() {}
 }
 
 // --- Test app ---
