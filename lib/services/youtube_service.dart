@@ -350,26 +350,31 @@ class YouTubeService {
       song?.streamUrl = cachedUrl;
       return cachedUrl;
     }
+    String? url;
     final serverUrl = await _server.getStreamUrl(videoId);
     if (serverUrl.isNotEmpty) {
-      final expiry = _extractExpiry(serverUrl);
-      await _streamUrlCache.put(videoId, serverUrl, expiry);
-      song?.streamUrl = serverUrl;
-      song?.streamUrlExpiresAt = expiry;
-      return serverUrl;
+      url = serverUrl;
+    } else {
+      final cachedPath = await _audioCache.getCachedAudioPath(videoId);
+      if (cachedPath != null) return cachedPath;
+      try {
+        url = await getAudioUrl(videoId);
+      } catch (e) {
+        rlog('[YouTubeService] getAudioUrl failed for $videoId: $e');
+      }
     }
-    final cachedPath = await _audioCache.getCachedAudioPath(videoId);
-    if (cachedPath != null) return cachedPath;
-    final url = await getAudioUrl(videoId);
-    if (url.isNotEmpty) {
+    if (url != null && url.isNotEmpty) {
       final expiry = _extractExpiry(url);
       await _streamUrlCache.put(videoId, url, expiry);
       song?.streamUrl = url;
       song?.streamUrlExpiresAt = expiry;
-      final isMix = song != null && song.serverId.isEmpty;
-      _server.pushStreamUrl(isMix ? videoId : serverId, url, isMix: isMix);
+      if (serverUrl.isEmpty) {
+        final isMix = song != null && song.serverId.isEmpty;
+        _server.pushStreamUrl(isMix ? videoId : serverId, url, isMix: isMix);
+      }
+      return url;
     }
-    return url;
+    return '';
   }
 
   DateTime _extractExpiry(String url) {
