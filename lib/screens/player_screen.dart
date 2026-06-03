@@ -31,8 +31,8 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
 
   late final AnimationController _rotationController;
   late final AnimationController _bgAnimationController;
+  late final AnimationController _pulseController;
   
-  // 3D Tilt variables
   Offset _tiltOffset = Offset.zero;
   int _coverStyle = 0;
 
@@ -52,6 +52,12 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
       vsync: this,
       duration: const Duration(seconds: 60),
     )..repeat(reverse: true);
+    
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 4),
+    )..repeat(reverse: true);
+
     _checkDownloaded();
   }
 
@@ -59,6 +65,7 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
   void dispose() {
     _rotationController.dispose();
     _bgAnimationController.dispose();
+    _pulseController.dispose();
     super.dispose();
   }
 
@@ -78,7 +85,6 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
         size: const Size(100, 100),
       );
       final raw = generator.dominantColor?.color ?? Colors.grey.shade900;
-      // Ensure minimum brightness so gradient provides contrast for white text
       final hsl = HSLColor.fromColor(raw);
       final color = hsl.lightness < 0.15 ? hsl.withLightness(0.2).toColor() : raw;
       if (mounted) {
@@ -133,14 +139,16 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
     return Consumer<MusicPlayerProvider>(
       builder: (context, player, _) {
         final song = player.currentSong;
-        if (song == null) return const Scaffold(body: Center(child: Text('No song playing')));
+        if (song == null) return Scaffold(body: Center(child: Text(AppLocalizations.of(context)!.playerNoSong)));
 
         if (song.imageUrl.isNotEmpty) _updateDominantColor(song.imageUrl);
 
         if (player.isPlaying) {
           if (!_rotationController.isAnimating) _rotationController.repeat();
+          if (!_pulseController.isAnimating) _pulseController.repeat(reverse: true);
         } else {
           if (_rotationController.isAnimating) _rotationController.stop();
+          if (_pulseController.isAnimating) _pulseController.stop();
         }
 
         final isLoading = player.isLoadingAudio(song.id) || player.isTransitioning;
@@ -148,7 +156,7 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
         return Scaffold(
           body: Stack(
             children: [
-              // 1. Cinematic Background
+              // 1. Cinematic Background with Pulse
               AnimatedBuilder(
                 animation: _bgAnimationController,
                 builder: (context, child) {
@@ -178,26 +186,29 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          Colors.black.withValues(alpha: 0.5),
-                          Colors.black.withValues(alpha: 0.75),
-                          Colors.black.withValues(alpha: 0.95),
+                          Colors.black.withValues(alpha: 0.4),
+                          Colors.black.withValues(alpha: 0.7),
+                          Colors.black.withValues(alpha: 0.9),
                         ],
                       ),
                     ),
                   ),
                 ),
               ),
-              // Color tint layer
-              Positioned.fill(
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        _dominantColor.withValues(alpha: 0.3),
-                        Colors.transparent,
-                      ],
+              // Dynamic Aura Pulse
+              AnimatedBuilder(
+                animation: _pulseController,
+                builder: (context, _) => Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: RadialGradient(
+                        center: Alignment.center,
+                        radius: 0.8 + (_pulseController.value * 0.4),
+                        colors: [
+                          _dominantColor.withValues(alpha: 0.2 * _pulseController.value),
+                          Colors.transparent,
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -209,7 +220,17 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
                     _buildAppBar(context, song),
                     Expanded(
                       child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 400),
+                        duration: const Duration(milliseconds: 500),
+                        transitionBuilder: (child, animation) => FadeTransition(
+                          opacity: animation,
+                          child: SlideTransition(
+                            position: Tween<Offset>(
+                              begin: const Offset(0, 0.05),
+                              end: Offset.zero,
+                            ).animate(animation),
+                            child: child,
+                          ),
+                        ),
                         child: _showLyrics 
                           ? _buildLyricsView(song) 
                           : _buildPlayerView(context, player, song, isLoading),
@@ -270,22 +291,33 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
       child: Column(
         children: [
           const Spacer(),
-          // 3D TILT ALBUM ART
+          // 3D TILT ALBUM ART WITH SWIPE
           GestureDetector(
             onPanUpdate: (details) {
               setState(() {
                 _tiltOffset += details.delta / 1000;
-                _tiltOffset = Offset(_tiltOffset.dx.clamp(-0.2, 0.2), _tiltOffset.dy.clamp(-0.2, 0.2));
+                _tiltOffset = Offset(_tiltOffset.dx.clamp(-0.25, 0.25), _tiltOffset.dy.clamp(-0.25, 0.25));
               });
             },
-            onPanEnd: (_) => setState(() => _tiltOffset = Offset.zero),
+            onPanEnd: (details) {
+              // Swipe detection
+              final velocity = details.velocity.pixelsPerSecond.dx;
+              if (velocity > 500) {
+                HapticFeedback.mediumImpact();
+                player.previousSong();
+              } else if (velocity < -500) {
+                HapticFeedback.mediumImpact();
+                player.nextSong();
+              }
+              setState(() => _tiltOffset = Offset.zero);
+            },
             onTap: () {
               HapticFeedback.lightImpact();
               setState(() => _coverStyle = (_coverStyle + 1) % 3);
             },
             child: AnimatedScale(
-              scale: player.isPlaying ? 1.0 : 0.9,
-              duration: const Duration(milliseconds: 600),
+              scale: player.isPlaying ? 1.0 : 0.88,
+              duration: const Duration(milliseconds: 800),
               curve: Curves.easeOutBack,
               child: Transform(
                 transform: Matrix4.identity()
@@ -296,19 +328,19 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
                 child: Stack(
                   children: [
                     _buildCover(song, isLoading),
-                    // Light gloss overlay that follows tilt
+                    // Dynamic Reflection Overlay
                     Positioned.fill(
                       child: IgnorePointer(
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 100),
                           decoration: BoxDecoration(
                             shape: _coverStyle == 2 ? BoxShape.rectangle : BoxShape.circle,
-                            borderRadius: _coverStyle == 2 ? BorderRadius.circular(24) : null,
+                            borderRadius: _coverStyle == 2 ? BorderRadius.circular(32) : null,
                             gradient: LinearGradient(
-                              begin: Alignment(_tiltOffset.dx * 5, _tiltOffset.dy * 5),
-                              end: Alignment(-_tiltOffset.dx * 5, -_tiltOffset.dy * 5),
+                              begin: Alignment(_tiltOffset.dx * 4, _tiltOffset.dy * 4),
+                              end: Alignment(-_tiltOffset.dx * 4, -_tiltOffset.dy * 4),
                               colors: [
-                                Colors.white.withValues(alpha: 0.1),
+                                Colors.white.withValues(alpha: 0.15),
                                 Colors.transparent,
                                 Colors.black.withValues(alpha: 0.1),
                               ],
@@ -323,6 +355,7 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
             ),
           ),
           const Spacer(),
+          // Track Info
           Row(
             children: [
               Expanded(
@@ -331,13 +364,14 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
                   children: [
                     Text(
                       song.title,
-                      style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: -0.5),
+                      style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: -0.8),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    const SizedBox(height: 4),
                     Text(
                       song.artist,
-                      style: TextStyle(fontSize: 18, color: Colors.white.withValues(alpha: 0.6), fontWeight: FontWeight.w500),
+                      style: TextStyle(fontSize: 18, color: Colors.white.withValues(alpha: 0.5), fontWeight: FontWeight.w600),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -351,8 +385,8 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
                   return IconButton(
                     icon: Icon(
                       liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                      color: liked ? Theme.of(context).colorScheme.primary : Colors.white70,
-                      size: 34,
+                      color: liked ? Theme.of(context).colorScheme.primary : Colors.white60,
+                      size: 32,
                     ),
                     onPressed: () {
                       HapticFeedback.mediumImpact();
@@ -401,8 +435,8 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(_fmt(position), style: const TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.w900, fontFamily: 'monospace')),
-                  Text(_fmt(total), style: const TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.w900, fontFamily: 'monospace')),
+                  Text(_fmt(position), style: const TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.w900, fontFamily: 'monospace')),
+                  Text(_fmt(total), style: const TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.w900, fontFamily: 'monospace')),
                 ],
               ),
             ),
@@ -418,14 +452,14 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         IconButton(
-          icon: Icon(Icons.shuffle_rounded, color: player.isShuffled ? theme.colorScheme.primary : Colors.white70),
+          icon: Icon(Icons.shuffle_rounded, color: player.isShuffled ? theme.colorScheme.primary : Colors.white54),
           onPressed: () {
             HapticFeedback.lightImpact();
             player.toggleShuffle();
           },
         ),
         IconButton(
-          icon: const Icon(Icons.skip_previous_rounded, size: 52),
+          icon: const Icon(Icons.skip_previous_rounded, size: 48, color: Colors.white),
           onPressed: () {
             HapticFeedback.mediumImpact();
             player.previousSong();
@@ -437,23 +471,23 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
             player.isPlaying ? player.pause() : player.resume();
           },
           child: Container(
-            height: 84, width: 84,
+            height: 80, width: 80,
             decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
             child: Icon(
               player.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-              size: 56, color: Colors.black,
+              size: 48, color: Colors.black,
             ),
           ),
         ),
         IconButton(
-          icon: Icon(Icons.skip_next_rounded, size: 52, color: isLoading ? Colors.white24 : Colors.white),
+          icon: Icon(Icons.skip_next_rounded, size: 48, color: isLoading ? Colors.white24 : Colors.white),
           onPressed: isLoading ? null : () {
             HapticFeedback.mediumImpact();
             player.nextSong();
           },
         ),
         IconButton(
-          icon: Icon(Icons.repeat_rounded, color: player.isRepeating ? theme.colorScheme.primary : Colors.white70),
+          icon: Icon(Icons.repeat_rounded, color: player.isRepeating ? theme.colorScheme.primary : Colors.white54),
           onPressed: () {
             HapticFeedback.lightImpact();
             player.toggleRepeat();
@@ -465,12 +499,12 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
 
   Widget _buildBottomControls(BuildContext context, MusicPlayerProvider player, song) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           IconButton(
-            icon: Icon(_showLyrics ? Icons.lyrics_rounded : Icons.lyrics_outlined, color: _showLyrics ? Theme.of(context).colorScheme.primary : Colors.white70, size: 28),
+            icon: Icon(_showLyrics ? Icons.lyrics_rounded : Icons.lyrics_outlined, color: _showLyrics ? Theme.of(context).colorScheme.primary : Colors.white54, size: 24),
             onPressed: () {
               HapticFeedback.lightImpact();
               setState(() => _showLyrics = !_showLyrics);
@@ -480,20 +514,21 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
           const Spacer(),
           if (_isDownloading)
             SizedBox(
-              width: 24, height: 24,
+              width: 20, height: 20,
               child: CircularProgressIndicator(
                 value: _downloadProgress > 0 ? _downloadProgress : null,
-                strokeWidth: 3,
+                strokeWidth: 2,
+                color: Theme.of(context).colorScheme.primary,
               ),
             )
           else if (context.watch<AuthProvider>().canDownload)
             IconButton(
               icon: Icon(_downloadedPath != null ? Icons.download_done_rounded : Icons.download_rounded,
-                  color: _downloadedPath != null ? Theme.of(context).colorScheme.primary : Colors.white70, size: 28),
+                  color: _downloadedPath != null ? Theme.of(context).colorScheme.primary : Colors.white54, size: 24),
               onPressed: _downloadedPath != null ? null : () => _download(context),
             ),
           IconButton(
-            icon: const Icon(Icons.playlist_play_rounded, size: 34, color: Colors.white70),
+            icon: const Icon(Icons.playlist_play_rounded, size: 28, color: Colors.white54),
             onPressed: () {
               HapticFeedback.lightImpact();
               _showQueueSheet(context, player);
@@ -505,7 +540,7 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
   }
 
   Widget _buildCover(song, bool isLoading) {
-    final shadow = BoxShadow(color: Colors.black.withValues(alpha: 0.6), blurRadius: 40, spreadRadius: 5);
+    final shadow = BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 40, spreadRadius: 2, offset: const Offset(0, 10));
 
     Widget image = Hero(
       tag: 'player_art',
@@ -540,9 +575,9 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
 
     return Container(
       width: 320, height: 320,
-      decoration: BoxDecoration(borderRadius: BorderRadius.circular(24), boxShadow: [shadow]),
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(32), boxShadow: [shadow]),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(32),
         child: Stack(alignment: Alignment.center, children: [
           image,
           if (isLoading) Container(color: Colors.black54, child: const CircularProgressIndicator(color: Colors.white)),
@@ -557,19 +592,35 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           Expanded(
             child: _lyricsLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _lyrics != null
                     ? SingleChildScrollView(
                         physics: const BouncingScrollPhysics(),
-                        child: Text(
-                          _lyrics!,
-                          style: const TextStyle(fontSize: 28, height: 1.5, fontWeight: FontWeight.w900, color: Colors.white),
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 100),
+                          child: Text(
+                            _lyrics!,
+                            style: const TextStyle(
+                              fontSize: 28, 
+                              height: 1.6, 
+                              fontWeight: FontWeight.w900, 
+                              color: Colors.white,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
                         ),
                       )
-                    : Center(child: Text(AppLocalizations.of(context)!.playerNoLyrics, style: const TextStyle(color: Colors.white54, fontSize: 18))),
+                    : Center(child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.lyrics_outlined, size: 64, color: Colors.white.withValues(alpha: 0.1)),
+                          const SizedBox(height: 16),
+                          Text(AppLocalizations.of(context)!.playerNoLyrics, style: const TextStyle(color: Colors.white24, fontSize: 18, fontWeight: FontWeight.bold)),
+                        ],
+                      )),
           ),
         ],
       ),
@@ -586,33 +637,33 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
         child: Container(
           height: MediaQuery.of(context).size.height * 0.75,
           decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.8),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+            color: Colors.black.withValues(alpha: 0.85),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(40)),
             border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
           ),
           child: Column(
             children: [
-              Container(margin: const EdgeInsets.symmetric(vertical: 12), width: 40, height: 4,
+              Container(margin: const EdgeInsets.symmetric(vertical: 16), width: 40, height: 4,
                   decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
               Padding(
-                padding: const EdgeInsets.all(20),
-                child: Text(AppLocalizations.of(context)!.playerQueue, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 22)),
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                child: Text(AppLocalizations.of(context)!.playerQueue, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 24)),
               ),
               Expanded(
                 child: ListView.builder(
-                  padding: const EdgeInsets.only(bottom: 24),
+                  padding: const EdgeInsets.only(bottom: 40),
                   itemCount: player.queue.length,
                   itemBuilder: (context, i) {
                     final s = player.queue[i];
                     final isCurrent = i == player.currentIndex;
                     return ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
-                      leading: ClipRRect(borderRadius: BorderRadius.circular(8),
-                        child: Image.network(s.imageUrl, width: 50, height: 50, fit: BoxFit.cover)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
+                      leading: ClipRRect(borderRadius: BorderRadius.circular(12),
+                        child: Image.network(s.imageUrl, width: 52, height: 52, fit: BoxFit.cover)),
                       title: Text(s.title, maxLines: 1, overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: isCurrent ? Theme.of(context).colorScheme.primary : Colors.white, fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal, fontSize: 15)),
+                          style: TextStyle(color: isCurrent ? Theme.of(context).colorScheme.primary : Colors.white, fontWeight: isCurrent ? FontWeight.w900 : FontWeight.w600, fontSize: 16)),
                       subtitle: Text(s.artist, maxLines: 1, overflow: TextOverflow.ellipsis, 
-                          style: TextStyle(color: isCurrent ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.7) : Colors.white38, fontSize: 13)),
+                          style: TextStyle(color: isCurrent ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.7) : Colors.white38, fontSize: 13, fontWeight: FontWeight.bold)),
                       trailing: isCurrent ? Icon(Icons.equalizer_rounded, color: Theme.of(context).colorScheme.primary) : null,
                       onTap: () {
                         HapticFeedback.lightImpact();

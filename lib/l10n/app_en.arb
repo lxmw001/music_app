@@ -40,6 +40,58 @@
   "connectivitySuccess": "SUCCESS: Device can reach YouTube.",
   "connectivityFail": "FAILED: Device cannot reach YouTube.",
   "ok": "OK",
+  "greetingMorning": "Good Morning",
+  "greetingAfternoon": "Good Afternoon",
+  "greetingEvening": "Good Evening",
+  "promptVibe": "What's the vibe?",
+  "promptReady": "Ready to play?",
+  "promptFindSound": "Find your sound",
+  "promptMood": "Let's set the mood",
+  "promptBeat": "Pick your beat",
+  "commonPlay": "Play",
+  "commonCancel": "Cancel",
+  "commonSignIn": "Sign In",
+  "commonSignOut": "Sign Out",
+  "commonLoadMore": "Load more",
+  "commonSeeAll": "See all {label}",
+  "@commonSeeAll": {
+    "placeholders": { "label": { "type": "String" } }
+  },
+  "searchForceRefresh": "Force refresh",
+  "searchNoResults": "No results found",
+  "searchNoArtists": "No artists found",
+  "searchRecent": "Recent Searches",
+  "searchClearAll": "Clear All",
+  "searchTrendingRank": "Trending #{rank}",
+  "@searchTrendingRank": {
+    "placeholders": { "rank": { "type": "int" } }
+  },
+  "libraryFindHint": "Find in your library",
+  "libraryOffline": "OFFLINE",
+  "libraryTryDifferent": "Try a different search",
+  "libraryDownloadProgress": "Downloaded {completed} of {total} tracks",
+  "@libraryDownloadProgress": {
+    "placeholders": {
+      "completed": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "personalizationTitle": "PERSONALIZATION",
+  "personalizationAdaptive": "Adaptive Interface",
+  "personalizationAdaptiveSubtitle": "Colors follow current album art",
+  "personalizationThemePreset": "Theme Preset",
+  "onboardingBirthYear": "When were you born?",
+  "onboardingSelectYear": "Select Year",
+  "onboardingFavoriteGenres": "Favorite Genres",
+  "onboardingGetStarted": "Get Started",
+  "fastModeContinueVibe": "CONTINUE VIBE",
+  "fastModeResumeNow": "RESUME NOW",
+  "fastModeAiEngine": "AI ENGINE",
+  "fastModeStart": "START FAST MODE",
+  "fastModeTagline": "Tap to find your perfect music match.",
+  "youtubeLoginTitle": "Sign in to YouTube",
+  "playerNoSong": "No song playing",
+  "rateLimited": "YouTube rate limited — playing downloaded songs",
   "songs": "{count} songs",
   "@songs": {
     "placeholders": {

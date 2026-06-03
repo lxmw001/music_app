@@ -259,9 +259,17 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       });
 
       _audioHandler.playbackState.listen((state) {
-        if (state.processingState == AudioProcessingState.completed && !_isSwitchingSong) {
+        if (state.processingState == AudioProcessingState.completed && !_isSwitchingSong && !_isTransitioning) {
           final completedSongId = _currentSong?.id;
-          if (completedSongId != null) {
+          if (completedSongId == _lastCompletedSongId) return; // already handled
+          final duration = totalDuration;
+          final pos = currentPosition;
+          final wasPlaying = pos.inSeconds >= 30 || _lastPosition.inSeconds >= 30;
+          final nearEnd = duration.inSeconds > 0
+              ? pos.inSeconds >= (duration.inSeconds - 5) || _lastPosition.inSeconds >= (duration.inSeconds - 5)
+              : _lastPosition.inSeconds >= 60;
+          if (completedSongId != null && wasPlaying && nearEnd) {
+            _lastCompletedSongId = completedSongId;
             _historyService.recordPlay(_currentSong!, _lastPosition.inSeconds);
             _markPendingPlaylistLiked(_currentSong!, _lastPosition.inSeconds);
             Future.delayed(const Duration(milliseconds: 300), () {
@@ -718,9 +726,11 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     if (!audioUrl.startsWith('/') && !audioUrl.startsWith('file://')) {
       final cacheSongId = song.id;
       final cacheUrl = audioUrl;
-      final delay = song.duration > Duration.zero ? song.duration : const Duration(minutes: 5);
-      Future.delayed(delay, () {
-        if (_currentSong?.id == cacheSongId) {
+      final dur = song.duration > Duration.zero ? song.duration : const Duration(minutes: 8);
+      // Cache only AFTER the song has finished/moved on, to avoid concurrent
+      // requests to the same googlevideo URL (which trigger 403 and skip the track).
+      Future.delayed(dur + const Duration(seconds: 5), () {
+        if (_currentSong?.id != cacheSongId) {
           _youtubeService.cacheAudioInBackground(cacheSongId, cacheUrl);
         }
       });
@@ -866,6 +876,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   int _pendingPlaylistLikedCount = 0;
   String? _errorMessage;
   String? _currentPlayRequestId;
+  String? _lastCompletedSongId;
 
   void _addToQueue(List<Song> songs, String excludeId) {
     final currentQueue = queue;

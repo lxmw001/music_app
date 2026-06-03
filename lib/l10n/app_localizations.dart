@@ -308,6 +308,246 @@ abstract class AppLocalizations {
   /// **'OK'**
   String get ok;
 
+  /// No description provided for @greetingMorning.
+  ///
+  /// In en, this message translates to:
+  /// **'Good Morning'**
+  String get greetingMorning;
+
+  /// No description provided for @greetingAfternoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Good Afternoon'**
+  String get greetingAfternoon;
+
+  /// No description provided for @greetingEvening.
+  ///
+  /// In en, this message translates to:
+  /// **'Good Evening'**
+  String get greetingEvening;
+
+  /// No description provided for @promptVibe.
+  ///
+  /// In en, this message translates to:
+  /// **'What\'s the vibe?'**
+  String get promptVibe;
+
+  /// No description provided for @promptReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready to play?'**
+  String get promptReady;
+
+  /// No description provided for @promptFindSound.
+  ///
+  /// In en, this message translates to:
+  /// **'Find your sound'**
+  String get promptFindSound;
+
+  /// No description provided for @promptMood.
+  ///
+  /// In en, this message translates to:
+  /// **'Let\'s set the mood'**
+  String get promptMood;
+
+  /// No description provided for @promptBeat.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick your beat'**
+  String get promptBeat;
+
+  /// No description provided for @commonPlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Play'**
+  String get commonPlay;
+
+  /// No description provided for @commonCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get commonCancel;
+
+  /// No description provided for @commonSignIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign In'**
+  String get commonSignIn;
+
+  /// No description provided for @commonSignOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign Out'**
+  String get commonSignOut;
+
+  /// No description provided for @commonLoadMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Load more'**
+  String get commonLoadMore;
+
+  /// No description provided for @commonSeeAll.
+  ///
+  /// In en, this message translates to:
+  /// **'See all {label}'**
+  String commonSeeAll(String label);
+
+  /// No description provided for @searchForceRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Force refresh'**
+  String get searchForceRefresh;
+
+  /// No description provided for @searchNoResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No results found'**
+  String get searchNoResults;
+
+  /// No description provided for @searchNoArtists.
+  ///
+  /// In en, this message translates to:
+  /// **'No artists found'**
+  String get searchNoArtists;
+
+  /// No description provided for @searchRecent.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent Searches'**
+  String get searchRecent;
+
+  /// No description provided for @searchClearAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear All'**
+  String get searchClearAll;
+
+  /// No description provided for @searchTrendingRank.
+  ///
+  /// In en, this message translates to:
+  /// **'Trending #{rank}'**
+  String searchTrendingRank(int rank);
+
+  /// No description provided for @libraryFindHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Find in your library'**
+  String get libraryFindHint;
+
+  /// No description provided for @libraryOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'OFFLINE'**
+  String get libraryOffline;
+
+  /// No description provided for @libraryTryDifferent.
+  ///
+  /// In en, this message translates to:
+  /// **'Try a different search'**
+  String get libraryTryDifferent;
+
+  /// No description provided for @libraryDownloadProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloaded {completed} of {total} tracks'**
+  String libraryDownloadProgress(int completed, int total);
+
+  /// No description provided for @personalizationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'PERSONALIZATION'**
+  String get personalizationTitle;
+
+  /// No description provided for @personalizationAdaptive.
+  ///
+  /// In en, this message translates to:
+  /// **'Adaptive Interface'**
+  String get personalizationAdaptive;
+
+  /// No description provided for @personalizationAdaptiveSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Colors follow current album art'**
+  String get personalizationAdaptiveSubtitle;
+
+  /// No description provided for @personalizationThemePreset.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme Preset'**
+  String get personalizationThemePreset;
+
+  /// No description provided for @onboardingBirthYear.
+  ///
+  /// In en, this message translates to:
+  /// **'When were you born?'**
+  String get onboardingBirthYear;
+
+  /// No description provided for @onboardingSelectYear.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Year'**
+  String get onboardingSelectYear;
+
+  /// No description provided for @onboardingFavoriteGenres.
+  ///
+  /// In en, this message translates to:
+  /// **'Favorite Genres'**
+  String get onboardingFavoriteGenres;
+
+  /// No description provided for @onboardingGetStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Get Started'**
+  String get onboardingGetStarted;
+
+  /// No description provided for @fastModeContinueVibe.
+  ///
+  /// In en, this message translates to:
+  /// **'CONTINUE VIBE'**
+  String get fastModeContinueVibe;
+
+  /// No description provided for @fastModeResumeNow.
+  ///
+  /// In en, this message translates to:
+  /// **'RESUME NOW'**
+  String get fastModeResumeNow;
+
+  /// No description provided for @fastModeAiEngine.
+  ///
+  /// In en, this message translates to:
+  /// **'AI ENGINE'**
+  String get fastModeAiEngine;
+
+  /// No description provided for @fastModeStart.
+  ///
+  /// In en, this message translates to:
+  /// **'START FAST MODE'**
+  String get fastModeStart;
+
+  /// No description provided for @fastModeTagline.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to find your perfect music match.'**
+  String get fastModeTagline;
+
+  /// No description provided for @youtubeLoginTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to YouTube'**
+  String get youtubeLoginTitle;
+
+  /// No description provided for @playerNoSong.
+  ///
+  /// In en, this message translates to:
+  /// **'No song playing'**
+  String get playerNoSong;
+
+  /// No description provided for @rateLimited.
+  ///
+  /// In en, this message translates to:
+  /// **'YouTube rate limited — playing downloaded songs'**
+  String get rateLimited;
+
   /// No description provided for @songs.
   ///
   /// In en, this message translates to:

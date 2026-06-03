@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../l10n/app_localizations.dart';
 import '../models/user_profile.dart';
 import '../services/profile_service.dart';
 
@@ -42,7 +43,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ),
               const SizedBox(height: 32),
 
-              const Text('When were you born?', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+              Text(AppLocalizations.of(context)!.onboardingBirthYear, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
               const SizedBox(height: 12),
               DropdownButtonFormField<int>(
                 value: _selectedYear,
@@ -51,13 +52,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   fillColor: Colors.grey[900],
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                hint: const Text('Select Year'),
+                hint: Text(AppLocalizations.of(context)!.onboardingSelectYear),
                 items: _years.map((y) => DropdownMenuItem(value: y, child: Text(y.toString()))).toList(),
                 onChanged: (val) => setState(() => _selectedYear = val),
               ),
 
               const SizedBox(height: 32),
-              const Text('Favorite Genres', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+              Text(AppLocalizations.of(context)!.onboardingFavoriteGenres, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
               const SizedBox(height: 12),
               Expanded(
                 child: SingleChildScrollView(
@@ -99,7 +100,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     foregroundColor: Colors.black,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  child: const Text('Get Started', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  child: Text(AppLocalizations.of(context)!.onboardingGetStarted, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 ),
               ),
             ],
