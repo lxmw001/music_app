@@ -43,9 +43,36 @@ class ThemeProvider extends ChangeNotifier {
     await prefs.setBool(_adaptiveKey, value);
   }
 
+  /// Updates the accent color with aggressive lightness boosting for visibility.
   void updateAdaptiveColor(Color color) {
-    if (_isAdaptive && _accentColor.value != color.value) {
-      _accentColor = color;
+    if (!_isAdaptive) return;
+
+    final hsl = HSLColor.fromColor(color);
+    
+    // HIGH-CONTRAST NORMALIZATION
+    // We force the color into a range that is guaranteed to be bright on dark backgrounds.
+    double newLightness = hsl.lightness;
+    double newSaturation = hsl.saturation;
+
+    // Boost lightness to a range of 70% - 85% (Luminous/Neon range)
+    if (newLightness < 0.70) {
+      newLightness = 0.75; 
+    } else if (newLightness > 0.9) {
+      newLightness = 0.85; 
+    }
+
+    // Boost saturation to ensure it doesn't look washed out
+    if (newSaturation < 0.5) {
+      newSaturation = 0.85; 
+    }
+
+    final adjustedColor = hsl
+        .withLightness(newLightness)
+        .withSaturation(newSaturation)
+        .toColor();
+
+    if (_accentColor.value != adjustedColor.value) {
+      _accentColor = adjustedColor;
       notifyListeners();
     }
   }
@@ -104,6 +131,9 @@ class ThemeProvider extends ChangeNotifier {
         surface: surfaceColor,
         onSurface: Colors.white,
         primary: _accentColor,
+        secondary: _accentColor,
+        primaryContainer: _accentColor.withValues(alpha: 0.25),
+        onPrimaryContainer: Colors.white,
       ),
       scaffoldBackgroundColor: backgroundColor,
       appBarTheme: const AppBarTheme(

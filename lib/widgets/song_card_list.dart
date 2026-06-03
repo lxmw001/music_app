@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/music_models.dart';
 import '../providers/music_player_provider.dart';
 import 'song_card.dart';
+import 'animated_list_item.dart';
 
 class SongCardList extends StatelessWidget {
   final List<Song> songs;
@@ -11,7 +12,7 @@ class SongCardList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 200,
+      height: 220, // Increased slightly to accommodate new shadows and labels
       child: Selector<MusicPlayerProvider, String?>(
         selector: (_, p) {
           try { return songs.firstWhere((s) => p.isLoadingAudio(s.id)).id; }
@@ -19,10 +20,19 @@ class SongCardList extends StatelessWidget {
         },
         builder: (context, loadingId, _) => ListView.builder(
           scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.only(left: 4), // Balanced padding
           itemCount: songs.length,
           itemBuilder: (context, index) {
             final song = songs[index];
-            return SongCard(song: song, queue: songs, isLoading: song.id == loadingId);
+            return AnimatedListItem(
+              index: index,
+              child: SongCard(
+                song: song, 
+                queue: songs, 
+                isLoading: song.id == loadingId
+              ),
+            );
           },
         ),
       ),

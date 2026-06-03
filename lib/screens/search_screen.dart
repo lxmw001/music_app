@@ -97,7 +97,7 @@ class _SearchScreenState extends State<SearchScreen> {
       _result = result; 
       isLoading = false; 
       _currentQuery = query; 
-      _activeFilter = 'songs'; 
+      _activeFilter = null; // Default to overview
     });
     if (mounted) {
       await context.read<MusicPlayerProvider>().saveSearch(query);
@@ -260,6 +260,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildResults() {
     final chips = [
+      'Overview',
       if (_result.songs.isNotEmpty) 'Songs',
       if (_result.mixes.isNotEmpty) 'Mixes',
       if (_result.videos.isNotEmpty) 'Videos',
@@ -272,7 +273,7 @@ class _SearchScreenState extends State<SearchScreen> {
       },
       builder: (context, loadingIds, _) => Column(
         children: [
-          if (chips.length > 1) _buildFilterChips(chips),
+          if (chips.length > 2) _buildFilterChips(chips),
           const SizedBox(height: 8),
           Expanded(child: _buildFilteredList(loadingIds)),
         ],
@@ -289,7 +290,11 @@ class _SearchScreenState extends State<SearchScreen> {
         itemCount: chips.length,
         itemBuilder: (context, i) {
           final chip = chips[i];
-          final active = _activeFilter == chip.toLowerCase();
+          final bool isOverview = chip == 'Overview';
+          final active = isOverview 
+              ? (_activeFilter == null)
+              : (_activeFilter == chip.toLowerCase());
+          
           final primary = Theme.of(context).colorScheme.primary;
           return Padding(
             padding: const EdgeInsets.only(right: 8),
@@ -298,7 +303,7 @@ class _SearchScreenState extends State<SearchScreen> {
               selected: active,
               onSelected: (selected) {
                 HapticFeedback.selectionClick();
-                setState(() => _activeFilter = active ? null : chip.toLowerCase());
+                setState(() => _activeFilter = isOverview ? null : chip.toLowerCase());
               },
               backgroundColor: Colors.white.withValues(alpha: 0.05),
               selectedColor: primary.withValues(alpha: 0.15),
@@ -323,10 +328,12 @@ class _SearchScreenState extends State<SearchScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           children: [
             if (_result.songs.isNotEmpty) ...[
-              _sectionHeader('Top Results'),
-              for (var i = 0; i < _result.songs.length && i < 3; i++)
+              _buildTopResult(_result.songs.first, loadingIds),
+              const SizedBox(height: 32),
+              _sectionHeader('Songs'),
+              for (var i = 1; i < _result.songs.length && i < 4; i++)
                 AnimatedListItem(index: i, child: _songTile(_result.songs[i], loadingIds)),
-              if (_result.songs.length > 3)
+              if (_result.songs.length > 4)
                 _seeAllButton('Songs', () => setState(() => _activeFilter = 'songs')),
             ],
             if (_result.mixes.isNotEmpty) ...[
@@ -341,6 +348,66 @@ class _SearchScreenState extends State<SearchScreen> {
           ],
         );
     }
+  }
+
+  Widget _buildTopResult(Song song, Set<String> loadingIds) {
+    final theme = context.watch<ThemeProvider>();
+    final primary = theme.accentColor;
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionHeader('Top Result'),
+        const SizedBox(height: 4),
+        AnimatedListItem(
+          index: 0,
+          child: GestureDetector(
+            onTap: () => context.read<MusicPlayerProvider>().playSong(song, searchQuery: _currentQuery),
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(32),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                boxShadow: [
+                  BoxShadow(color: primary.withValues(alpha: 0.1), blurRadius: 30, offset: const Offset(0, 10)),
+                ],
+              ),
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Image.network(song.imageUrl, width: 100, height: 100, fit: BoxFit.cover),
+                  ),
+                  const SizedBox(width: 20),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(song.title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: -0.5), maxLines: 2, overflow: TextOverflow.ellipsis),
+                        const SizedBox(height: 6),
+                        Text(song.artist, style: TextStyle(fontSize: 16, color: primary, fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(20)),
+                          child: const Text('SONG', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.0, color: Colors.white60)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    height: 56, width: 56,
+                    decoration: BoxDecoration(color: primary, shape: BoxShape.circle),
+                    child: const Icon(Icons.play_arrow_rounded, color: Colors.black, size: 36),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _songsList(List<Song> songs, Set<String> loadingIds, {bool showLoadMore = false}) {

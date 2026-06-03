@@ -2,7 +2,6 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:palette_generator/palette_generator.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../l10n/app_localizations.dart';
@@ -25,9 +24,6 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
   bool _isDownloading = false;
   double _downloadProgress = 0;
   String? _downloadedPath;
-
-  Color _dominantColor = Colors.grey.shade900;
-  String? _lastColorUrl;
 
   late final AnimationController _rotationController;
   late final AnimationController _bgAnimationController;
@@ -76,24 +72,6 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
     if (mounted) setState(() => _downloadedPath = path);
   }
 
-  Future<void> _updateDominantColor(String imageUrl) async {
-    if (imageUrl == _lastColorUrl) return;
-    _lastColorUrl = imageUrl;
-    try {
-      final generator = await PaletteGenerator.fromImageProvider(
-        NetworkImage(imageUrl),
-        size: const Size(100, 100),
-      );
-      final raw = generator.dominantColor?.color ?? Colors.grey.shade900;
-      final hsl = HSLColor.fromColor(raw);
-      final color = hsl.lightness < 0.15 ? hsl.withLightness(0.2).toColor() : raw;
-      if (mounted) {
-        setState(() => _dominantColor = color);
-        context.read<ThemeProvider>().updateAdaptiveColor(color);
-      }
-    } catch (_) {}
-  }
-
   Future<void> _fetchLyrics(String title, String artist) async {
     final key = '$title|$artist';
     if (key == _lastLyricsKey) return;
@@ -136,12 +114,13 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
 
   @override
   Widget build(BuildContext context) {
+    final theme = context.watch<ThemeProvider>();
+    final accentColor = theme.accentColor;
+
     return Consumer<MusicPlayerProvider>(
       builder: (context, player, _) {
         final song = player.currentSong;
         if (song == null) return Scaffold(body: Center(child: Text(AppLocalizations.of(context)!.playerNoSong)));
-
-        if (song.imageUrl.isNotEmpty) _updateDominantColor(song.imageUrl);
 
         if (player.isPlaying) {
           if (!_rotationController.isAnimating) _rotationController.repeat();
@@ -176,7 +155,7 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
                   errorBuilder: (_, __, ___) => Container(color: Colors.black),
                 ),
               ),
-              FloatingParticles(color: _dominantColor),
+              FloatingParticles(color: accentColor),
               Positioned.fill(
                 child: BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
@@ -195,7 +174,7 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
                   ),
                 ),
               ),
-              // Dynamic Aura Pulse
+              // Dynamic Aura Pulse using normalized accent color
               AnimatedBuilder(
                 animation: _pulseController,
                 builder: (context, _) => Positioned.fill(
@@ -205,7 +184,7 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
                         center: Alignment.center,
                         radius: 0.8 + (_pulseController.value * 0.4),
                         colors: [
-                          _dominantColor.withValues(alpha: 0.2 * _pulseController.value),
+                          accentColor.withValues(alpha: 0.25 * _pulseController.value),
                           Colors.transparent,
                         ],
                       ),
@@ -223,17 +202,11 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
                         duration: const Duration(milliseconds: 500),
                         transitionBuilder: (child, animation) => FadeTransition(
                           opacity: animation,
-                          child: SlideTransition(
-                            position: Tween<Offset>(
-                              begin: const Offset(0, 0.05),
-                              end: Offset.zero,
-                            ).animate(animation),
-                            child: child,
-                          ),
+                          child: child,
                         ),
                         child: _showLyrics 
                           ? _buildLyricsView(song) 
-                          : _buildPlayerView(context, player, song, isLoading),
+                          : _buildPlayerView(context, player, song, isLoading, accentColor),
                       ),
                     ),
                     _buildBottomControls(context, player, song),
@@ -285,7 +258,7 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
     );
   }
 
-  Widget _buildPlayerView(BuildContext context, MusicPlayerProvider player, song, bool isLoading) {
+  Widget _buildPlayerView(BuildContext context, MusicPlayerProvider player, song, bool isLoading, Color accentColor) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 32),
       child: Column(
@@ -300,7 +273,6 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
               });
             },
             onPanEnd: (details) {
-              // Swipe detection
               final velocity = details.velocity.pixelsPerSecond.dx;
               if (velocity > 500) {
                 HapticFeedback.mediumImpact();
@@ -385,7 +357,7 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
                   return IconButton(
                     icon: Icon(
                       liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                      color: liked ? Theme.of(context).colorScheme.primary : Colors.white60,
+                      color: liked ? accentColor : Colors.white60,
                       size: 32,
                     ),
                     onPressed: () {
@@ -398,7 +370,7 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
             ],
           ),
           const SizedBox(height: 24),
-          _buildWaveformProgressBar(player, song),
+          _buildWaveformProgressBar(player, song, accentColor),
           const SizedBox(height: 16),
           _buildMainControls(player, isLoading),
           const Spacer(),
@@ -407,7 +379,7 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
     );
   }
 
-  Widget _buildWaveformProgressBar(MusicPlayerProvider player, song) {
+  Widget _buildWaveformProgressBar(MusicPlayerProvider player, song, Color accentColor) {
     return StreamBuilder<Duration>(
       stream: player.positionStream,
       builder: (context, snap) {
@@ -422,7 +394,7 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
             WaveformProgressBar(
               progress: progress,
               isPlaying: player.isPlaying,
-              color: Colors.white,
+              color: accentColor,
               songId: song.id,
               onSeek: (p) {
                 HapticFeedback.selectionClick();
@@ -597,18 +569,29 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
             child: _lyricsLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _lyrics != null
-                    ? SingleChildScrollView(
-                        physics: const BouncingScrollPhysics(),
-                        child: Padding(
-                          padding: const EdgeInsets.only(bottom: 100),
-                          child: Text(
-                            _lyrics!,
-                            style: const TextStyle(
-                              fontSize: 28, 
-                              height: 1.6, 
-                              fontWeight: FontWeight.w900, 
-                              color: Colors.white,
-                              letterSpacing: -0.5,
+                    ? ShaderMask(
+                        shaderCallback: (rect) {
+                          return const LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [Colors.transparent, Colors.black, Colors.black, Colors.transparent],
+                            stops: [0.0, 0.1, 0.9, 1.0],
+                          ).createShader(rect);
+                        },
+                        blendMode: BlendMode.dstIn,
+                        child: SingleChildScrollView(
+                          physics: const BouncingScrollPhysics(),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 40),
+                            child: Text(
+                              _lyrics!,
+                              style: const TextStyle(
+                                fontSize: 28, 
+                                height: 1.6, 
+                                fontWeight: FontWeight.w900, 
+                                color: Colors.white,
+                                letterSpacing: -0.5,
+                              ),
                             ),
                           ),
                         ),
@@ -655,7 +638,7 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
                   itemCount: player.queue.length,
                   itemBuilder: (context, i) {
                     final s = player.queue[i];
-                    final isCurrent = i == player.currentIndex;
+                    final isCurrent = s.id == player.currentSong?.id;
                     return ListTile(
                       contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
                       leading: ClipRRect(borderRadius: BorderRadius.circular(12),

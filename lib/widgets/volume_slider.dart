@@ -19,31 +19,50 @@ class VolumeSlider extends StatelessWidget {
       children: [
         Icon(
           value == 0
-              ? Icons.volume_mute_rounded
+              ? Icons.volume_off_rounded
               : value < 0.5
                   ? Icons.volume_down_rounded
                   : Icons.volume_up_rounded,
-          color: Colors.white54,
-          size: 20,
+          color: Colors.white.withValues(alpha: 0.5),
+          size: 22,
         ),
         Expanded(
           child: SliderTheme(
             data: SliderTheme.of(context).copyWith(
-              trackHeight: 2,
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-              overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+              trackHeight: 4, // Thicker, premium track
+              thumbShape: const RoundSliderThumbShape(
+                enabledThumbRadius: 7,
+                elevation: 4,
+                pressedElevation: 8,
+              ),
+              overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
               activeTrackColor: Colors.white,
               inactiveTrackColor: Colors.white.withValues(alpha: 0.1),
               thumbColor: Colors.white,
+              trackShape: const RoundedRectSliderTrackShape(),
             ),
-            child: Slider(
-              value: value,
-              onChanged: (v) {
-                if ((v - value).abs() > 0.1) {
-                  HapticFeedback.selectionClick();
-                }
-                onChanged(v);
-              },
+            child: Container(
+              height: 40,
+              decoration: BoxDecoration(
+                boxShadow: [
+                  // Subtle glow around the slider area
+                  BoxShadow(
+                    color: activeColor.withValues(alpha: 0.1),
+                    blurRadius: 20,
+                    spreadRadius: -5,
+                  ),
+                ],
+              ),
+              child: Slider(
+                value: value,
+                onChanged: (v) {
+                  // Haptic "ticks" for volume steps
+                  if ((v * 10).round() != (value * 10).round()) {
+                    HapticFeedback.lightImpact();
+                  }
+                  onChanged(v);
+                },
+              ),
             ),
           ),
         ),

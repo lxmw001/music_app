@@ -13,6 +13,7 @@ import '../widgets/song_card_list.dart';
 import '../widgets/recent_songs_grid.dart';
 import '../widgets/shimmer.dart';
 import '../widgets/fast_mode_section.dart';
+import '../widgets/animated_list_item.dart';
 import 'login_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -80,8 +81,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final player = context.watch<MusicPlayerProvider>();
     final primaryColor = Theme.of(context).colorScheme.primary;
+    final l10n = AppLocalizations.of(context)!;
     
-    // If Fast Mode is active, show NOTHING ELSE but the Fast Mode UI
     if (player.isFastModeActive) {
       return const Scaffold(
         backgroundColor: Colors.transparent,
@@ -94,39 +95,49 @@ class _HomeScreenState extends State<HomeScreen> {
       body: RefreshIndicator(
         onRefresh: _loadWithCache,
         color: primaryColor,
+        edgeOffset: 100,
         child: CustomScrollView(
           physics: const BouncingScrollPhysics(),
           slivers: [
             SliverAppBar(
-              expandedHeight: 160,
+              expandedHeight: 180,
               floating: false,
               pinned: true,
               stretch: true,
               backgroundColor: Colors.transparent,
+              elevation: 0,
               flexibleSpace: FlexibleSpaceBar(
                 stretchModes: const [StretchMode.blurBackground, StretchMode.zoomBackground],
                 centerTitle: false,
                 titlePadding: const EdgeInsets.only(left: 20, bottom: 20),
-                title: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _getGreetingPrefix().toUpperCase(),
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.5),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 2.0,
+                title: AnimatedListItem(
+                  index: 0,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _getGreetingPrefix().toUpperCase(),
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.5),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 2.0,
+                        ),
                       ),
-                    ),
-                    Text(
-                      _getPrompt(),
-                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 30, letterSpacing: -1.2),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                    ),
-                  ],
+                      Text(
+                        _getPrompt(),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900, 
+                          fontSize: 28, 
+                          letterSpacing: -1.0,
+                          color: Colors.white,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    ],
+                  ),
                 ),
                 background: Container(
                   decoration: BoxDecoration(
@@ -134,74 +145,81 @@ class _HomeScreenState extends State<HomeScreen> {
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        primaryColor.withValues(alpha: 0.2),
+                        primaryColor.withValues(alpha: 0.15),
                         Colors.transparent,
                       ],
                     ),
+                  ),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: Container(color: Colors.transparent),
                   ),
                 ),
               ),
               actions: [
                 Consumer<AuthProvider>(
-                  builder: (context, auth, _) => IconButton(
-                    icon: auth.isSignedIn && auth.user?.photoURL != null
-                        ? Container(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white24, width: 2),
-                            ),
-                            child: CircleAvatar(
-                              radius: 14,
-                              backgroundImage: NetworkImage(auth.user!.photoURL!),
-                            ),
-                          )
-                        : const Icon(Icons.account_circle_outlined, size: 30, color: Colors.white70),
-                    onPressed: () => _showProfileAndThemeMenu(context, auth),
+                  builder: (context, auth, _) => Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: IconButton(
+                      icon: auth.isSignedIn && auth.user?.photoURL != null
+                          ? Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(color: primaryColor.withValues(alpha: 0.5), width: 1.5),
+                                boxShadow: [BoxShadow(color: primaryColor.withValues(alpha: 0.2), blurRadius: 8)],
+                              ),
+                              child: CircleAvatar(
+                                radius: 15,
+                                backgroundImage: NetworkImage(auth.user!.photoURL!),
+                              ),
+                            )
+                          : Icon(Icons.account_circle_outlined, size: 28, color: Colors.white.withValues(alpha: 0.7)),
+                      onPressed: () => _showProfileAndThemeMenu(context, auth),
+                    ),
                   ),
                 ),
-                const SizedBox(width: 16),
               ],
             ),
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 12),
                   
-                  // 0. FAST MODE LAUNCHER
-                  const FastModeSection(),
+                  // 0. FAST MODE SECTION
+                  const AnimatedListItem(index: 1, child: FastModeSection()),
 
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 48),
                   
                   // 1. RECENTLY PLAYED
-                  _buildSectionHeader(AppLocalizations.of(context)!.homeRecentlyPlayed),
-                  const SizedBox(height: 16),
+                  _buildSectionHeader(l10n.homeRecentlyPlayed, index: 2),
+                  const SizedBox(height: 20),
                   if (recentPlaylists.isEmpty && !isLoading)
-                    _buildEmptyState(Icons.queue_music_rounded, AppLocalizations.of(context)!.homeNoPlaylists)
+                    AnimatedListItem(index: 3, child: _buildEmptyState(Icons.history_rounded, l10n.homeNoPlaylists))
                   else if (isLoading && recentPlaylists.isEmpty)
                     _buildShimmerHorizontalList()
                   else
                     RecentPlaylistsGrid(playlists: recentPlaylists),
                   
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 48),
                   
                   // 2. TRENDING
-                  _buildSectionHeader(AppLocalizations.of(context)!.homeTrending),
-                  const SizedBox(height: 16),
+                  _buildSectionHeader(l10n.homeTrending, index: 4),
+                  const SizedBox(height: 20),
                   isLoading
                       ? _buildShimmerHorizontalList()
                       : SongCardList(songs: trendingSongs),
                   
                   if (suggestedSongs.isNotEmpty || isLoading) ...[
-                    const SizedBox(height: 40),
+                    const SizedBox(height: 48),
                     // 3. SUGGESTED
-                    _buildSectionHeader(AppLocalizations.of(context)!.homeSuggested),
-                    const SizedBox(height: 16),
+                    _buildSectionHeader(l10n.homeSuggested, index: 5),
+                    const SizedBox(height: 20),
                     isLoading
                       ? _buildShimmerHorizontalList()
                       : SongCardList(songs: suggestedSongs),
                   ],
-                  const SizedBox(height: 200), 
+                  const SizedBox(height: 180), 
                 ]),
               ),
             ),
@@ -228,42 +246,54 @@ class _HomeScreenState extends State<HomeScreen> {
       l10n.promptMood,
       l10n.promptBeat,
     ];
-    // Rotate through the day so it feels fresh without persisting state
     final hour = DateTime.now().hour;
     return prompts[hour % prompts.length];
   }
 
-  Widget _buildSectionHeader(String title) {
-    return Row(
-      children: [
-        Container(
-          width: 4, height: 24,
-          margin: const EdgeInsets.only(right: 12),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primary,
-            borderRadius: BorderRadius.circular(2),
+  Widget _buildSectionHeader(String title, {required int index}) {
+    return AnimatedListItem(
+      index: index,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 4, height: 20,
+                margin: const EdgeInsets.only(right: 12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary,
+                  borderRadius: BorderRadius.circular(2),
+                  boxShadow: [
+                    BoxShadow(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.5), blurRadius: 8),
+                  ],
+                ),
+              ),
+              Text(
+                title,
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: -0.5),
+              ),
+            ],
           ),
-        ),
-        Text(
-          title,
-          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: -0.5),
-        ),
-      ],
+          Icon(Icons.chevron_right_rounded, color: Colors.white.withValues(alpha: 0.2)),
+        ],
+      ),
     );
   }
 
   Widget _buildShimmerHorizontalList() {
     return SizedBox(
-      height: 180,
+      height: 200,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        itemCount: 5,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: 3,
         itemBuilder: (_, __) => Padding(
           padding: const EdgeInsets.only(right: 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Shimmer(child: ShimmerBox(width: 140, height: 140, borderRadius: 20)),
+              Shimmer(child: ShimmerBox(width: 155, height: 155, borderRadius: 24)),
               const SizedBox(height: 12),
               Shimmer(child: ShimmerBox(width: 100, height: 14, borderRadius: 4)),
             ],
@@ -275,19 +305,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildEmptyState(IconData icon, String message) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
+      padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.03),
         borderRadius: BorderRadius.circular(32),
-        border: Border.all(color: Colors.white10),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
       child: Column(
         children: [
-          Icon(icon, size: 50, color: Colors.white10),
+          Icon(icon, size: 48, color: Colors.white.withValues(alpha: 0.05)),
           const SizedBox(height: 16),
           Text(
             message,
-            style: const TextStyle(color: Colors.white38, fontSize: 14, height: 1.6),
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 14, fontWeight: FontWeight.w600),
             textAlign: TextAlign.center,
           ),
         ],
@@ -296,6 +326,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showProfileAndThemeMenu(BuildContext context, AuthProvider auth) {
+    HapticFeedback.mediumImpact();
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -319,6 +350,7 @@ class _ProfileAndThemeSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = context.watch<ThemeProvider>();
+    final primary = theme.accentColor;
     
     return BackdropFilter(
       filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
@@ -340,7 +372,8 @@ class _ProfileAndThemeSheet extends StatelessWidget {
                   Container(
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: theme.accentColor.withValues(alpha: 0.5), width: 2),
+                      border: Border.all(color: primary.withValues(alpha: 0.5), width: 2),
+                      boxShadow: [BoxShadow(color: primary.withValues(alpha: 0.2), blurRadius: 15)],
                     ),
                     child: CircleAvatar(
                       radius: 38,
@@ -362,22 +395,22 @@ class _ProfileAndThemeSheet extends StatelessWidget {
               ),
               const SizedBox(height: 40),
               
-              // PERSONALIZATION
-              Align(alignment: Alignment.centerLeft, child: Text(AppLocalizations.of(context)!.personalizationTitle, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 2.0, color: Colors.white38))),
+              Align(alignment: Alignment.centerLeft, child: Text(AppLocalizations.of(context)!.personalizationTitle.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 2.0, color: Colors.white38))),
               const SizedBox(height: 24),
               
               Container(
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
                 ),
                 child: Column(
                   children: [
                     SwitchListTile(
-                      title: Text(AppLocalizations.of(context)!.personalizationAdaptive, style: const TextStyle(fontWeight: FontWeight.bold)),
+                      title: Text(AppLocalizations.of(context)!.personalizationAdaptive, style: const TextStyle(fontWeight: FontWeight.w800)),
                       subtitle: Text(AppLocalizations.of(context)!.personalizationAdaptiveSubtitle, style: const TextStyle(fontSize: 12, color: Colors.white54)),
                       value: theme.isAdaptive,
-                      activeColor: theme.accentColor,
+                      activeColor: primary,
                       onChanged: (v) {
                         HapticFeedback.mediumImpact();
                         theme.toggleAdaptive(v);
@@ -385,18 +418,21 @@ class _ProfileAndThemeSheet extends StatelessWidget {
                     ),
                     const Divider(height: 1, indent: 16, endIndent: 16, color: Colors.white10),
                     ListTile(
-                      title: Text(AppLocalizations.of(context)!.personalizationThemePreset, style: const TextStyle(fontWeight: FontWeight.bold)),
+                      title: Text(AppLocalizations.of(context)!.personalizationThemePreset, style: const TextStyle(fontWeight: FontWeight.w800)),
                       trailing: DropdownButton<ThemeModePreset>(
                         value: theme.preset,
                         underline: const SizedBox(),
                         dropdownColor: Colors.grey[900],
                         borderRadius: BorderRadius.circular(16),
                         onChanged: (v) {
-                          if (v != null) theme.setPreset(v);
+                          if (v != null) {
+                            HapticFeedback.selectionClick();
+                            theme.setPreset(v);
+                          }
                         },
                         items: ThemeModePreset.values.map((p) => DropdownMenuItem(
                           value: p,
-                          child: Text(p.name[0].toUpperCase() + p.name.substring(1), style: const TextStyle(fontSize: 14)),
+                          child: Text(p.name[0].toUpperCase() + p.name.substring(1), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                         )).toList(),
                       ),
                     ),
@@ -428,7 +464,7 @@ class _ProfileAndThemeSheet extends StatelessWidget {
                             color: c,
                             shape: BoxShape.circle,
                             border: isSelected ? Border.all(color: Colors.white, width: 3) : Border.all(color: Colors.white10, width: 1),
-                            boxShadow: isSelected ? [BoxShadow(color: c.withValues(alpha: 0.5), blurRadius: 12)] : [],
+                            boxShadow: isSelected ? [BoxShadow(color: c.withValues(alpha: 0.5), blurRadius: 15)] : [],
                           ),
                           child: isSelected ? const Icon(Icons.check, color: Colors.black, size: 20) : null,
                         ),
@@ -445,12 +481,12 @@ class _ProfileAndThemeSheet extends StatelessWidget {
                   child: FilledButton.icon(
                     style: FilledButton.styleFrom(
                       backgroundColor: Colors.red.withValues(alpha: 0.1),
-                      foregroundColor: Colors.red,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      foregroundColor: Colors.redAccent,
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
                     ),
                     icon: const Icon(Icons.logout_rounded),
-                    label: Text(AppLocalizations.of(context)!.commonSignOut, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    label: Text(AppLocalizations.of(context)!.commonSignOut, style: const TextStyle(fontWeight: FontWeight.w900)),
                     onPressed: () { 
                       HapticFeedback.heavyImpact();
                       Navigator.pop(context); 
@@ -464,12 +500,12 @@ class _ProfileAndThemeSheet extends StatelessWidget {
                   child: FilledButton.icon(
                     style: FilledButton.styleFrom(
                       backgroundColor: Colors.green.withValues(alpha: 0.1),
-                      foregroundColor: Colors.green,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      foregroundColor: Colors.greenAccent,
+                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
                     ),
                     icon: const Icon(Icons.login_rounded),
-                    label: Text(AppLocalizations.of(context)!.commonSignIn, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    label: Text(AppLocalizations.of(context)!.commonSignIn, style: const TextStyle(fontWeight: FontWeight.w900)),
                     onPressed: () {
                       HapticFeedback.mediumImpact();
                       Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginScreen()));

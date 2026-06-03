@@ -17,7 +17,7 @@ class _MeshGradientState extends State<MeshGradient> with SingleTickerProviderSt
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 20),
+      duration: const Duration(seconds: 25), // Slower, more fluid
     )..repeat();
   }
 
@@ -52,33 +52,34 @@ class _MeshPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..maskFilter = const MaskFilter.blur(BlurStyle.normal, 100);
+    // Increased blur for a more "atmospheric" look
+    final paint = Paint()..maskFilter = const MaskFilter.blur(BlurStyle.normal, 120);
 
-    // Multiple moving glowing orbs to create a mesh feel
+    // DYNAMIC ORBS WITH BOOSTED OPACITY
     final orbs = [
       _Orb(
         center: Offset(
-          size.width * (0.5 + 0.4 * sin(t * 2 * pi)),
-          size.height * (0.3 + 0.2 * cos(t * 2 * pi)),
+          size.width * (0.5 + 0.45 * sin(t * 2 * pi)),
+          size.height * (0.3 + 0.25 * cos(t * 2 * pi)),
+        ),
+        radius: size.width * 1.0,
+        opacity: 0.28, // Boosted for visibility
+      ),
+      _Orb(
+        center: Offset(
+          size.width * (0.2 + 0.4 * cos(t * 2 * pi + 1.5)),
+          size.height * (0.7 + 0.25 * sin(t * 2 * pi + 1.5)),
         ),
         radius: size.width * 0.8,
-        opacity: 0.15,
+        opacity: 0.22,
       ),
       _Orb(
         center: Offset(
-          size.width * (0.2 + 0.3 * cos(t * 2 * pi + 1)),
-          size.height * (0.7 + 0.2 * sin(t * 2 * pi + 1)),
+          size.width * (0.8 + 0.3 * sin(t * 4 * pi)),
+          size.height * (0.5 + 0.35 * cos(t * 2 * pi)),
         ),
-        radius: size.width * 0.6,
-        opacity: 0.12,
-      ),
-      _Orb(
-        center: Offset(
-          size.width * (0.8 + 0.2 * sin(t * 4 * pi)),
-          size.height * (0.5 + 0.3 * cos(t * 2 * pi)),
-        ),
-        radius: size.width * 0.7,
-        opacity: 0.1,
+        radius: size.width * 0.9,
+        opacity: 0.18,
       ),
     ];
 
