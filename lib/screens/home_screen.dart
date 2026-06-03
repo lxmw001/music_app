@@ -121,8 +121,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     Text(
-                      AppLocalizations.of(context)!.homeGreeting,
+                      _getPrompt(),
                       style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 30, letterSpacing: -1.2),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
                     ),
                   ],
                 ),
@@ -210,10 +212,25 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   String _getGreetingPrefix() {
+    final l10n = AppLocalizations.of(context)!;
     final hour = DateTime.now().hour;
-    if (hour < 12) return 'Good Morning';
-    if (hour < 17) return 'Good Afternoon';
-    return 'Good Evening';
+    if (hour < 12) return l10n.greetingMorning;
+    if (hour < 17) return l10n.greetingAfternoon;
+    return l10n.greetingEvening;
+  }
+
+  String _getPrompt() {
+    final l10n = AppLocalizations.of(context)!;
+    final prompts = [
+      l10n.promptVibe,
+      l10n.promptReady,
+      l10n.promptFindSound,
+      l10n.promptMood,
+      l10n.promptBeat,
+    ];
+    // Rotate through the day so it feels fresh without persisting state
+    final hour = DateTime.now().hour;
+    return prompts[hour % prompts.length];
   }
 
   Widget _buildSectionHeader(String title) {
@@ -346,7 +363,7 @@ class _ProfileAndThemeSheet extends StatelessWidget {
               const SizedBox(height: 40),
               
               // PERSONALIZATION
-              const Align(alignment: Alignment.centerLeft, child: Text('PERSONALIZATION', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 2.0, color: Colors.white38))),
+              Align(alignment: Alignment.centerLeft, child: Text(AppLocalizations.of(context)!.personalizationTitle, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 2.0, color: Colors.white38))),
               const SizedBox(height: 24),
               
               Container(
@@ -357,8 +374,8 @@ class _ProfileAndThemeSheet extends StatelessWidget {
                 child: Column(
                   children: [
                     SwitchListTile(
-                      title: const Text('Adaptive Interface', style: TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: const Text('Colors follow current album art', style: TextStyle(fontSize: 12, color: Colors.white54)),
+                      title: Text(AppLocalizations.of(context)!.personalizationAdaptive, style: const TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: Text(AppLocalizations.of(context)!.personalizationAdaptiveSubtitle, style: const TextStyle(fontSize: 12, color: Colors.white54)),
                       value: theme.isAdaptive,
                       activeColor: theme.accentColor,
                       onChanged: (v) {
@@ -368,7 +385,7 @@ class _ProfileAndThemeSheet extends StatelessWidget {
                     ),
                     const Divider(height: 1, indent: 16, endIndent: 16, color: Colors.white10),
                     ListTile(
-                      title: const Text('Theme Preset', style: TextStyle(fontWeight: FontWeight.bold)),
+                      title: Text(AppLocalizations.of(context)!.personalizationThemePreset, style: const TextStyle(fontWeight: FontWeight.bold)),
                       trailing: DropdownButton<ThemeModePreset>(
                         value: theme.preset,
                         underline: const SizedBox(),
@@ -433,7 +450,7 @@ class _ProfileAndThemeSheet extends StatelessWidget {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                     ),
                     icon: const Icon(Icons.logout_rounded),
-                    label: const Text('Sign Out', style: TextStyle(fontWeight: FontWeight.bold)),
+                    label: Text(AppLocalizations.of(context)!.commonSignOut, style: const TextStyle(fontWeight: FontWeight.bold)),
                     onPressed: () { 
                       HapticFeedback.heavyImpact();
                       Navigator.pop(context); 
@@ -452,7 +469,7 @@ class _ProfileAndThemeSheet extends StatelessWidget {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                     ),
                     icon: const Icon(Icons.login_rounded),
-                    label: const Text('Sign In', style: TextStyle(fontWeight: FontWeight.bold)),
+                    label: Text(AppLocalizations.of(context)!.commonSignIn, style: const TextStyle(fontWeight: FontWeight.bold)),
                     onPressed: () {
                       HapticFeedback.mediumImpact();
                       Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginScreen()));

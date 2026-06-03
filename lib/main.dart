@@ -175,9 +175,9 @@ class _MainScreenState extends State<MainScreen> {
       final player = context.read<MusicPlayerProvider>() as MusicPlayerProviderImpl;
       player.setOnRateLimit(() {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('YouTube rate limited — playing downloaded songs'),
-          duration: Duration(seconds: 4),
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(AppLocalizations.of(context)!.rateLimited),
+          duration: const Duration(seconds: 4),
           behavior: SnackBarBehavior.floating,
         ));
       });
@@ -237,8 +237,17 @@ class _MainScreenState extends State<MainScreen> {
       canPop: false,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
-        final shouldPop = await _onWillPop();
-        if (shouldPop && context.mounted) Navigator.of(context).pop();
+        final shouldExit = await _onWillPop();
+        if (shouldExit && context.mounted) {
+          final player = context.read<MusicPlayerProvider>();
+          if (player.isPlaying) {
+            // Minimize to background (keep music playing)
+            SystemNavigator.pop(animated: true);
+          } else {
+            // Actually close the app
+            SystemNavigator.pop();
+          }
+        }
       },
       child: Scaffold(
         extendBody: true,

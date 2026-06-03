@@ -120,6 +120,134 @@ class AppLocalizationsEs extends AppLocalizations {
   String get ok => 'OK';
 
   @override
+  String get greetingMorning => 'Buenos días';
+
+  @override
+  String get greetingAfternoon => 'Buenas tardes';
+
+  @override
+  String get greetingEvening => 'Buenas noches';
+
+  @override
+  String get promptVibe => '¿Cuál es el vibe?';
+
+  @override
+  String get promptReady => '¿List@ para reproducir?';
+
+  @override
+  String get promptFindSound => 'Encuentra tu sonido';
+
+  @override
+  String get promptMood => 'Pongamos el ambiente';
+
+  @override
+  String get promptBeat => 'Elige tu ritmo';
+
+  @override
+  String get commonPlay => 'Reproducir';
+
+  @override
+  String get commonCancel => 'Cancelar';
+
+  @override
+  String get commonSignIn => 'Iniciar sesión';
+
+  @override
+  String get commonSignOut => 'Cerrar sesión';
+
+  @override
+  String get commonLoadMore => 'Cargar más';
+
+  @override
+  String commonSeeAll(String label) {
+    return 'Ver todo $label';
+  }
+
+  @override
+  String get searchForceRefresh => 'Forzar actualización';
+
+  @override
+  String get searchNoResults => 'No se encontraron resultados';
+
+  @override
+  String get searchNoArtists => 'No se encontraron artistas';
+
+  @override
+  String get searchRecent => 'Búsquedas recientes';
+
+  @override
+  String get searchClearAll => 'Borrar todo';
+
+  @override
+  String searchTrendingRank(int rank) {
+    return 'Tendencia #$rank';
+  }
+
+  @override
+  String get libraryFindHint => 'Busca en tu biblioteca';
+
+  @override
+  String get libraryOffline => 'SIN CONEXIÓN';
+
+  @override
+  String get libraryTryDifferent => 'Prueba una búsqueda diferente';
+
+  @override
+  String libraryDownloadProgress(int completed, int total) {
+    return 'Descargadas $completed de $total canciones';
+  }
+
+  @override
+  String get personalizationTitle => 'PERSONALIZACIÓN';
+
+  @override
+  String get personalizationAdaptive => 'Interfaz adaptable';
+
+  @override
+  String get personalizationAdaptiveSubtitle =>
+      'Los colores siguen la portada actual';
+
+  @override
+  String get personalizationThemePreset => 'Tema predefinido';
+
+  @override
+  String get onboardingBirthYear => '¿En qué año naciste?';
+
+  @override
+  String get onboardingSelectYear => 'Selecciona el año';
+
+  @override
+  String get onboardingFavoriteGenres => 'Géneros favoritos';
+
+  @override
+  String get onboardingGetStarted => 'Comenzar';
+
+  @override
+  String get fastModeContinueVibe => 'CONTINUAR VIBE';
+
+  @override
+  String get fastModeResumeNow => 'REANUDAR';
+
+  @override
+  String get fastModeAiEngine => 'MOTOR IA';
+
+  @override
+  String get fastModeStart => 'INICIAR FAST MODE';
+
+  @override
+  String get fastModeTagline => 'Toca para encontrar tu música perfecta.';
+
+  @override
+  String get youtubeLoginTitle => 'Inicia sesión en YouTube';
+
+  @override
+  String get playerNoSong => 'No hay canción reproduciéndose';
+
+  @override
+  String get rateLimited =>
+      'YouTube limitó las solicitudes — reproduciendo descargas';
+
+  @override
   String songs(int count) {
     return '$count canciones';
   }

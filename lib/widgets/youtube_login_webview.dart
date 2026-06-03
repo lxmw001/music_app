@@ -2,6 +2,7 @@ import "package:music_app/utils/logger.dart";
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import '../l10n/app_localizations.dart';
 import '../services/youtube_cookie_auth.dart';
 
 /// Full-screen WebView that lets the user log into YouTube.
@@ -40,11 +41,11 @@ class _YouTubeLoginWebViewState extends State<YouTubeLoginWebView> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Sign in to YouTube'),
+        title: Text(AppLocalizations.of(context)!.youtubeLoginTitle),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white)),
+            child: Text(AppLocalizations.of(context)!.commonCancel, style: const TextStyle(color: Colors.white)),
           ),
         ],
       ),

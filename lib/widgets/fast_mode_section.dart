@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import '../l10n/app_localizations.dart';
 import '../models/vibe.dart';
 import '../providers/music_player_provider.dart';
 import '../screens/fast_mode_picker_screen.dart';
@@ -81,9 +82,9 @@ class FastModeSection extends StatelessWidget {
                     children: [
                       const Icon(Icons.bolt_rounded, color: Colors.amber, size: 24),
                       const SizedBox(width: 8),
-                      const Text(
-                        'CONTINUE VIBE',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 2.0, color: Colors.white54),
+                      Text(
+                        AppLocalizations.of(context)!.fastModeContinueVibe,
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 2.0, color: Colors.white54),
                       ),
                     ],
                   ),
@@ -108,7 +109,7 @@ class FastModeSection extends StatelessWidget {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                           ),
                           icon: const Icon(Icons.play_arrow_rounded, size: 28),
-                          label: const Text('RESUME NOW', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                          label: Text(AppLocalizations.of(context)!.fastModeResumeNow, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -175,24 +176,24 @@ class FastModeSection extends StatelessWidget {
                         color: Colors.black.withValues(alpha: 0.3),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.auto_awesome, color: Colors.blueAccent, size: 14),
-                          SizedBox(width: 6),
-                          Text('AI ENGINE', style: TextStyle(color: Colors.blueAccent, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.0)),
+                          const Icon(Icons.auto_awesome, color: Colors.blueAccent, size: 14),
+                          const SizedBox(width: 6),
+                          Text(AppLocalizations.of(context)!.fastModeAiEngine, style: const TextStyle(color: Colors.blueAccent, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.0)),
                         ],
                       ),
                     ),
                     const SizedBox(height: 16),
-                    const Text(
-                      'START FAST MODE',
-                      style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: -0.5),
+                    Text(
+                      AppLocalizations.of(context)!.fastModeStart,
+                      style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: -0.5),
                     ),
                     const SizedBox(height: 4),
-                    const Text(
-                      'Tap to find your perfect music match.',
-                      style: TextStyle(color: Colors.white60, fontSize: 14, fontWeight: FontWeight.w600),
+                    Text(
+                      AppLocalizations.of(context)!.fastModeTagline,
+                      style: const TextStyle(color: Colors.white60, fontSize: 14, fontWeight: FontWeight.w600),
                     ),
                   ],
                 ),

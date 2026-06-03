@@ -118,6 +118,133 @@ class AppLocalizationsEn extends AppLocalizations {
   String get ok => 'OK';
 
   @override
+  String get greetingMorning => 'Good Morning';
+
+  @override
+  String get greetingAfternoon => 'Good Afternoon';
+
+  @override
+  String get greetingEvening => 'Good Evening';
+
+  @override
+  String get promptVibe => 'What\'s the vibe?';
+
+  @override
+  String get promptReady => 'Ready to play?';
+
+  @override
+  String get promptFindSound => 'Find your sound';
+
+  @override
+  String get promptMood => 'Let\'s set the mood';
+
+  @override
+  String get promptBeat => 'Pick your beat';
+
+  @override
+  String get commonPlay => 'Play';
+
+  @override
+  String get commonCancel => 'Cancel';
+
+  @override
+  String get commonSignIn => 'Sign In';
+
+  @override
+  String get commonSignOut => 'Sign Out';
+
+  @override
+  String get commonLoadMore => 'Load more';
+
+  @override
+  String commonSeeAll(String label) {
+    return 'See all $label';
+  }
+
+  @override
+  String get searchForceRefresh => 'Force refresh';
+
+  @override
+  String get searchNoResults => 'No results found';
+
+  @override
+  String get searchNoArtists => 'No artists found';
+
+  @override
+  String get searchRecent => 'Recent Searches';
+
+  @override
+  String get searchClearAll => 'Clear All';
+
+  @override
+  String searchTrendingRank(int rank) {
+    return 'Trending #$rank';
+  }
+
+  @override
+  String get libraryFindHint => 'Find in your library';
+
+  @override
+  String get libraryOffline => 'OFFLINE';
+
+  @override
+  String get libraryTryDifferent => 'Try a different search';
+
+  @override
+  String libraryDownloadProgress(int completed, int total) {
+    return 'Downloaded $completed of $total tracks';
+  }
+
+  @override
+  String get personalizationTitle => 'PERSONALIZATION';
+
+  @override
+  String get personalizationAdaptive => 'Adaptive Interface';
+
+  @override
+  String get personalizationAdaptiveSubtitle =>
+      'Colors follow current album art';
+
+  @override
+  String get personalizationThemePreset => 'Theme Preset';
+
+  @override
+  String get onboardingBirthYear => 'When were you born?';
+
+  @override
+  String get onboardingSelectYear => 'Select Year';
+
+  @override
+  String get onboardingFavoriteGenres => 'Favorite Genres';
+
+  @override
+  String get onboardingGetStarted => 'Get Started';
+
+  @override
+  String get fastModeContinueVibe => 'CONTINUE VIBE';
+
+  @override
+  String get fastModeResumeNow => 'RESUME NOW';
+
+  @override
+  String get fastModeAiEngine => 'AI ENGINE';
+
+  @override
+  String get fastModeStart => 'START FAST MODE';
+
+  @override
+  String get fastModeTagline => 'Tap to find your perfect music match.';
+
+  @override
+  String get youtubeLoginTitle => 'Sign in to YouTube';
+
+  @override
+  String get playerNoSong => 'No song playing';
+
+  @override
+  String get rateLimited => 'YouTube rate limited — playing downloaded songs';
+
+  @override
   String songs(int count) {
     return '$count songs';
   }

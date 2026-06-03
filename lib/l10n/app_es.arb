@@ -40,6 +40,58 @@
   "connectivitySuccess": "ÉXITO: El dispositivo puede acceder a YouTube.",
   "connectivityFail": "FALLO: El dispositivo no puede acceder a YouTube.",
   "ok": "OK",
+  "greetingMorning": "Buenos días",
+  "greetingAfternoon": "Buenas tardes",
+  "greetingEvening": "Buenas noches",
+  "promptVibe": "¿Cuál es el vibe?",
+  "promptReady": "¿List@ para reproducir?",
+  "promptFindSound": "Encuentra tu sonido",
+  "promptMood": "Pongamos el ambiente",
+  "promptBeat": "Elige tu ritmo",
+  "commonPlay": "Reproducir",
+  "commonCancel": "Cancelar",
+  "commonSignIn": "Iniciar sesión",
+  "commonSignOut": "Cerrar sesión",
+  "commonLoadMore": "Cargar más",
+  "commonSeeAll": "Ver todo {label}",
+  "@commonSeeAll": {
+    "placeholders": { "label": { "type": "String" } }
+  },
+  "searchForceRefresh": "Forzar actualización",
+  "searchNoResults": "No se encontraron resultados",
+  "searchNoArtists": "No se encontraron artistas",
+  "searchRecent": "Búsquedas recientes",
+  "searchClearAll": "Borrar todo",
+  "searchTrendingRank": "Tendencia #{rank}",
+  "@searchTrendingRank": {
+    "placeholders": { "rank": { "type": "int" } }
+  },
+  "libraryFindHint": "Busca en tu biblioteca",
+  "libraryOffline": "SIN CONEXIÓN",
+  "libraryTryDifferent": "Prueba una búsqueda diferente",
+  "libraryDownloadProgress": "Descargadas {completed} de {total} canciones",
+  "@libraryDownloadProgress": {
+    "placeholders": {
+      "completed": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "personalizationTitle": "PERSONALIZACIÓN",
+  "personalizationAdaptive": "Interfaz adaptable",
+  "personalizationAdaptiveSubtitle": "Los colores siguen la portada actual",
+  "personalizationThemePreset": "Tema predefinido",
+  "onboardingBirthYear": "¿En qué año naciste?",
+  "onboardingSelectYear": "Selecciona el año",
+  "onboardingFavoriteGenres": "Géneros favoritos",
+  "onboardingGetStarted": "Comenzar",
+  "fastModeContinueVibe": "CONTINUAR VIBE",
+  "fastModeResumeNow": "REANUDAR",
+  "fastModeAiEngine": "MOTOR IA",
+  "fastModeStart": "INICIAR FAST MODE",
+  "fastModeTagline": "Toca para encontrar tu música perfecta.",
+  "youtubeLoginTitle": "Inicia sesión en YouTube",
+  "playerNoSong": "No hay canción reproduciéndose",
+  "rateLimited": "YouTube limitó las solicitudes — reproduciendo descargas",
   "songs": "{count} canciones",
   "@songs": {
     "placeholders": {
