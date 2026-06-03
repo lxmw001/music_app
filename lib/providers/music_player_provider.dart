@@ -59,6 +59,7 @@ abstract class MusicPlayerProvider extends ChangeNotifier {
   void toggleAutoAddSuggestions();
   Future<void> fetchSuggestions();
   void addSuggestedToQueue(Song song);
+  void reorderQueue(int oldIndex, int newIndex);
   void clearSuggestions();
   Future<List<Song>> getMostLikedFromHistory();
   Future<List<Song>> getRecentSongs();
@@ -116,7 +117,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   
   Song? _currentSong;
   
-  // Two separate queues for normal and fast mode
   List<Song> _normalQueue = [];
   int _normalIndex = 0;
   List<Song> _vibeQueue = [];
@@ -140,7 +140,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   UserProfile? _userProfile;
   List<Vibe> _vibes = availableVibes;
 
-  // Pending initialization queue
   Song? _pendingSong;
   List<Song>? _pendingQueue;
 
@@ -154,7 +153,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
 
   @override
   bool isLoadingAudio(String songId) => _loadingAudioIds.contains(songId);
-  @override
   @override
   bool get isTransitioning => _isTransitioning;
   @override
@@ -206,7 +204,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
 
   Future<void> _init() async {
     try {
-      rlog('[MusicPlayerProvider] starting AudioService.init');
       _audioHandler = await AudioService.init(
         builder: () => AudioPlayerHandler(
           onSkipToNext: () => nextSong(),
@@ -221,7 +218,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
           androidStopForegroundOnPause: true,
         ),
       );
-      rlog('[MusicPlayerProvider] AudioService.init complete');
 
       final savedNormal = await _historyService.loadQueue();
       final savedVibeQueue = await _historyService.loadVibeQueue();
@@ -261,13 +257,13 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       _audioHandler.playbackState.listen((state) {
         if (state.processingState == AudioProcessingState.completed && !_isSwitchingSong && !_isTransitioning) {
           final completedSongId = _currentSong?.id;
-          if (completedSongId == _lastCompletedSongId) return; // already handled
+          if (completedSongId == _lastCompletedSongId) return; 
           final duration = totalDuration;
-          final pos = currentPosition;
-          final wasPlaying = pos.inSeconds >= 30 || _lastPosition.inSeconds >= 30;
+          final played = _lastPosition.inSeconds;
+          final wasPlaying = played >= 10;
           final nearEnd = duration.inSeconds > 0
-              ? pos.inSeconds >= (duration.inSeconds - 5) || _lastPosition.inSeconds >= (duration.inSeconds - 5)
-              : _lastPosition.inSeconds >= 60;
+              ? played >= (duration.inSeconds - 15) || played >= (duration.inSeconds * 0.8)
+              : played >= 20;
           if (completedSongId != null && wasPlaying && nearEnd) {
             _lastCompletedSongId = completedSongId;
             _historyService.recordPlay(_currentSong!, _lastPosition.inSeconds);
@@ -307,10 +303,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         notifyListeners();
       });
 
-      _audioHandler.mediaItem.listen((_) {
-        notifyListeners();
-      });
-
       if (savedNormal != null) {
         _normalQueue = savedNormal.queue;
         _normalIndex = savedNormal.currentIndex;
@@ -330,8 +322,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         _pendingQueue = null;
         await playSong(song, queue: q);
       } else {
-        // PER REQUEST: Start app in NORMAL player mode, even if a vibe was last.
-        // Fast Mode section will show the Resume card.
         _isFastModeActive = false;
         if (_normalQueue.isNotEmpty) {
           _currentSong = _normalQueue[_normalIndex];
@@ -340,8 +330,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       }
       
       notifyListeners();
-
-      // Listen for connectivity changes
       Connectivity().onConnectivityChanged.listen(_onConnectivityChanged);
     } catch (e, st) {
       rlog('[MusicPlayerProvider] _init ERROR: $e\n$st');
@@ -357,24 +345,20 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         c == ConnectivityResult.wifi || c == ConnectivityResult.mobile);
 
     if (!hasInternet && !_isOfflineMode) {
-      // Lost internet — switch to offline
       _isOfflineMode = true;
       if (_currentSong != null && !(_currentSong!.audioUrl.startsWith('/') || _currentSong!.audioUrl.startsWith('file://'))) {
         _songBeforeOffline = _currentSong;
         _positionBeforeOffline = currentPosition;
-        rlog('[MusicPlayerProvider] internet lost, saving ${_currentSong!.title} at ${_positionBeforeOffline.inSeconds}s');
         _playOfflineByGenre(_currentSong!);
       }
     } else if (hasInternet && _isOfflineMode) {
-      // Internet back — resume previous song
       _isOfflineMode = false;
       if (_songBeforeOffline != null) {
-        rlog('[MusicPlayerProvider] internet back, resuming ${_songBeforeOffline!.title}');
         final song = _songBeforeOffline!;
         final pos = _positionBeforeOffline;
         _songBeforeOffline = null;
         _positionBeforeOffline = Duration.zero;
-        song.audioUrl = ''; // force re-fetch
+        song.audioUrl = ''; 
         playSong(song, seekTo: pos);
       }
     }
@@ -400,7 +384,12 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         NetworkImage(imageUrl),
         size: const Size(100, 100),
       );
-      _dominantColor = generator.dominantColor?.color;
+      
+      final color = generator.vibrantColor?.color ?? 
+                    generator.lightVibrantColor?.color ?? 
+                    generator.dominantColor?.color;
+
+      _dominantColor = color;
       if (_dominantColor != null && _themeProvider != null) {
         _themeProvider!.updateAdaptiveColor(_dominantColor!);
       }
@@ -445,7 +434,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     final downloadedIds = downloaded.map((s) => s.id).toSet();
     final playlists = await _historyService.loadPlaylists();
 
-    // Collect first 10 downloaded songs from each playlist
     final offlineQueue = <Song>[];
     final seen = <String>{};
     for (final pl in playlists) {
@@ -459,7 +447,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         }
       }
     }
-    // Add remaining downloaded songs not in any playlist
     for (final s in downloaded) {
       if (!seen.contains(s.id) && s.id != stalledSong.id) {
         offlineQueue.add(s);
@@ -468,7 +455,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
 
     if (offlineQueue.isEmpty) return;
     offlineQueue.shuffle();
-    rlog('[MusicPlayerProvider] playing offline: ${offlineQueue.length} songs');
     Future.microtask(() => playSong(offlineQueue.first, queue: offlineQueue));
   }
 
@@ -480,7 +466,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     if (_consecutiveFailures > 3) {
       _consecutiveFailures = 0;
       _isHandlingStreamFailure = false;
-      rlog('[MusicPlayerProvider] too many consecutive failures, stopping');
       return;
     }
 
@@ -607,7 +592,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         _historyService.saveQueue(_normalQueue, _normalIndex);
       }
     } else {
-      // PER REQUEST: IF WE WERE IN FAST MODE, AND WE ARE PLAYING SOMETHING ELSE, EXIT FAST MODE
       if (_isFastModeActive) {
         _isFastModeActive = false;
         _activeVibeId = null;
@@ -679,7 +663,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         _loadingAudioIds.remove(song.id);
         _audioHandler.nextEnabled = true;
         notifyListeners();
-        rlog('[MusicPlayerProvider] stream URL empty for ${song.title} (id=${song.id})');
         await _handleStreamUrlFailure(song, fromQueue: fromQueue);
         return;
       }
@@ -708,7 +691,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       _audioHandler.nextEnabled = true;
       notifyListeners();
     } catch (e) {
-      rlog('[MusicPlayerProvider] setAudioSource failed for ${song.title}: $e');
       _isTransitioning = false;
       _loadingAudioIds.remove(song.id);
       _audioHandler.nextEnabled = true;
@@ -727,8 +709,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       final cacheSongId = song.id;
       final cacheUrl = audioUrl;
       final dur = song.duration > Duration.zero ? song.duration : const Duration(minutes: 8);
-      // Cache only AFTER the song has finished/moved on, to avoid concurrent
-      // requests to the same googlevideo URL (which trigger 403 and skip the track).
       Future.delayed(dur + const Duration(seconds: 5), () {
         if (_currentSong?.id != cacheSongId) {
           _youtubeService.cacheAudioInBackground(cacheSongId, cacheUrl);
@@ -757,6 +737,28 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   }
 
   @override
+  void reorderQueue(int oldIndex, int newIndex) {
+    if (newIndex > oldIndex) newIndex -= 1;
+    
+    if (_isFastModeActive) {
+      final song = _vibeQueue.removeAt(oldIndex);
+      _vibeQueue.insert(newIndex, song);
+      if (_vibeIndex == oldIndex) _vibeIndex = newIndex;
+      else if (oldIndex < _vibeIndex && newIndex >= _vibeIndex) _vibeIndex--;
+      else if (oldIndex > _vibeIndex && newIndex <= _vibeIndex) _vibeIndex++;
+      _historyService.saveVibeQueue(_vibeQueue, _vibeIndex);
+    } else {
+      final song = _normalQueue.removeAt(oldIndex);
+      _normalQueue.insert(newIndex, song);
+      if (_normalIndex == oldIndex) _normalIndex = newIndex;
+      else if (oldIndex < _normalIndex && newIndex >= _normalIndex) _normalIndex--;
+      else if (oldIndex > _normalIndex && newIndex <= _normalIndex) _normalIndex++;
+      _historyService.saveQueue(_normalQueue, _normalIndex);
+    }
+    notifyListeners();
+  }
+
+  @override
   Future<void> playFastMode({required String vibeId, String? subCategoryId}) async {
     _userProfile ??= await _profileService.getProfile();
 
@@ -766,10 +768,9 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     _lastSavedVibe = (vibeId: vibeId, subCategoryId: subCategoryId);
     _historyService.saveVibeState(vibeId, subCategoryId);
 
-    // If we already have songs for this vibe, play one immediately
     final hasPreviousSongs = _vibeQueue.isNotEmpty;
     if (hasPreviousSongs) {
-      _vibePlayedIds.clear(); // reload — allow repeats from fresh pick
+      _vibePlayedIds.clear(); 
       final song = _pickVibeSong();
       _vibeIndex = 0;
       notifyListeners();
@@ -779,14 +780,12 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       notifyListeners();
     }
 
-    // Fetch new songs in background
     _fetchVibeInBackground(vibeId, subCategoryId, playImmediately: !hasPreviousSongs);
   }
 
   Song _pickVibeSong() {
     final unplayed = _vibeQueue.where((s) => !_vibePlayedIds.contains(s.id)).toList();
     if (unplayed.isEmpty) {
-      // All played — reset and pick from full queue
       _vibePlayedIds.clear();
       return (_vibeQueue.toList()..shuffle()).first;
     }
@@ -805,7 +804,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       );
       if (songs.isNotEmpty) {
         _vibeQueue = songs;
-        _vibePlayedIds.clear(); // fresh batch — reset played tracking
+        _vibePlayedIds.clear(); 
         _vibeIndex = 0;
         _historyService.saveVibeQueue(_vibeQueue, _vibeIndex);
         if (playImmediately) {
@@ -854,12 +853,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     _isFastModeActive = false;
     _activeVibeId = null;
     _activeSubCategoryId = null;
-    // Keep _lastSavedVibe so "Continue Vibe" card shows in fast mode section
-    
-    // Stop fast mode playback
     _audioHandler.stop();
-    
-    // Restore normal song in UI without playing
     if (_normalQueue.isNotEmpty) {
       _currentSong = _normalQueue[_normalIndex];
     } else {
@@ -951,13 +945,11 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     final currentQueue = queue;
     var index = currentIndex;
 
-    // Mark current song as played in fast mode
     if (_isFastModeActive && _currentSong != null) {
       _vibePlayedIds.add(_currentSong!.id);
     }
     
     if (_isFastModeActive && _vibeQueue.isNotEmpty) {
-      // Pick next unplayed song
       final song = _pickVibeSong();
       _vibePlayedIds.add(song.id);
       playSong(song, fromQueue: true);
@@ -1236,3 +1228,23 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     }
   }
 }
+
+const List<Vibe> availableVibes = [
+  Vibe(
+    id: 'rcYoqkpVIe242IUSR1u7',
+    labelKey: 'vibe_chill',
+    label: 'Relajado',
+    icon: '😌',
+    order: 1,
+    color: Colors.teal,
+    subCategories: [
+      VibeSubCategory(labelKey: 'vibe_chill_lofi', label: 'Lofi', icon: '🎧'),
+      VibeSubCategory(labelKey: 'vibe_chill_acoustic', label: 'Acústico', icon: '🎸'),
+      VibeSubCategory(labelKey: 'vibe_chill_ambient', label: 'Ambiental', icon: '🌊'),
+      VibeSubCategory(labelKey: 'vibe_chill_jazz', label: 'Jazz suave', icon: '🎷'),
+      VibeSubCategory(labelKey: 'vibe_chill_nature', label: 'Naturaleza', icon: '🌿'),
+      VibeSubCategory(labelKey: 'vibe_chill_piano', label: 'Piano', icon: '🎹'),
+      VibeSubCategory(labelKey: 'vibe_chill_yoga', label: 'Yoga', icon: '🧘'),
+    ],
+  ),
+];

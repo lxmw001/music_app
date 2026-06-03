@@ -122,6 +122,8 @@ class AudioPlayerHandler extends BaseAudioHandler {
       tag: item,
       headers: (headers == null || headers.isEmpty) ? null : headers,
     ));
+    // Force immediate playbackState update so Bluetooth/notification refreshes metadata
+    playbackState.add(_transformEvent(_player.playbackEvent));
   }
 
   Map<String, String> _headersForUrl(String url) {

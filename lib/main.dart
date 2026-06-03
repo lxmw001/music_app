@@ -31,7 +31,6 @@ void main() async {
     JustAudioMediaKit.ensureInitialized(android: true);
   }
 
-  // Configure audio session for music playback (Bluetooth, notification, audio focus)
   final session = await AudioSession.instance;
   await session.configure(const AudioSessionConfiguration.music());
   
@@ -241,10 +240,8 @@ class _MainScreenState extends State<MainScreen> {
         if (shouldExit && context.mounted) {
           final player = context.read<MusicPlayerProvider>();
           if (player.isPlaying) {
-            // Minimize to background (keep music playing)
             SystemNavigator.pop(animated: true);
           } else {
-            // Actually close the app
             SystemNavigator.pop();
           }
         }
@@ -253,7 +250,6 @@ class _MainScreenState extends State<MainScreen> {
         extendBody: true,
         body: Stack(
           children: [
-            // Global Mesh Aura
             if (!isFastMode) MeshGradient(color: theme.accentColor),
             
             Column(
@@ -306,10 +302,9 @@ class _MainScreenState extends State<MainScreen> {
                 ),
               ],
             ),
-            // Floating Mini Player (Glassmorphic)
             if (!isFastMode)
               Positioned(
-                left: 12, right: 12, bottom: 95,
+                left: 12, right: 12, bottom: 100, // Adjusted bottom for better spacing
                 child: Consumer<MusicPlayerProvider>(
                   builder: (context, player, child) {
                     if (player.currentSong == null || player.isFastModeActive) return const SizedBox.shrink();
@@ -317,10 +312,9 @@ class _MainScreenState extends State<MainScreen> {
                   },
                 ),
               ),
-            // Floating Glass Navigation Pill
             if (!isFastMode)
               Positioned(
-                left: 20, right: 20, bottom: 20,
+                left: 20, right: 20, bottom: 24,
                 child: _buildFloatingNavBar(theme),
               ),
           ],
@@ -331,35 +325,38 @@ class _MainScreenState extends State<MainScreen> {
 
   Widget _buildFloatingNavBar(ThemeProvider theme) {
     return Container(
-      height: 64,
+      height: 68,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(32),
+        borderRadius: BorderRadius.circular(34),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 25, offset: const Offset(0, 10)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.6), blurRadius: 30, offset: const Offset(0, 12)),
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(32),
+        borderRadius: BorderRadius.circular(34),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+          filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
           child: Container(
-            color: Colors.white.withValues(alpha: 0.06),
+            color: Colors.white.withValues(alpha: 0.08),
+            padding: const EdgeInsets.symmetric(horizontal: 10),
             child: Stack(
               children: [
-                // Animated Sliding Indicator
                 AnimatedAlign(
-                  duration: const Duration(milliseconds: 400),
+                  duration: const Duration(milliseconds: 500),
                   curve: Curves.easeOutBack,
                   alignment: Alignment(-1.0 + (_currentIndex * 1.0), 0.0),
                   child: FractionallySizedBox(
                     widthFactor: 1/3,
                     child: Center(
                       child: Container(
-                        width: 54, height: 44,
+                        width: 58, height: 48,
                         decoration: BoxDecoration(
-                          color: theme.accentColor.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(22),
-                          border: Border.all(color: theme.accentColor.withValues(alpha: 0.1), width: 1),
+                          color: theme.accentColor.withValues(alpha: 0.25), // Increased vibrancy
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: theme.accentColor.withValues(alpha: 0.3), width: 1.5),
+                          boxShadow: [
+                            BoxShadow(color: theme.accentColor.withValues(alpha: 0.2), blurRadius: 10),
+                          ],
                         ),
                       ),
                     ),
@@ -384,7 +381,7 @@ class _MainScreenState extends State<MainScreen> {
 
   Widget _navItem(int index, IconData activeIcon, IconData inactiveIcon) {
     final isSelected = _currentIndex == index;
-    final color = isSelected ? Theme.of(context).colorScheme.primary : Colors.white54;
+    final color = isSelected ? Colors.white : Colors.white.withValues(alpha: 0.4);
     
     return Expanded(
       child: GestureDetector(
@@ -410,12 +407,10 @@ class _MainScreenState extends State<MainScreen> {
         PageRouteBuilder(
           pageBuilder: (context, animation, secondaryAnimation) => const PlayerScreen(),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return SlideTransition(
-              position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
-                .chain(CurveTween(curve: Curves.easeOutQuart))
-                .animate(animation),
+            return FadeTransition(opacity: animation, child: SlideTransition(
+              position: Tween<Offset>(begin: const Offset(0, 0.05), end: Offset.zero).animate(animation),
               child: child,
-            );
+            ));
           },
         ),
       ),
@@ -430,22 +425,22 @@ class _MainScreenState extends State<MainScreen> {
         }
       },
       child: Container(
-        height: 68,
+        height: 72,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(22),
           boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.4), blurRadius: 20, offset: const Offset(0, 5)),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 25, offset: const Offset(0, 8)),
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(22),
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+            filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
             child: Container(
-              color: Colors.white.withValues(alpha: 0.12),
+              color: Colors.white.withValues(alpha: 0.1),
               child: Stack(
                 children: [
-                  // LIQUID PROGRESS FILL
+                  // ENHANCED LIQUID PROGRESS
                   Positioned.fill(
                     child: FractionallySizedBox(
                       alignment: Alignment.centerLeft,
@@ -454,8 +449,8 @@ class _MainScreenState extends State<MainScreen> {
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
-                              theme.colorScheme.primary.withValues(alpha: 0.15),
-                              theme.colorScheme.primary.withValues(alpha: 0.05),
+                              theme.colorScheme.primary.withValues(alpha: 0.3),
+                              theme.colorScheme.primary.withValues(alpha: 0.1),
                             ],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
@@ -465,24 +460,30 @@ class _MainScreenState extends State<MainScreen> {
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
                     child: Row(
                       children: [
                         Hero(
                           tag: 'player_art',
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.network(
-                              song.imageUrl,
-                              width: 44, height: 44, fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
-                                width: 44, height: 44, color: Colors.grey[800],
-                                child: const Icon(Icons.music_note, size: 24),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                              boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 8)],
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.network(
+                                song.imageUrl,
+                                width: 48, height: 48, fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(
+                                  width: 48, height: 48, color: Colors.grey[800],
+                                  child: const Icon(Icons.music_note, size: 24),
+                                ),
                               ),
                             ),
                           ),
                         ),
-                        const SizedBox(width: 14),
+                        const SizedBox(width: 16),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -490,24 +491,27 @@ class _MainScreenState extends State<MainScreen> {
                             children: [
                               Text(
                                 song.title,
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, letterSpacing: -0.2),
+                                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: -0.4),
                                 overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
                               ),
+                              const SizedBox(height: 2),
                               Text(
                                 song.artist,
-                                style: TextStyle(color: Colors.white60, fontSize: 11, fontWeight: FontWeight.w500),
+                                style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12, fontWeight: FontWeight.bold),
                                 overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
                               ),
                             ],
                           ),
                         ),
                         if (player.isPlaying) 
                           Padding(
-                            padding: const EdgeInsets.only(right: 12),
+                            padding: const EdgeInsets.only(right: 16),
                             child: MiniEqualizer(isPlaying: true, color: theme.colorScheme.primary),
                           ),
                         IconButton(
-                          icon: Icon(player.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded, size: 34, color: Colors.white),
+                          icon: Icon(player.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded, size: 36, color: Colors.white),
                           onPressed: () {
                             HapticFeedback.lightImpact();
                             player.isPlaying ? player.pause() : player.resume();
@@ -516,21 +520,19 @@ class _MainScreenState extends State<MainScreen> {
                       ],
                     ),
                   ),
-                  // Progress line indicator at bottom
+                  // BRIGHT LASER PROGRESS LINE
                   Positioned(
                     left: 0, right: 0, bottom: 0,
                     child: FractionallySizedBox(
                       alignment: Alignment.centerLeft,
-                      widthFactor: player.totalDuration.inSeconds > 0
-                          ? (player.currentPosition.inSeconds / player.totalDuration.inSeconds).clamp(0.0, 1.0)
-                          : 0.0,
+                      widthFactor: progress,
                       child: Container(
-                        height: 3,
+                        height: 3.5,
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(2),
                           boxShadow: [
-                            BoxShadow(color: theme.colorScheme.primary.withValues(alpha: 0.6), blurRadius: 6),
+                            BoxShadow(color: theme.colorScheme.primary, blurRadius: 10, spreadRadius: 1),
                           ],
                         ),
                       ),

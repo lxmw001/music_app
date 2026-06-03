@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../l10n/app_localizations.dart';
 import '../models/music_models.dart';
@@ -35,6 +36,7 @@ class _SongListTileState extends State<SongListTile> with SingleTickerProviderSt
   final _downloadService = DownloadService();
   bool _isDownloading = false;
   bool _isDownloaded = false;
+  bool _isPressed = false;
   late final AnimationController _eqController;
 
   @override
@@ -86,7 +88,7 @@ class _SongListTileState extends State<SongListTile> with SingleTickerProviderSt
           key: Key('swipe_${widget.song.id}'),
           confirmDismiss: (direction) async {
             if (direction == DismissDirection.startToEnd) {
-              // Swipe Right -> Add to Queue / Play Next
+              HapticFeedback.mediumImpact();
               player.addSuggestedToQueue(widget.song);
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -96,142 +98,167 @@ class _SongListTileState extends State<SongListTile> with SingleTickerProviderSt
                 ),
               );
             } else if (direction == DismissDirection.endToStart) {
-              // Swipe Left -> Toggle Like
+              HapticFeedback.mediumImpact();
               player.toggleLike(widget.song);
             }
-            return false; // Don't actually remove from list
+            return false;
           },
           background: Container(
-            color: Colors.blue.withValues(alpha: 0.2),
+            color: Colors.blue.withValues(alpha: 0.15),
             alignment: Alignment.centerLeft,
-            padding: const EdgeInsets.only(left: 20),
-            child: const Icon(Icons.playlist_add_rounded, color: Colors.blue),
+            padding: const EdgeInsets.only(left: 24),
+            child: const Icon(Icons.playlist_add_rounded, color: Colors.blue, size: 28),
           ),
           secondaryBackground: Container(
-            color: primaryColor.withValues(alpha: 0.2),
+            color: Colors.pink.withValues(alpha: 0.15),
             alignment: Alignment.centerRight,
-            padding: const EdgeInsets.only(right: 20),
-            child: const Icon(Icons.favorite_rounded, color: Colors.pink),
+            padding: const EdgeInsets.only(right: 24),
+            child: const Icon(Icons.favorite_rounded, color: Colors.pink, size: 28),
           ),
-          child: InkWell(
-            onTap: widget.onTap ?? () {
-              if (player.currentSong?.id == widget.song.id) {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerScreen()));
-              } else {
-                player.playSong(widget.song, queue: widget.queue);
-              }
-            },
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Row(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Image.network(
-                          widget.song.imageUrl,
-                          width: 52, height: 52, fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => _defaultCover(),
-                          loadingBuilder: (_, child, loadingProgress) {
-                            if (loadingProgress == null) return child;
-                            return _defaultCover();
-                          },
-                        ),
-                        if (widget.isLoading)
-                          Container(
-                            width: 52, height: 52, color: Colors.black54,
-                            child: const Center(
-                              child: SizedBox(
-                                width: 20, height: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                              ),
-                            ),
-                          ),
-                        if (isCurrent && !widget.isLoading)
-                          Container(
-                            width: 52, height: 52, color: Colors.black54,
-                            child: Center(
-                              child: _EqualizerIcon(
-                                controller: _eqController, 
-                                playing: state.playing,
-                                color: primaryColor,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.song.title, 
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: isCurrent ? primaryColor : Colors.white,
-                            fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
-                            fontSize: 15,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          widget.song.artist, 
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: Colors.grey[400],
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
+          child: GestureDetector(
+            onTapDown: (_) => setState(() => _isPressed = true),
+            onTapUp: (_) => setState(() => _isPressed = false),
+            onTapCancel: () => setState(() => _isPressed = false),
+            child: AnimatedScale(
+              scale: _isPressed ? 0.98 : 1.0,
+              duration: const Duration(milliseconds: 100),
+              child: InkWell(
+                onTap: widget.onTap ?? () {
+                  if (player.currentSong?.id == widget.song.id) {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerScreen()));
+                  } else {
+                    player.playSong(widget.song, queue: widget.queue);
+                  }
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  child: Row(
                     children: [
-                      if (_isDownloading || widget.isDownloading)
-                        const SizedBox(
-                          width: 20, height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
-                      else if (widget.showDownload && context.watch<AuthProvider>().canDownload)
-                        IconButton(
-                          icon: Icon(
-                            _isDownloaded ? Icons.download_done_rounded : Icons.download_rounded,
-                            size: 22, 
-                            color: _isDownloaded ? primaryColor : Colors.grey[600],
-                          ),
-                          onPressed: _isDownloaded ? null : _download,
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Image.network(
+                              widget.song.imageUrl,
+                              width: 52, height: 52, fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => _defaultCover(),
+                            ),
+                            if (widget.isLoading)
+                              Container(
+                                width: 52, height: 52, color: Colors.black54,
+                                child: const Center(
+                                  child: SizedBox(
+                                    width: 20, height: 20,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  ),
+                                ),
+                              ),
+                            if (isCurrent && !widget.isLoading)
+                              Container(
+                                width: 52, height: 52, color: Colors.black54,
+                                child: Center(
+                                  child: _EqualizerIcon(
+                                    controller: _eqController, 
+                                    playing: state.playing,
+                                    color: primaryColor,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
-                      if (widget.onRemove != null)
-                        PopupMenuButton<String>(
-                          icon: Icon(Icons.more_vert_rounded, size: 22, color: Colors.grey[600]),
-                          onSelected: (value) { if (value == 'remove') widget.onRemove!(); },
-                          itemBuilder: (_) => [
-                            PopupMenuItem(
-                              value: 'remove', 
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.favorite_border_rounded, size: 18),
-                                  const SizedBox(width: 8),
-                                  Text(l10n.playerQueue), // Placeholder for "Remove from liked"
-                                ],
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.song.title, 
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: isCurrent ? primaryColor : Colors.white,
+                                fontWeight: isCurrent ? FontWeight.w900 : FontWeight.w700,
+                                fontSize: 15,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              widget.song.artist, 
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: isCurrent ? primaryColor.withValues(alpha: 0.7) : Colors.white38,
+                                fontWeight: isCurrent ? FontWeight.bold : FontWeight.w600,
+                                fontSize: 13,
                               ),
                             ),
                           ],
                         ),
+                      ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (_isDownloading || widget.isDownloading)
+                            const SizedBox(
+                              width: 20, height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          else if (widget.showDownload && context.watch<AuthProvider>().canDownload)
+                            IconButton(
+                              icon: Icon(
+                                _isDownloaded ? Icons.download_done_rounded : Icons.download_rounded,
+                                size: 22, 
+                                color: _isDownloaded ? primaryColor : Colors.white24,
+                              ),
+                              onPressed: _isDownloaded ? null : _download,
+                            ),
+                          if (widget.onRemove != null)
+                            IconButton(
+                              icon: const Icon(Icons.more_vert_rounded, size: 22, color: Colors.white24),
+                              onPressed: () {
+                                HapticFeedback.lightImpact();
+                                _showOptions(context, l10n);
+                              },
+                            ),
+                        ],
+                      ),
                     ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
         );
       },
+    );
+  }
+
+  void _showOptions(BuildContext context, AppLocalizations l10n) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: Colors.grey[900],
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent),
+                title: const Text('Remove from Library', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  widget.onRemove?.call();
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

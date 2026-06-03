@@ -9,6 +9,7 @@ import '../providers/music_player_provider.dart';
 import '../services/download_service.dart';
 import '../widgets/song_list_tile.dart';
 import '../widgets/animated_list_item.dart';
+import '../widgets/floating_particles.dart';
 
 class LibraryScreen extends StatefulWidget {
   const LibraryScreen({super.key});
@@ -95,7 +96,6 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
     return Scaffold(
       body: Stack(
         children: [
-          // Background aura glow
           Positioned.fill(
             child: Container(
               decoration: BoxDecoration(
@@ -103,13 +103,14 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
                   begin: Alignment.bottomRight,
                   end: Alignment.topLeft,
                   colors: [
-                    primaryColor.withValues(alpha: 0.1),
+                    primaryColor.withValues(alpha: 0.15),
                     Colors.black,
                   ],
                 ),
               ),
             ),
           ),
+          FloatingParticles(color: primaryColor),
           SafeArea(
             child: NestedScrollView(
               headerSliverBuilder: (context, innerBoxIsScrolled) => [
@@ -129,12 +130,13 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
                         fontSize: 26, 
                         letterSpacing: -1.0,
                         color: Colors.white,
+                        shadows: [Shadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 2))],
                       ),
                     ),
                     background: ClipRect(
                       child: BackdropFilter(
                         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                        child: Container(color: Colors.black.withValues(alpha: 0.2)),
+                        child: Container(color: Colors.black.withValues(alpha: 0.15)),
                       ),
                     ),
                   ),
@@ -153,6 +155,7 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
               ],
               body: TabBarView(
                 controller: _tabController,
+                physics: const BouncingScrollPhysics(),
                 children: [
                   _buildSongsTab(),
                   _buildPlaylistsTab(),
@@ -168,6 +171,7 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
   }
 
   Widget _buildGlassTabBar() {
+    final primary = Theme.of(context).colorScheme.primary;
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       padding: const EdgeInsets.all(4),
@@ -182,11 +186,11 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
         tabAlignment: TabAlignment.start,
         dividerColor: Colors.transparent,
         indicator: BoxDecoration(
-          color: Theme.of(context).colorScheme.primary,
+          color: primary,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.4), 
+              color: primary.withValues(alpha: 0.4), 
               blurRadius: 12, 
               offset: const Offset(0, 4)
             ),
@@ -195,8 +199,8 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
         indicatorSize: TabBarIndicatorSize.tab,
         labelColor: Colors.black,
         unselectedLabelColor: Colors.white60,
-        labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
-        unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+        labelStyle: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+        unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
         tabs: const [
           Tab(text: '  Songs  '),
           Tab(text: '  Playlists  '),
@@ -208,6 +212,7 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
   }
 
   Widget _buildOfflineChip() {
+    final primary = Theme.of(context).colorScheme.primary;
     return FilterChip(
       label: Row(
         mainAxisSize: MainAxisSize.min,
@@ -225,7 +230,7 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
         HapticFeedback.mediumImpact();
         setState(() => _offlineOnly = v);
       },
-      selectedColor: Theme.of(context).colorScheme.primary,
+      selectedColor: primary,
       backgroundColor: Colors.white.withValues(alpha: 0.05),
       showCheckmark: false,
       shape: StadiumBorder(side: BorderSide(color: _offlineOnly ? Colors.transparent : Colors.white10)),
@@ -240,7 +245,7 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
           child: Container(
-            height: 48,
+            height: 52,
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(16),
@@ -248,7 +253,7 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
             ),
             child: TextField(
               onChanged: (v) => setState(() => _searchQuery = v),
-              style: const TextStyle(color: Colors.white, fontSize: 15),
+              style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
               decoration: InputDecoration(
                 hintText: 'Find in your library',
                 hintStyle: const TextStyle(color: Colors.white24, fontSize: 14),
@@ -260,7 +265,7 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
                     )
                   : null,
                 border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                contentPadding: const EdgeInsets.symmetric(vertical: 14),
               ),
             ),
           ),
@@ -274,17 +279,58 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
     return Column(
       children: [
         _buildTypeFilterChips(),
-        if (songs.isNotEmpty) _buildActionButtons(songs),
+        if (songs.isNotEmpty) ...[
+          _buildLibraryStats(songs),
+          _buildActionButtons(songs),
+        ],
         Expanded(
           child: RefreshIndicator(
             onRefresh: _loadAll,
             child: songs.isEmpty 
               ? _buildEmptyState(Icons.music_note_rounded, 'No tracks found')
               : ListView.builder(
-                  padding: const EdgeInsets.only(bottom: 100, top: 4),
+                  padding: const EdgeInsets.only(bottom: 120, top: 4),
+                  physics: const BouncingScrollPhysics(),
                   itemCount: songs.length,
                   itemBuilder: (context, i) => AnimatedListItem(index: i, child: SongListTile(song: songs[i], queue: songs)),
                 ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLibraryStats(List<Song> songs) {
+    final totalDuration = songs.fold(Duration.zero, (prev, s) => prev + s.duration);
+    final hours = totalDuration.inHours;
+    final minutes = totalDuration.inMinutes.remainder(60);
+    final durationStr = hours > 0 ? '${hours}h ${minutes}m' : '${minutes}m';
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+      child: Row(
+        children: [
+          _statItem(Icons.library_music_rounded, '${songs.length} tracks'),
+          const SizedBox(width: 16),
+          _statItem(Icons.access_time_rounded, durationStr),
+        ],
+      ),
+    );
+  }
+
+  Widget _statItem(IconData icon, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: Colors.white24),
+        const SizedBox(width: 6),
+        Text(
+          label.toUpperCase(),
+          style: const TextStyle(
+            color: Colors.white38,
+            fontSize: 10,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1.0,
           ),
         ),
       ],
@@ -338,23 +384,24 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
           HapticFeedback.lightImpact();
           onPressed();
         },
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          padding: const EdgeInsets.symmetric(vertical: 14),
           decoration: BoxDecoration(
-            color: isFilled ? color : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-            border: isFilled ? null : Border.all(color: Colors.white10),
+            color: isFilled ? color : Colors.white.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(16),
+            border: isFilled ? null : Border.all(color: Colors.white.withValues(alpha: 0.05)),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 18, color: isFilled ? Colors.black : Colors.white),
-              const SizedBox(width: 8),
+              Icon(icon, size: 20, color: isFilled ? Colors.black : Colors.white),
+              const SizedBox(width: 10),
               Text(label, style: TextStyle(
                 color: isFilled ? Colors.black : Colors.white,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w900,
                 fontSize: 14,
+                letterSpacing: 0.2,
               )),
             ],
           ),
@@ -366,7 +413,7 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
   Widget _buildTypeFilterChips() {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
           _buildTypeChip('All', null),
@@ -395,7 +442,7 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
       selectedColor: primary.withValues(alpha: 0.15),
       labelStyle: TextStyle(
         color: isSelected ? primary : Colors.white60,
-        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+        fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
         fontSize: 12,
       ),
       shape: StadiumBorder(side: BorderSide(color: isSelected ? primary.withValues(alpha: 0.5) : Colors.transparent)),
@@ -416,31 +463,38 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
     return RefreshIndicator(
       onRefresh: _loadAll,
       child: ListView.builder(
-        padding: const EdgeInsets.only(bottom: 100, top: 8),
+        padding: const EdgeInsets.only(bottom: 120, top: 8),
+        physics: const BouncingScrollPhysics(),
         itemCount: playlists.length,
         itemBuilder: (context, i) {
           final pl = playlists[i];
           return AnimatedListItem(index: i, child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             leading: Hero(
               tag: 'playlist_${pl.id}',
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  width: 56, height: 56,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.05),
-                    border: Border.all(color: Colors.white10, width: 0.5),
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 10, offset: const Offset(0, 4))],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    width: 60, height: 60,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.05),
+                      border: Border.all(color: Colors.white10, width: 0.5),
+                    ),
+                    child: pl.imageUrl.isNotEmpty
+                        ? Image.network(pl.imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _playlistIcon())
+                        : _playlistIcon(),
                   ),
-                  child: pl.imageUrl.isNotEmpty
-                      ? Image.network(pl.imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _playlistIcon())
-                      : _playlistIcon(),
                 ),
               ),
             ),
-            title: Text(pl.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            subtitle: Text('${pl.songs.length} tracks', style: const TextStyle(color: Colors.white38, fontSize: 13)),
-            trailing: const Icon(Icons.chevron_right_rounded, color: Colors.white24),
+            title: Text(pl.name, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: -0.2)),
+            subtitle: Text('${pl.songs.length} tracks', style: const TextStyle(color: Colors.white38, fontSize: 13, fontWeight: FontWeight.bold)),
+            trailing: const Icon(Icons.chevron_right_rounded, color: Colors.white12),
             onTap: () => _showPlaylistDetail(pl),
           ));
         },
@@ -459,6 +513,7 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
 
   Widget _buildArtistsTab() {
     final songs = _allSongsBase;
+    final primary = Theme.of(context).colorScheme.primary;
 
     // First pass: count solo songs for each individual artist
     final soloCounts = <String, int>{};
@@ -494,10 +549,11 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
     if (artists.isEmpty) return _buildEmptyState(Icons.person_rounded, 'No artists found');
 
     return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+      physics: const BouncingScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
-        childAspectRatio: 0.8,
+        childAspectRatio: 0.78,
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
       ),
@@ -515,8 +571,9 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
                 child: Container(
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
+                    border: Border.all(color: primary.withValues(alpha: 0.4), width: 2),
                     boxShadow: [
-                      BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 5)),
+                      BoxShadow(color: primary.withValues(alpha: 0.2), blurRadius: 12, spreadRadius: 1),
                     ],
                   ),
                   child: CircleAvatar(
@@ -524,22 +581,22 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
                     backgroundColor: Colors.white.withValues(alpha: 0.05),
                     backgroundImage: firstSongImg.isNotEmpty ? NetworkImage(firstSongImg) : null,
                     child: firstSongImg.isEmpty 
-                      ? Text(artist[0].toUpperCase(), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white70))
+                      ? Text(artist[0].toUpperCase(), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white70))
                       : null,
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
               Text(
                 artist, 
                 textAlign: TextAlign.center,
                 maxLines: 1, 
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: -0.2),
               ),
               Text(
                 '${artistSongs.length} tracks', 
-                style: const TextStyle(color: Colors.white38, fontSize: 11),
+                style: const TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.w900),
               ),
             ],
           ),
@@ -563,7 +620,8 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
     if (genres.isEmpty) return _buildEmptyState(Icons.category_rounded, 'No genres found');
 
     return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+      physics: const BouncingScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2, childAspectRatio: 1.6, crossAxisSpacing: 14, mainAxisSpacing: 14,
       ),
@@ -583,17 +641,17 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
                   gradient[1].withValues(alpha: 0.6),
                 ],
               ),
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(24),
               border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
               boxShadow: [
-                BoxShadow(color: gradient[0].withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 4)),
+                BoxShadow(color: gradient[0].withValues(alpha: 0.2), blurRadius: 12, offset: const Offset(0, 4)),
               ],
             ),
             child: Stack(
               children: [
                 Positioned(
                   right: -15, bottom: -15,
-                  child: Icon(Icons.music_note_rounded, size: 80, color: Colors.white.withValues(alpha: 0.1)),
+                  child: Icon(Icons.music_note_rounded, size: 80, color: Colors.white38.withValues(alpha: 0.1)),
                 ),
                 Center(
                   child: Text(
@@ -603,6 +661,7 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
                       fontSize: 15, 
                       color: Colors.white,
                       letterSpacing: 1.2,
+                      shadows: [Shadow(color: Colors.black26, blurRadius: 8)],
                     ),
                   ),
                 ),
@@ -646,19 +705,19 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(28),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.03),
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, size: 64, color: Colors.white10),
+            child: Icon(icon, size: 64, color: Colors.white.withValues(alpha: 0.05)),
           ),
           const SizedBox(height: 24),
-          Text(message, style: const TextStyle(color: Colors.white38, fontSize: 16, fontWeight: FontWeight.bold)),
+          Text(message, style: const TextStyle(color: Colors.white24, fontSize: 16, fontWeight: FontWeight.w900)),
           if (_searchQuery.isNotEmpty) 
             Padding(
-              padding: const EdgeInsets.only(top: 8.0),
-              child: Text('Try a different search', style: TextStyle(color: Colors.white.withValues(alpha: 0.1), fontSize: 13)),
+              padding: const EdgeInsets.only(top: 12.0),
+              child: Text('Try a different search query', style: TextStyle(color: Colors.white.withValues(alpha: 0.1), fontSize: 13, fontWeight: FontWeight.w600)),
             ),
         ],
       ),
@@ -674,12 +733,12 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
         height: MediaQuery.of(context).size.height * 0.8,
         decoration: BoxDecoration(
           color: const Color(0xFF0F0F0F),
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(40)),
           border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
         ),
         child: Column(
           children: [
-            Container(margin: const EdgeInsets.symmetric(vertical: 12), width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
+            Container(margin: const EdgeInsets.symmetric(vertical: 16), width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
               child: Row(
@@ -688,8 +747,8 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(title, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white)),
-                        Text('${songs.length} tracks', style: const TextStyle(color: Colors.white38, fontWeight: FontWeight.bold)),
+                        Text(title, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -0.5)),
+                        Text('${songs.length} tracks', style: const TextStyle(color: Colors.white38, fontWeight: FontWeight.w800)),
                       ],
                     ),
                   ),
@@ -699,8 +758,8 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
                       context.read<MusicPlayerProvider>().playSong(shuffled.first, queue: shuffled);
                       Navigator.pop(context);
                     },
-                    icon: const Icon(Icons.shuffle_rounded, color: Colors.black),
-                    style: IconButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.primary),
+                    icon: const Icon(Icons.shuffle_rounded, color: Colors.black, size: 28),
+                    style: IconButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.primary, padding: const EdgeInsets.all(12)),
                   ),
                 ],
               ),
@@ -709,6 +768,7 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.symmetric(vertical: 12),
+                physics: const BouncingScrollPhysics(),
                 itemCount: songs.length,
                 itemBuilder: (context, i) => SongListTile(song: songs[i], queue: songs),
               ),
@@ -757,6 +817,8 @@ class _PlaylistDetailSheetState extends State<_PlaylistDetailSheet> {
   @override
   Widget build(BuildContext context) {
     final playlist = widget.playlist;
+    final primary = Theme.of(context).colorScheme.primary;
+
     return BackdropFilter(
       filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
       child: Container(
@@ -775,11 +837,17 @@ class _PlaylistDetailSheetState extends State<_PlaylistDetailSheet> {
                 children: [
                   Hero(
                     tag: 'playlist_${playlist.id}',
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: playlist.imageUrl.isNotEmpty 
-                        ? Image.network(playlist.imageUrl, width: 90, height: 90, fit: BoxFit.cover)
-                        : Container(width: 90, height: 90, color: Colors.white.withValues(alpha: 0.05), child: const Icon(Icons.music_note, size: 40, color: Colors.white24)),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [BoxShadow(color: Colors.black45, blurRadius: 20)],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: playlist.imageUrl.isNotEmpty 
+                          ? Image.network(playlist.imageUrl, width: 90, height: 90, fit: BoxFit.cover)
+                          : Container(width: 90, height: 90, color: Colors.white.withValues(alpha: 0.05), child: const Icon(Icons.music_note, size: 40, color: Colors.white24)),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 20),
@@ -787,9 +855,9 @@ class _PlaylistDetailSheetState extends State<_PlaylistDetailSheet> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(playlist.name, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white)),
+                        Text(playlist.name, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -0.5)),
                         const SizedBox(height: 4),
-                        Text('${playlist.songs.length} tracks', style: const TextStyle(color: Colors.white38, fontWeight: FontWeight.bold)),
+                        Text('${playlist.songs.length} tracks', style: const TextStyle(color: Colors.white38, fontWeight: FontWeight.w900)),
                       ],
                     ),
                   ),
@@ -807,12 +875,13 @@ class _PlaylistDetailSheetState extends State<_PlaylistDetailSheet> {
                         Navigator.pop(context);
                         context.read<MusicPlayerProvider>().playSong(playlist.songs.first, queue: playlist.songs);
                       },
-                      icon: const Icon(Icons.play_arrow_rounded, color: Colors.black, size: 28),
-                      label: const Text('Play', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900)),
+                      icon: const Icon(Icons.play_arrow_rounded, color: Colors.black, size: 32),
+                      label: const Text('PLAY', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, letterSpacing: 1.0)),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).colorScheme.primary,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        backgroundColor: primary,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        elevation: 0,
                       ),
                     ),
                   ),
@@ -828,11 +897,11 @@ class _PlaylistDetailSheetState extends State<_PlaylistDetailSheet> {
                       context.read<MusicPlayerProvider>().deletePlaylist(playlist.id);
                       Navigator.pop(context);
                     },
-                    icon: const Icon(Icons.delete_outline_rounded, size: 22, color: Colors.redAccent),
+                    icon: const Icon(Icons.delete_outline_rounded, size: 24, color: Colors.redAccent),
                     style: IconButton.styleFrom(
                       backgroundColor: Colors.red.withValues(alpha: 0.1),
-                      padding: const EdgeInsets.all(12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      padding: const EdgeInsets.all(16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                     ),
                   ),
                 ],
@@ -843,6 +912,7 @@ class _PlaylistDetailSheetState extends State<_PlaylistDetailSheet> {
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.symmetric(vertical: 12),
+                physics: const BouncingScrollPhysics(),
                 itemCount: playlist.songs.length,
                 itemBuilder: (context, i) {
                   final song = playlist.songs[i];
@@ -924,24 +994,25 @@ class _DownloadAllButtonState extends State<_DownloadAllButton> {
 
   @override
   Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
     return IconButton.filled(
       onPressed: _isDownloading || _allDownloaded ? null : _downloadAll,
       icon: _isDownloading
           ? SizedBox(
-              width: 20, height: 20,
+              width: 22, height: 22,
               child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: Theme.of(context).colorScheme.primary,
+                strokeWidth: 3,
+                color: primary,
               ),
             )
           : Icon(_allDownloaded ? Icons.download_done_rounded : Icons.download_rounded, 
-              size: 22, 
-              color: _allDownloaded ? Theme.of(context).colorScheme.primary : Colors.white
+              size: 24, 
+              color: _allDownloaded ? primary : Colors.white
             ),
       style: IconButton.styleFrom(
-        backgroundColor: Colors.white.withValues(alpha: 0.05),
-        padding: const EdgeInsets.all(12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: Colors.white.withValues(alpha: 0.08),
+        padding: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
     );
   }

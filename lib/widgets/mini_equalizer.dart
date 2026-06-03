@@ -17,7 +17,7 @@ class _MiniEqualizerState extends State<MiniEqualizer> with SingleTickerProvider
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 1000),
     );
     if (widget.isPlaying) _controller.repeat(reverse: true);
   }
@@ -50,10 +50,10 @@ class _MiniEqualizerState extends State<MiniEqualizer> with SingleTickerProvider
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             _bar(0.4 + 0.6 * _controller.value),
-            const SizedBox(width: 2),
-            _bar(1.0 - 0.5 * _controller.value),
-            const SizedBox(width: 2),
-            _bar(0.7 + 0.3 * (1 - _controller.value)),
+            const SizedBox(width: 2.5),
+            _bar(0.8 - 0.5 * _controller.value),
+            const SizedBox(width: 2.5),
+            _bar(0.6 + 0.4 * (1 - _controller.value)),
           ],
         );
       },
@@ -62,11 +62,18 @@ class _MiniEqualizerState extends State<MiniEqualizer> with SingleTickerProvider
 
   Widget _bar(double heightFactor) {
     return Container(
-      width: 3,
-      height: 14 * heightFactor,
+      width: 3.5,
+      height: 16 * heightFactor,
       decoration: BoxDecoration(
         color: widget.color,
-        borderRadius: BorderRadius.circular(1),
+        borderRadius: BorderRadius.circular(1.5),
+        boxShadow: [
+          BoxShadow(
+            color: widget.color.withValues(alpha: 0.5),
+            blurRadius: 8,
+            spreadRadius: 0.5,
+          ),
+        ],
       ),
     );
   }
