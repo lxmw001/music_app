@@ -592,7 +592,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     }
     
     final isCompleted = _audioHandler.playbackState.value.processingState == AudioProcessingState.completed;
-    if (_currentSong?.id == song.id && isPlaying && !isCompleted && queue == null) return;
+    if (_currentSong?.id == song.id && isPlaying && !isCompleted) return;
 
     final previousSong = _currentSong;
     final previousPosition = currentPosition.inSeconds;
@@ -715,14 +715,15 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     );
     _lastPosition = Duration.zero;
     _isSwitchingSong = true;
+    _currentSong = song;
+    _updateDominantColor(song.imageUrl);
+    notifyListeners();
     try {
       await _audioHandler.setAudioSource(audioUrl, mediaItem);
       if (seekTo != null && seekTo > Duration.zero) {
         await _audioHandler.seek(seekTo);
       }
       await _audioHandler.play();
-      _currentSong = song;
-      _updateDominantColor(song.imageUrl);
       _consecutiveFailures = 0;
       _isTransitioning = false;
       _loadingAudioIds.remove(song.id);

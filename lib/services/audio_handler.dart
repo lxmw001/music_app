@@ -114,7 +114,6 @@ class AudioPlayerHandler extends BaseAudioHandler {
   }
 
   Future<void> setAudioSource(String url, MediaItem item) async {
-    mediaItem.add(item);
     final isLocal = url.startsWith('/') || url.startsWith('file://');
     final uri = isLocal ? Uri.file(url) : Uri.parse(url);
     final headers = isLocal ? null : (_isWebm(url) ? null : _headersForUrl(url));
@@ -122,7 +121,8 @@ class AudioPlayerHandler extends BaseAudioHandler {
       tag: item,
       headers: (headers == null || headers.isEmpty) ? null : headers,
     ));
-    // Force immediate playbackState update so Bluetooth/notification refreshes metadata
+    // Update notification/Bluetooth only after source is ready
+    mediaItem.add(item);
     playbackState.add(_transformEvent(_player.playbackEvent));
   }
 
