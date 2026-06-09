@@ -11,7 +11,9 @@ import 'package:http/http.dart' as _i3;
 import 'package:mockito/mockito.dart' as _i1;
 import 'package:mockito/src/dummies.dart' as _i7;
 import 'package:music_app/models/music_models.dart' as _i4;
-import 'package:music_app/services/gemini_service.dart' as _i11;
+import 'package:music_app/models/user_profile.dart' as _i12;
+import 'package:music_app/models/vibe.dart' as _i11;
+import 'package:music_app/services/gemini_service.dart' as _i13;
 import 'package:music_app/services/music_server_service.dart' as _i10;
 import 'package:music_app/services/youtube_service.dart' as _i5;
 import 'package:youtube_explode_dart/youtube_explode_dart.dart' as _i2;
@@ -394,11 +396,15 @@ class MockMusicServerService extends _i1.Mock
   }
 
   @override
-  _i6.Future<_i4.MusicSearchResult> searchSongs(String? query) =>
+  _i6.Future<_i4.MusicSearchResult> searchSongs(
+    String? query, {
+    bool? force = false,
+  }) =>
       (super.noSuchMethod(
         Invocation.method(
           #searchSongs,
           [query],
+          {#force: force},
         ),
         returnValue:
             _i6.Future<_i4.MusicSearchResult>.value(_FakeMusicSearchResult_3(
@@ -406,6 +412,7 @@ class MockMusicServerService extends _i1.Mock
           Invocation.method(
             #searchSongs,
             [query],
+            {#force: force},
           ),
         )),
       ) as _i6.Future<_i4.MusicSearchResult>);
@@ -428,9 +435,27 @@ class MockMusicServerService extends _i1.Mock
       ) as _i6.Future<List<_i4.Song>>);
 
   @override
+  _i6.Future<List<_i4.Song>> getCachedTrending() => (super.noSuchMethod(
+        Invocation.method(
+          #getCachedTrending,
+          [],
+        ),
+        returnValue: _i6.Future<List<_i4.Song>>.value(<_i4.Song>[]),
+      ) as _i6.Future<List<_i4.Song>>);
+
+  @override
   _i6.Future<List<String>> getSearchSuggestions() => (super.noSuchMethod(
         Invocation.method(
           #getSearchSuggestions,
+          [],
+        ),
+        returnValue: _i6.Future<List<String>>.value(<String>[]),
+      ) as _i6.Future<List<String>>);
+
+  @override
+  _i6.Future<List<String>> getCachedSearchSuggestions() => (super.noSuchMethod(
+        Invocation.method(
+          #getCachedSearchSuggestions,
           [],
         ),
         returnValue: _i6.Future<List<String>>.value(<String>[]),
@@ -489,93 +514,67 @@ class MockMusicServerService extends _i1.Mock
       ) as _i6.Future<List<_i4.Song>>);
 
   @override
-  _i6.Future<Map<String, dynamic>?> getProfile() => (super.noSuchMethod(
+  _i6.Future<List<_i11.Vibe>> getVibes() => (super.noSuchMethod(
         Invocation.method(
-          #getProfile,
+          #getVibes,
           [],
         ),
-        returnValue: _i6.Future<Map<String, dynamic>?>.value(),
-      ) as _i6.Future<Map<String, dynamic>?>);
+        returnValue: _i6.Future<List<_i11.Vibe>>.value(<_i11.Vibe>[]),
+      ) as _i6.Future<List<_i11.Vibe>>);
 
   @override
-  _i6.Future<List<String>> getLikedSongs() => (super.noSuchMethod(
+  _i6.Future<List<_i11.Vibe>> getCachedVibes() => (super.noSuchMethod(
         Invocation.method(
-          #getLikedSongs,
+          #getCachedVibes,
           [],
         ),
-        returnValue: _i6.Future<List<String>>.value(<String>[]),
-      ) as _i6.Future<List<String>>);
+        returnValue: _i6.Future<List<_i11.Vibe>>.value(<_i11.Vibe>[]),
+      ) as _i6.Future<List<_i11.Vibe>>);
 
   @override
-  _i6.Future<bool> isSongLiked(String? songId) => (super.noSuchMethod(
+  _i6.Future<List<_i4.Song>> fetchAIVibe({
+    required String? vibeId,
+    String? subCategoryId,
+    required _i12.UserProfile? profile,
+  }) =>
+      (super.noSuchMethod(
         Invocation.method(
-          #isSongLiked,
-          [songId],
-        ),
-        returnValue: _i6.Future<bool>.value(false),
-      ) as _i6.Future<bool>);
-
-  @override
-  _i6.Future<bool> likeSong(String? songId) => (super.noSuchMethod(
-        Invocation.method(
-          #likeSong,
-          [songId],
-        ),
-        returnValue: _i6.Future<bool>.value(false),
-      ) as _i6.Future<bool>);
-
-  @override
-  _i6.Future<bool> unlikeSong(String? songId) => (super.noSuchMethod(
-        Invocation.method(
-          #unlikeSong,
-          [songId],
-        ),
-        returnValue: _i6.Future<bool>.value(false),
-      ) as _i6.Future<bool>);
-
-  @override
-  _i6.Future<List<String>> getDownloadedSongIds() => (super.noSuchMethod(
-        Invocation.method(
-          #getDownloadedSongIds,
+          #fetchAIVibe,
           [],
+          {
+            #vibeId: vibeId,
+            #subCategoryId: subCategoryId,
+            #profile: profile,
+          },
         ),
-        returnValue: _i6.Future<List<String>>.value(<String>[]),
-      ) as _i6.Future<List<String>>);
+        returnValue: _i6.Future<List<_i4.Song>>.value(<_i4.Song>[]),
+      ) as _i6.Future<List<_i4.Song>>);
 
   @override
-  _i6.Future<bool> markDownloaded(String? songId) => (super.noSuchMethod(
+  _i6.Future<_i4.Song?> findAlternative(String? videoId) => (super.noSuchMethod(
         Invocation.method(
-          #markDownloaded,
-          [songId],
+          #findAlternative,
+          [videoId],
         ),
-        returnValue: _i6.Future<bool>.value(false),
-      ) as _i6.Future<bool>);
-
-  @override
-  _i6.Future<bool> removeDownload(String? songId) => (super.noSuchMethod(
-        Invocation.method(
-          #removeDownload,
-          [songId],
-        ),
-        returnValue: _i6.Future<bool>.value(false),
-      ) as _i6.Future<bool>);
+        returnValue: _i6.Future<_i4.Song?>.value(),
+      ) as _i6.Future<_i4.Song?>);
 }
 
 /// A class which mocks [GeminiService].
 ///
 /// See the documentation for Mockito's code generation for more information.
-class MockGeminiService extends _i1.Mock implements _i11.GeminiService {
+class MockGeminiService extends _i1.Mock implements _i13.GeminiService {
   MockGeminiService() {
     _i1.throwOnMissingStub(this);
   }
 
   @override
-  _i6.Future<_i11.SongMetadata?> getSongMetadata(String? videoTitle) =>
+  _i6.Future<_i13.SongMetadata?> getSongMetadata(String? videoTitle) =>
       (super.noSuchMethod(
         Invocation.method(
           #getSongMetadata,
           [videoTitle],
         ),
-        returnValue: _i6.Future<_i11.SongMetadata?>.value(),
-      ) as _i6.Future<_i11.SongMetadata?>);
+        returnValue: _i6.Future<_i13.SongMetadata?>.value(),
+      ) as _i6.Future<_i13.SongMetadata?>);
 }

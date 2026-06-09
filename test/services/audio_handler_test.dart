@@ -108,6 +108,13 @@ void main() {
       final item = MediaItem(id: 's1', title: 'Title');
       when(mockPlayer.setAudioSource(any, initialIndex: anyNamed('initialIndex'), initialPosition: anyNamed('initialPosition'), preload: anyNamed('preload')))
           .thenAnswer((_) async => null);
+      when(mockPlayer.playbackEvent).thenReturn(PlaybackEvent());
+      when(mockPlayer.processingState).thenReturn(ProcessingState.idle);
+      when(mockPlayer.playing).thenReturn(false);
+      when(mockPlayer.position).thenReturn(Duration.zero);
+      when(mockPlayer.bufferedPosition).thenReturn(Duration.zero);
+      when(mockPlayer.speed).thenReturn(1.0);
+      when(mockPlayer.currentIndex).thenReturn(null);
 
       await handler.setAudioSource(url, item);
 
