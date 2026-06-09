@@ -343,7 +343,10 @@ class YouTubeService {
   Future<String> getPlayableAudioPath(String videoId, {String serverId = '', Song? song}) async {
     await _awaitInit();
     final downloadedPath = await _downloadService.getDownloadedPathById(videoId);
-    if (downloadedPath != null) return downloadedPath;
+    if (downloadedPath != null) {
+      print('[YouTubeService] using downloaded file for $videoId');
+      return downloadedPath;
+    }
     if (song != null && song.hasValidStreamUrl) return song.streamUrl!;
     final cachedUrl = await _streamUrlCache.get(videoId);
     if (cachedUrl != null) {

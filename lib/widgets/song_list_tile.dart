@@ -204,15 +204,14 @@ class _SongListTileState extends State<SongListTile> with SingleTickerProviderSt
                               width: 20, height: 20,
                               child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                             )
-                          else if (widget.showDownload && context.watch<AuthProvider>().canDownload)
-                            IconButton(
-                              icon: Icon(
-                                _isDownloaded ? Icons.download_done_rounded : Icons.download_rounded,
-                                size: 22, 
-                                color: _isDownloaded ? primaryColor : Colors.white24,
+                          else if (widget.showDownload)
+                            if (_isDownloaded)
+                              Icon(Icons.download_done_rounded, size: 22, color: primaryColor)
+                            else if (context.watch<AuthProvider>().canDownload)
+                              IconButton(
+                                icon: const Icon(Icons.download_rounded, size: 22, color: Colors.white24),
+                                onPressed: _download,
                               ),
-                              onPressed: _isDownloaded ? null : _download,
-                            ),
                           if (widget.onRemove != null)
                             IconButton(
                               icon: const Icon(Icons.more_vert_rounded, size: 22, color: Colors.white24),
