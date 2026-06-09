@@ -33,10 +33,20 @@ class AuthProvider extends ChangeNotifier {
   bool get hasSuggestedPlaylists => hasPermission('suggest_playlists');
 
   AuthProvider() {
+    _loadCachedPermissions();
     _auth.authStateChanges().listen((u) async {
       if (u != null) await _refreshPermissions();
       notifyListeners();
     });
+  }
+
+  Future<void> _loadCachedPermissions() async {
+    final prefs = await SharedPreferences.getInstance();
+    final cached = prefs.getStringList(_permsCacheKey);
+    if (cached != null && cached.isNotEmpty) {
+      _permissions = cached.toSet();
+      notifyListeners();
+    }
   }
 
   static const _permsCacheKey = 'cached_permissions';

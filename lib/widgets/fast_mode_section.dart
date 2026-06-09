@@ -51,7 +51,7 @@ class FastModeSection extends StatelessWidget {
       key: const ValueKey('resume'),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Container(
-        height: 220,
+        constraints: const BoxConstraints(minHeight: 180),
         width: double.infinity,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(40),
@@ -99,7 +99,7 @@ class FastModeSection extends StatelessWidget {
                       vibe.getLocalizedName(context).toUpperCase(),
                       style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w900, letterSpacing: -1.5),
                     ),
-                    const Spacer(),
+                    const SizedBox(height: 20),
                     Row(
                       children: [
                         Expanded(
@@ -153,7 +153,7 @@ class FastModeSection extends StatelessWidget {
         onTap: () => _launchPicker(context),
         borderRadius: BorderRadius.circular(40),
         child: Container(
-          height: 180,
+          constraints: const BoxConstraints(minHeight: 160),
           width: double.infinity,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(40),

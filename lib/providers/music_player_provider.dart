@@ -249,6 +249,10 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
           final current = _audioHandler.mediaItem.value;
           if (current != null && (current.duration == null || current.duration == Duration.zero)) {
             _audioHandler.mediaItem.add(current.copyWith(duration: duration));
+            // Force playbackState update so Bluetooth refreshes metadata
+            _audioHandler.playbackState.add(_audioHandler.playbackState.value.copyWith(
+              updatePosition: _audioHandler.currentPosition,
+            ));
           }
           notifyListeners();
         }
@@ -329,6 +333,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         }
       }
       
+      _updateAudioHandlerQueue();
       notifyListeners();
       Connectivity().onConnectivityChanged.listen(_onConnectivityChanged);
     } catch (e, st) {
@@ -338,6 +343,8 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
 
   Song? _songBeforeOffline;
   Duration _positionBeforeOffline = Duration.zero;
+  List<Song>? _queueBeforeOffline;
+  int _indexBeforeOffline = 0;
   bool _isOfflineMode = false;
 
   void _onConnectivityChanged(List<ConnectivityResult> results) {
@@ -348,18 +355,37 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       _isOfflineMode = true;
       if (_currentSong != null && !(_currentSong!.audioUrl.startsWith('/') || _currentSong!.audioUrl.startsWith('file://'))) {
         _songBeforeOffline = _currentSong;
-        _positionBeforeOffline = currentPosition;
-        _playOfflineByGenre(_currentSong!);
+        _queueBeforeOffline = List.from(_normalQueue);
+        _indexBeforeOffline = _normalIndex;
+        // Wait for buffered audio to finish before switching to offline
+        final buffered = _audioHandler.playbackState.value.bufferedPosition;
+        final pos = currentPosition;
+        final remaining = buffered - pos;
+        final delay = remaining > const Duration(seconds: 2) ? remaining - const Duration(seconds: 1) : Duration.zero;
+        rlog('[MusicPlayerProvider] internet lost, buffered ${remaining.inSeconds}s ahead, switching in ${delay.inSeconds}s');
+        Future.delayed(delay, () {
+          if (_isOfflineMode && _songBeforeOffline != null) {
+            _positionBeforeOffline = currentPosition;
+            _playOfflineByGenre(_songBeforeOffline!);
+          }
+        });
       }
     } else if (hasInternet && _isOfflineMode) {
       _isOfflineMode = false;
       if (_songBeforeOffline != null) {
+        rlog('[MusicPlayerProvider] internet back, resuming ${_songBeforeOffline!.title}');
         final song = _songBeforeOffline!;
         final pos = _positionBeforeOffline;
         _songBeforeOffline = null;
         _positionBeforeOffline = Duration.zero;
-        song.audioUrl = ''; 
-        playSong(song, seekTo: pos);
+        // Restore original queue
+        if (_queueBeforeOffline != null) {
+          _normalQueue = _queueBeforeOffline!;
+          _normalIndex = _indexBeforeOffline;
+          _queueBeforeOffline = null;
+        }
+        song.audioUrl = ''; // force re-fetch
+        playSong(song, seekTo: pos, fromQueue: true);
       }
     }
   }
@@ -427,7 +453,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   }
 
   Future<void> _playOfflineByGenre(Song stalledSong) async {
-    if (_authProvider?.canDownload != true) return;
     final downloaded = await _downloadService.getDownloadedSongs();
     if (downloaded.isEmpty) return;
 
@@ -503,6 +528,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       _normalQueue.removeWhere((s) => s.id == song.id);
       if (_normalIndex >= _normalQueue.length) _normalIndex = _normalQueue.isEmpty ? 0 : _normalQueue.length - 1;
     }
+    _updateAudioHandlerQueue();
     notifyListeners();
   }
 
@@ -526,6 +552,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         } else {
           _historyService.saveQueue(_normalQueue, _normalIndex);
         }
+        _updateAudioHandlerQueue();
         notifyListeners();
       } else {
         final insertIndex = currentIndex + 1;
@@ -537,6 +564,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
             _normalQueue.insert(insertIndex, alternative);
             _historyService.saveQueue(_normalQueue, _normalIndex);
           }
+          _updateAudioHandlerQueue();
           notifyListeners();
         }
       }
@@ -626,6 +654,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
                 _pendingPlaylistName = plName;
                 _pendingPlaylistSongs = _normalQueue;
                 _pendingPlaylistLikedCount = 0;
+                _updateAudioHandlerQueue();
                 notifyListeners();
               }
             });
@@ -634,10 +663,19 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       }
       _historyService.saveQueue(_normalQueue, _normalIndex);
     }
+    _updateAudioHandlerQueue();
     notifyListeners();
 
     _suggestedSongs = [];
     String audioUrl = song.audioUrl;
+    // Check local download first (instant, works offline)
+    if (audioUrl.isEmpty) {
+      final dlPath = await _downloadService.getDownloadedPathById(song.id);
+      if (dlPath != null) {
+        audioUrl = dlPath;
+        song.audioUrl = dlPath;
+      }
+    }
     if (audioUrl.isEmpty) {
       _loadingAudioIds.add(song.id);
       _audioHandler.nextEnabled = false;
@@ -755,6 +793,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       else if (oldIndex > _normalIndex && newIndex <= _normalIndex) _normalIndex++;
       _historyService.saveQueue(_normalQueue, _normalIndex);
     }
+    _updateAudioHandlerQueue();
     notifyListeners();
   }
 
@@ -773,6 +812,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       _vibePlayedIds.clear(); 
       final song = _pickVibeSong();
       _vibeIndex = 0;
+      _updateAudioHandlerQueue();
       notifyListeners();
       playSong(song, queue: List.from(_vibeQueue), fromQueue: true);
     } else {
@@ -807,6 +847,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         _vibePlayedIds.clear(); 
         _vibeIndex = 0;
         _historyService.saveVibeQueue(_vibeQueue, _vibeIndex);
+        _updateAudioHandlerQueue();
         if (playImmediately) {
           final song = _pickVibeSong();
           notifyListeners();
@@ -840,6 +881,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         _activeSubCategoryId = state.subCategoryId;
         _vibeQueue = savedQ.queue;
         _vibeIndex = savedQ.currentIndex;
+        _updateAudioHandlerQueue();
         notifyListeners();
         await playSong(_vibeQueue[_vibeIndex], fromQueue: true);
       } else {
@@ -859,6 +901,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     } else {
       _currentSong = null;
     }
+    _updateAudioHandlerQueue();
     notifyListeners();
   }
 
@@ -892,6 +935,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       if (toAdd.first.audioUrl.isEmpty) {
         _youtubeService.getAudioUrl(toAdd.first.id).then((url) => toAdd.first.audioUrl = url);
       }
+      _updateAudioHandlerQueue();
       notifyListeners();
     }
   }
@@ -978,6 +1022,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         _normalIndex = _normalQueue.length - 1;
         _historyService.saveQueue(_normalQueue, _normalIndex);
       }
+      _updateAudioHandlerQueue();
       playSong(next, fromQueue: true);
     } else if (_currentSong != null) {
       _fetchAndPlaySuggestion();
@@ -1021,6 +1066,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
           _normalQueue.add(suggestions.first);
           _normalIndex = _normalQueue.length - 1;
         }
+        _updateAudioHandlerQueue();
         playSong(suggestions.first);
       }
     } on YouTubeRateLimitException {
@@ -1176,6 +1222,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         _normalQueue.add(song);
         _historyService.saveQueue(_normalQueue, _normalIndex);
       }
+      _updateAudioHandlerQueue();
       notifyListeners();
     }
   }
@@ -1226,6 +1273,19 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       _pendingPlaylistName = null;
       _pendingPlaylistSongs = null;
     }
+  }
+
+  void _updateAudioHandlerQueue() {
+    if (!_isInitialized) return;
+    final currentQueue = queue;
+    final mediaItems = currentQueue.map((song) => MediaItem(
+      id: song.id,
+      title: song.title,
+      artist: song.artist,
+      artUri: song.imageUrl.isNotEmpty ? Uri.tryParse(song.imageUrl) : null,
+      duration: song.duration,
+    )).toList();
+    _audioHandler.queue.add(mediaItems);
   }
 }
 

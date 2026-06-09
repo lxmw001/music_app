@@ -8,6 +8,7 @@ import '../services/music_server_service.dart';
 import '../models/music_models.dart';
 import '../providers/music_player_provider.dart';
 import '../providers/theme_provider.dart';
+import 'player_screen.dart';
 import '../providers/auth_provider.dart';
 import '../widgets/song_list_tile.dart';
 import '../widgets/mesh_gradient.dart';
@@ -362,7 +363,14 @@ class _SearchScreenState extends State<SearchScreen> {
         AnimatedListItem(
           index: 0,
           child: GestureDetector(
-            onTap: () => context.read<MusicPlayerProvider>().playSong(song, searchQuery: _currentQuery),
+            onTap: () {
+              final player = context.read<MusicPlayerProvider>();
+              if (player.currentSong?.id == song.id) {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const PlayerScreen()));
+              } else {
+                player.playSong(song, searchQuery: _currentQuery);
+              }
+            },
             child: Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -399,7 +407,12 @@ class _SearchScreenState extends State<SearchScreen> {
                   Container(
                     height: 56, width: 56,
                     decoration: BoxDecoration(color: primary, shape: BoxShape.circle),
-                    child: const Icon(Icons.play_arrow_rounded, color: Colors.black, size: 36),
+                    child: loadingIds.contains(song.id)
+                        ? const Padding(
+                            padding: EdgeInsets.all(14),
+                            child: CircularProgressIndicator(strokeWidth: 3, color: Colors.black),
+                          )
+                        : const Icon(Icons.play_arrow_rounded, color: Colors.black, size: 36),
                   ),
                 ],
               ),

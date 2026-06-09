@@ -145,7 +145,7 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
                     const SizedBox(width: 12),
                   ],
                   bottom: PreferredSize(
-                    preferredSize: const Size.fromHeight(60),
+                    preferredSize: const Size.fromHeight(70),
                     child: _buildGlassTabBar(),
                   ),
                 ),
