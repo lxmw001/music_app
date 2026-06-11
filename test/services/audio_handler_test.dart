@@ -45,6 +45,12 @@ void main() {
   group('AudioPlayerHandler.play', () {
     test('delegates to AudioPlayer.play()', () async {
       when(mockPlayer.processingState).thenReturn(ProcessingState.ready);
+      when(mockPlayer.playing).thenReturn(true);
+      when(mockPlayer.position).thenReturn(Duration.zero);
+      when(mockPlayer.bufferedPosition).thenReturn(Duration.zero);
+      when(mockPlayer.speed).thenReturn(1.0);
+      when(mockPlayer.currentIndex).thenReturn(null);
+      when(mockPlayer.playbackEvent).thenReturn(PlaybackEvent());
       when(mockPlayer.play()).thenAnswer((_) async {});
       await handler.play();
       verify(mockPlayer.play()).called(1);
@@ -53,6 +59,13 @@ void main() {
 
   group('AudioPlayerHandler.pause', () {
     test('delegates to AudioPlayer.pause()', () async {
+      when(mockPlayer.processingState).thenReturn(ProcessingState.ready);
+      when(mockPlayer.playing).thenReturn(false);
+      when(mockPlayer.position).thenReturn(Duration.zero);
+      when(mockPlayer.bufferedPosition).thenReturn(Duration.zero);
+      when(mockPlayer.speed).thenReturn(1.0);
+      when(mockPlayer.currentIndex).thenReturn(null);
+      when(mockPlayer.playbackEvent).thenReturn(PlaybackEvent());
       when(mockPlayer.pause()).thenAnswer((_) async {});
       await handler.pause();
       verify(mockPlayer.pause()).called(1);
