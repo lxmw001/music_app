@@ -40,12 +40,6 @@ class AudioPlayerHandler extends BaseAudioHandler {
     }
 
     _player.playbackEventStream.map(_transformEvent).listen(emit);
-    _player.sequenceStateStream.listen((sequenceState) {
-      final currentItem = sequenceState.currentSource?.tag as MediaItem?;
-      if (currentItem != null) {
-        mediaItem.add(currentItem);
-      }
-    });
   }
 
   bool _nextEnabled = true;
@@ -88,11 +82,16 @@ class AudioPlayerHandler extends BaseAudioHandler {
       onPlay?.call();
     } else {
       await _player.play();
+      // Force immediate state update for Bluetooth/notification
+      playbackState.add(_transformEvent(_player.playbackEvent));
     }
   }
 
   @override
-  Future<void> pause() => _player.pause();
+  Future<void> pause() async {
+    await _player.pause();
+    playbackState.add(_transformEvent(_player.playbackEvent));
+  }
 
   @override
   Future<void> seek(Duration position) => _player.seek(position);

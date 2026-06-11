@@ -242,6 +242,17 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
             _fetchSuggestionsInBackground();
           }
         }
+        // Fallback: detect end-of-song via position when completed state is not emitted
+        if (!_isSwitchingSong && !_isTransitioning && _currentSong != null) {
+          final duration = totalDuration;
+          if (duration.inSeconds > 0 && position.inSeconds >= duration.inSeconds && _currentSong?.id != _lastCompletedSongId) {
+            _lastCompletedSongId = _currentSong?.id;
+            _historyService.recordPlay(_currentSong!, position.inSeconds);
+            Future.delayed(const Duration(milliseconds: 500), () {
+              if (_currentSong?.id == _lastCompletedSongId) nextSong();
+            });
+          }
+        }
       });
 
       _audioHandler.durationStream.listen((duration) {
