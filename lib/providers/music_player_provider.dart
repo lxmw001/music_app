@@ -895,7 +895,8 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         _vibeIndex = savedQ.currentIndex;
         _updateAudioHandlerQueue();
         notifyListeners();
-        await playSong(_vibeQueue[_vibeIndex], fromQueue: true);
+        final pos = await _historyService.getLastPosition(_vibeQueue[_vibeIndex].id);
+        await playSong(_vibeQueue[_vibeIndex], fromQueue: true, seekTo: pos > 0 ? Duration(seconds: pos) : null);
       } else {
         await playFastMode(vibeId: state.vibeId, subCategoryId: state.subCategoryId);
       }
@@ -907,6 +908,10 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     _isFastModeActive = false;
     _activeVibeId = null;
     _activeSubCategoryId = null;
+    // Save current position so resume starts where we left off
+    if (_currentSong != null) {
+      _historyService.savePosition(_currentSong!, currentPosition.inSeconds);
+    }
     _audioHandler.stop();
     if (_normalQueue.isNotEmpty) {
       _currentSong = _normalQueue[_normalIndex];
@@ -1022,7 +1027,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
         _historyService.saveQueue(_normalQueue, _normalIndex);
       }
       playSong(currentQueue[index], fromQueue: true);
-    } else if (_suggestedSongs.isNotEmpty) {
+    } else if (_suggestedSongs.isNotEmpty && currentQueue.length > 1) {
       final next = _suggestedSongs.first;
       _suggestedSongs = [];
       if (_isFastModeActive) {

@@ -82,7 +82,9 @@ class AudioPlayerHandler extends BaseAudioHandler {
       onPlay?.call();
     } else {
       await _player.play();
-      // Force immediate state update for Bluetooth/notification
+      // Re-emit mediaItem + playbackState together so Bluetooth refreshes metadata
+      final current = mediaItem.value;
+      if (current != null) mediaItem.add(current);
       playbackState.add(_transformEvent(_player.playbackEvent));
     }
   }
