@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
+import 'error_reporting_service.dart';
 
 class ApiException implements Exception {
   final int statusCode;
@@ -41,7 +42,17 @@ class ApiService {
       Uri.parse('$baseUrl$path'),
       headers: await _headers(requiresAuth: requiresAuth),
     ).timeout(timeout);
-    if (res.statusCode >= 400) throw ApiException.fromResponse(res);
+    if (res.statusCode >= 400) {
+      if (!path.contains('error-report')) {
+        ErrorReportingService.instance.report(
+          error: res.body,
+          endpoint: path,
+          statusCode: res.statusCode,
+          action: 'api_get',
+        );
+      }
+      throw ApiException.fromResponse(res);
+    }
     return jsonDecode(res.body);
   }
 
@@ -51,7 +62,18 @@ class ApiService {
       headers: await _headers(requiresAuth: requiresAuth),
       body: body != null ? jsonEncode(body) : null,
     ).timeout(timeout);
-    if (res.statusCode >= 400) throw ApiException.fromResponse(res);
+    if (res.statusCode >= 400) {
+      if (!path.contains('error-report')) {
+        ErrorReportingService.instance.report(
+          error: res.body,
+          endpoint: path,
+          statusCode: res.statusCode,
+          action: 'api_post',
+          requestBody: body != null ? jsonEncode(body) : null,
+        );
+      }
+      throw ApiException.fromResponse(res);
+    }
     if (res.statusCode == 204 || res.body.isEmpty) return null;
     return jsonDecode(res.body);
   }

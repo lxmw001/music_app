@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'services/error_reporting_service.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'l10n/app_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -46,6 +47,22 @@ void main() async {
     systemNavigationBarColor: Colors.transparent,
     systemNavigationBarIconBrightness: Brightness.light,
   ));
+
+  // Global error handlers
+  FlutterError.onError = (details) {
+    ErrorReportingService.instance.report(
+      error: details.exceptionAsString(),
+      stackTrace: details.stack?.toString(),
+      file: details.library,
+    );
+  };
+  PlatformDispatcher.instance.onError = (error, stack) {
+    ErrorReportingService.instance.report(
+      error: error.toString(),
+      stackTrace: stack.toString(),
+    );
+    return true;
+  };
 
   runApp(
     MultiProvider(

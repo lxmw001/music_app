@@ -15,6 +15,7 @@ import '../services/youtube_service.dart' show YouTubeService, YouTubeRateLimitE
 import '../services/music_server_service.dart';
 import '../services/profile_service.dart';
 import '../utils/logger.dart';
+import '../services/error_reporting_service.dart';
 import 'auth_provider.dart';
 import 'theme_provider.dart';
 
@@ -745,6 +746,12 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       _loadingAudioIds.remove(song.id);
       _audioHandler.nextEnabled = true;
       notifyListeners();
+      ErrorReportingService.instance.report(
+        error: e.toString(),
+        action: 'play_song',
+        songId: song.serverId,
+        youtubeId: song.id,
+      );
       await _handleStreamUrlFailure(song, fromQueue: fromQueue);
       return;
     } finally {
