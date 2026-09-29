@@ -207,6 +207,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     try {
       _audioHandler = await AudioService.init(
         builder: () => AudioPlayerHandler(
+          ytService: _youtubeService,
           onSkipToNext: () => nextSong(),
           onSkipToPrevious: () => previousSong(),
           onPlay: () => resume(),
@@ -731,7 +732,7 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     _updateDominantColor(song.imageUrl);
     notifyListeners();
     try {
-      await _audioHandler.setAudioSource(audioUrl, mediaItem);
+      await _audioHandler.setAudioSource(audioUrl, mediaItem, videoId: song.id);
       if (seekTo != null && seekTo > Duration.zero) {
         await _audioHandler.seek(seekTo);
       }

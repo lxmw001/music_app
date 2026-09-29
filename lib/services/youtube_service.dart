@@ -1,5 +1,6 @@
 import "package:music_app/utils/logger.dart";
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import 'package:http/http.dart' as http;
 import '../models/music_models.dart';
@@ -37,14 +38,20 @@ class _AuthenticatedYoutubeHttpClient extends YoutubeHttpClient {
 }
 
 class YoutubeExplodeGateway implements YoutubeGateway {
-  YoutubeExplode _yt;
-  YoutubeExplodeGateway({YoutubeExplode? yt}) : _yt = yt ?? YoutubeExplode();
+  late YoutubeExplode _yt;
+  late YoutubeHttpClient _ytHttpClient;
+
+  YoutubeHttpClient get ytHttpClient => _ytHttpClient;
+
+  YoutubeExplodeGateway({YoutubeExplode? yt}) {
+    _ytHttpClient = YoutubeHttpClient();
+    _yt = yt ?? YoutubeExplode(httpClient: _ytHttpClient);
+  }
 
   void applyOAuthToken(String accessToken) {
     final old = _yt;
-    _yt = YoutubeExplode(httpClient: YoutubeHttpClient(AuthHttpClient({
-      'Authorization': 'Bearer $accessToken',
-    })));
+    _ytHttpClient = YoutubeHttpClient(AuthHttpClient({'Authorization': 'Bearer $accessToken'}));
+    _yt = YoutubeExplode(httpClient: _ytHttpClient);
     try { old.close(); } catch (_) {}
   }
 
@@ -52,9 +59,11 @@ class YoutubeExplodeGateway implements YoutubeGateway {
     final cookieHeader = await YoutubeCookieAuth.loadCookieHeader();
     final old = _yt;
     if (cookieHeader != null) {
-      _yt = YoutubeExplode(httpClient: _AuthenticatedYoutubeHttpClient(cookieHeader));
+      _ytHttpClient = _AuthenticatedYoutubeHttpClient(cookieHeader);
+      _yt = YoutubeExplode(httpClient: _ytHttpClient);
     } else {
-      _yt = YoutubeExplode();
+      _ytHttpClient = YoutubeHttpClient();
+      _yt = YoutubeExplode(httpClient: _ytHttpClient);
     }
     try { old.close(); } catch (_) {}
   }
@@ -67,11 +76,14 @@ class YoutubeExplodeGateway implements YoutubeGateway {
 
   @override
   Future<String> getAudioUrl(String videoId) async {
-    final clientSets = [
+    // null = android default (only client reliably returning streams currently)
+    final clientSets = <List<YoutubeApiClient>?>[
+      null, // android default — must be first
       [YoutubeApiClient.ios, YoutubeApiClient.androidVr],
       [YoutubeApiClient.tv, YoutubeApiClient.safari],
     ];
-    for (int attempt = 0; attempt < 2; attempt++) {
+    Object? lastError;
+    for (int attempt = 0; attempt < clientSets.length; attempt++) {
       try {
         final manifest = await _yt.videos.streamsClient
             .getManifest(videoId, ytClients: clientSets[attempt])
@@ -79,12 +91,16 @@ class YoutubeExplodeGateway implements YoutubeGateway {
         final streams = manifest.audioOnly
             .where((s) => s.codec.mimeType.startsWith('audio/'))
             .toList();
-        if (streams.isEmpty) throw Exception('No audio streams for $videoId');
+        if (streams.isEmpty) {
+          lastError = Exception('No audio streams for $videoId (attempt ${attempt + 1})');
+          continue;
+        }
         final aac = streams
             .where((s) => s.codec.mimeType.contains('mp4a') || s.container.name == 'mp4')
             .toList();
-        final picked = aac.isNotEmpty ? (aac..sort((a, b) => b.bitrate.compareTo(a.bitrate))).first
-                                      : (streams..sort((a, b) => b.bitrate.compareTo(a.bitrate))).first;
+        final picked = aac.isNotEmpty
+            ? (aac..sort((a, b) => b.bitrate.compareTo(a.bitrate))).first
+            : (streams..sort((a, b) => b.bitrate.compareTo(a.bitrate))).first;
         return picked.url.toString();
       } catch (e) {
         if (e.toString().contains('RequestLimitExceeded')) {
@@ -92,16 +108,37 @@ class YoutubeExplodeGateway implements YoutubeGateway {
           _yt = YoutubeExplode();
           throw const YouTubeRateLimitException();
         }
-        if (attempt == 0) {
+        lastError = e;
+        if (attempt < clientSets.length - 1) {
           try { _yt.close(); } catch (_) {}
           _yt = YoutubeExplode();
-        } else {
-          rethrow;
         }
       }
     }
-    throw Exception('getAudioUrl unreachable');
+    throw lastError ?? Exception('getAudioUrl: all clients failed for $videoId');
   }
+
+  /// Returns the best audio [StreamInfo] for [videoId].
+  /// Use [getStream] to fetch bytes — the library handles rqh=1 correctly.
+  Future<AudioStreamInfo> getAudioStreamInfo(String videoId) async {
+    final manifest = await _yt.videos.streamsClient
+        .getManifest(videoId)
+        .timeout(const Duration(seconds: 80));
+    final streams = manifest.audioOnly
+        .where((s) => s.codec.mimeType.startsWith('audio/'))
+        .toList();
+    if (streams.isEmpty) throw Exception('No audio streams for $videoId');
+    final aac = streams
+        .where((s) => s.codec.mimeType.contains('mp4a') || s.container.name == 'mp4')
+        .toList();
+    return aac.isNotEmpty
+        ? (aac..sort((a, b) => b.bitrate.compareTo(a.bitrate))).first
+        : (streams..sort((a, b) => b.bitrate.compareTo(a.bitrate))).first;
+  }
+
+  /// Streams audio bytes for [streamInfo] using the library's own HTTP client.
+  Stream<List<int>> getStream(AudioStreamInfo streamInfo, {int start = 0}) =>
+      _ytHttpClient.getStream(streamInfo, streamClient: _yt.videos.streamsClient, start: start);
 
   @override
   Future<Video> getVideo(String videoId) => _yt.videos.get(videoId);
@@ -211,6 +248,11 @@ class YouTubeService {
     }
   }
 
+  /// The YoutubeHttpClient used internally — reuse for stream playback so that
+  /// rqh=1 URLs are fetched with the same session that generated them.
+  YoutubeHttpClient? get ytHttpClient =>
+      _gateway is YoutubeExplodeGateway ? (_gateway as YoutubeExplodeGateway).ytHttpClient : null;
+
   Future<void>? _initFuture;
 
   Future<void> _awaitInit() async {
@@ -253,6 +295,25 @@ class YouTubeService {
     } catch (e) {
       rlog('[YouTubeService.getAudioUrl] Error for $videoId: $e');
       return '';
+    }
+  }
+
+  /// Returns the best [AudioStreamInfo] + a stream factory fetched by
+  /// youtube_explode_dart's own HTTP client — the only method that correctly
+  /// handles rqh=1/svpuc=1 signed URLs.
+  Future<({AudioStreamInfo info, Stream<List<int>> Function(int start) stream})?> getAudioStreamInfo(String videoId) async {
+    await _awaitInit();
+    if (_gateway is! YoutubeExplodeGateway) return null;
+    final gw = _gateway as YoutubeExplodeGateway;
+    try {
+      final info = await gw.getAudioStreamInfo(videoId);
+      return (
+        info: info,
+        stream: (int start) => gw.getStream(info, start: start),
+      );
+    } catch (e) {
+      rlog('[YouTubeService.getAudioStreamInfo] Error for $videoId: $e');
+      return null;
     }
   }
 
@@ -347,14 +408,22 @@ class YouTubeService {
       print('[YouTubeService] using downloaded file for $videoId');
       return downloadedPath;
     }
-    if (song != null && song.hasValidStreamUrl) return song.streamUrl!;
+    if (song != null && song.hasValidStreamUrl) {
+      rlog('[YouTubeService] using song.streamUrl ip=${Uri.tryParse(song.streamUrl!)?.queryParameters['ip']}');
+      return song.streamUrl!;
+    }
     final cachedUrl = await _streamUrlCache.get(videoId);
     if (cachedUrl != null) {
+      rlog('[YouTubeService] using cached url ip=${Uri.tryParse(cachedUrl)?.queryParameters['ip']}');
       song?.streamUrl = cachedUrl;
       return cachedUrl;
     }
     String? url;
-    final serverUrl = await _server.getStreamUrl(videoId);
+    // On Android, skip server-cached URLs — they are IP-bound and may have been
+    // cached from a different network session, causing 403 on the current IP.
+    final serverUrl = defaultTargetPlatform == TargetPlatform.android
+        ? ''
+        : await _server.getStreamUrl(videoId);
     if (serverUrl.isNotEmpty) {
       url = serverUrl;
     } else {
@@ -362,6 +431,10 @@ class YouTubeService {
       if (cachedPath != null) return cachedPath;
       try {
         url = await getAudioUrl(videoId);
+        if (url != null && url.isNotEmpty) {
+          final uri = Uri.tryParse(url);
+          rlog('[YouTubeService] fresh url ip=${uri?.queryParameters['ip']} c=${uri?.queryParameters['c']}');
+        }
       } catch (e) {
         rlog('[YouTubeService] getAudioUrl failed for $videoId: $e');
       }

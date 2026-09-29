@@ -2,18 +2,50 @@ import 'dart:async';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:youtube_explode_dart/youtube_explode_dart.dart' show AudioStreamInfo;
 import '../models/music_models.dart';
+import 'youtube_service.dart';
+
+/// Streams audio using youtube_explode_dart's own getStream() which correctly
+/// handles rqh=1/svpuc=1 signed YouTube URLs. The library's stream fetcher uses
+/// chunked range requests internally — the only method proven to work.
+/// just_audio serves bytes via http://127.0.0.1/id/<uuid> so MPV never calls YouTube.
+class _YtLibStreamSource extends StreamAudioSource {
+  final AudioStreamInfo streamInfo;
+  final Stream<List<int>> Function(int start) getStream;
+
+  _YtLibStreamSource(this.streamInfo, this.getStream, {dynamic tag})
+      : super(tag: tag);
+
+  @override
+  Future<StreamAudioResponse> request([int? start, int? end]) async {
+    final from = start ?? 0;
+    final totalBytes = streamInfo.size.totalBytes;
+    debugPrint('[YtLibStream] request start=$from total=$totalBytes mime=${streamInfo.codec.mimeType}');
+    return StreamAudioResponse(
+      sourceLength: totalBytes,
+      contentLength: totalBytes - from,
+      offset: from,
+      stream: getStream(from),
+      contentType: streamInfo.codec.mimeType,
+    );
+  }
+}
 
 class AudioPlayerHandler extends BaseAudioHandler {
   final AudioPlayer _player;
+  YouTubeService? _ytService;
   final VoidCallback? onSkipToNext;
   final VoidCallback? onSkipToPrevious;
   final VoidCallback? onPlay;
 
-  AudioPlayerHandler({AudioPlayer? player, this.onSkipToNext, this.onSkipToPrevious, this.onPlay})
-      : _player = player ?? AudioPlayer(androidApplyAudioAttributes: false) {
+  AudioPlayerHandler({AudioPlayer? player, YouTubeService? ytService, this.onSkipToNext, this.onSkipToPrevious, this.onPlay})
+      : _player = player ?? AudioPlayer(androidApplyAudioAttributes: false),
+        _ytService = ytService {
     _init();
   }
+
+  void updateYtService(YouTubeService service) => _ytService = service;
 
   void _init() {
     // Throttle playbackState updates to ~4/sec to avoid Android notification rate limit
@@ -78,11 +110,9 @@ class AudioPlayerHandler extends BaseAudioHandler {
   @override
   Future<void> play() async {
     if (_player.processingState == ProcessingState.idle) {
-      // Nothing loaded — delegate to provider to resume last song
       onPlay?.call();
     } else {
       await _player.play();
-      // Re-emit mediaItem + playbackState together so Bluetooth refreshes metadata
       final current = mediaItem.value;
       if (current != null) mediaItem.add(current);
       playbackState.add(_transformEvent(_player.playbackEvent));
@@ -99,14 +129,10 @@ class AudioPlayerHandler extends BaseAudioHandler {
   Future<void> seek(Duration position) => _player.seek(position);
 
   @override
-  Future<void> skipToNext() async {
-    onSkipToNext?.call();
-  }
+  Future<void> skipToNext() async => onSkipToNext?.call();
 
   @override
-  Future<void> skipToPrevious() async {
-    onSkipToPrevious?.call();
-  }
+  Future<void> skipToPrevious() async => onSkipToPrevious?.call();
 
   @override
   Future<void> stop() async {
@@ -114,55 +140,51 @@ class AudioPlayerHandler extends BaseAudioHandler {
     return super.stop();
   }
 
-  Future<void> setAudioSource(String url, MediaItem item) async {
+  Future<void> setAudioSource(String url, MediaItem item, {String? videoId}) async {
     final isLocal = url.startsWith('/') || url.startsWith('file://');
+
+    // On Android, use youtube_explode_dart's own stream fetcher (_YtLibStreamSource).
+    // This is the only method proven to work with rqh=1/svpuc=1 signed URLs.
+    // The library's getStream() handles chunked requests internally.
+    // just_audio serves bytes via http://127.0.0.1/id/<uuid> — MPV never calls YouTube.
+    if (!isLocal && defaultTargetPlatform == TargetPlatform.android
+        && _ytService != null && videoId != null && videoId.isNotEmpty) {
+      try {
+        final result = await _ytService!.getAudioStreamInfo(videoId);
+        if (result != null) {
+          debugPrint('[AudioHandler] _YtLibStreamSource for $videoId mime=${result.info.codec.mimeType}');
+          final source = _YtLibStreamSource(result.info, result.stream, tag: item);
+          await _player.setAudioSource(source);
+          mediaItem.add(item);
+          playbackState.add(_transformEvent(_player.playbackEvent));
+          return;
+        }
+      } catch (e) {
+        debugPrint('[AudioHandler] _YtLibStreamSource failed for $videoId: $e — falling back');
+      }
+    }
+
+    // Fallback: URI source with headers (works on iOS/desktop, fallback on Android)
     final uri = isLocal ? Uri.file(url) : Uri.parse(url);
     final headers = isLocal ? null : (_isWebm(url) ? null : _headersForUrl(url));
     await _player.setAudioSource(AudioSource.uri(uri,
       tag: item,
       headers: (headers == null || headers.isEmpty) ? null : headers,
     ));
-    // Update notification/Bluetooth only after source is ready
     mediaItem.add(item);
     playbackState.add(_transformEvent(_player.playbackEvent));
   }
 
   Map<String, String> _headersForUrl(String url) {
-    if (url.contains('c=ANDROID_VR')) {
-      return {
-        'User-Agent': 'com.google.android.apps.youtube.vr.oculus/1.56.21 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip',
-        'X-Youtube-Client-Name': 'ANDROID_VR',
-        'X-Youtube-Client-Version': '1.56.21',
-      };
-    }
-    if (url.contains('c=ANDROID_MUSIC')) {
-      return {
-        'User-Agent': 'com.google.android.apps.youtube.music/7.16.52 (Linux; U; Android 11) gzip',
-        'X-Youtube-Client-Name': 'ANDROID_MUSIC',
-        'X-Youtube-Client-Version': '7.16.52',
-      };
-    }
-    if (url.contains('c=ANDROID')) {
-      return {
-        'User-Agent': 'com.google.android.youtube/20.10.38 (Linux; U; Android 11) gzip',
-        'X-Youtube-Client-Name': 'ANDROID',
-        'X-Youtube-Client-Version': '20.10.38',
-      };
-    }
-    if (url.contains('c=IOS')) {
-      return {
-        'User-Agent': 'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X)',
-        'X-Youtube-Client-Name': 'IOS',
-        'X-Youtube-Client-Version': '19.29.1',
-      };
-    }
+    // Match YoutubeHttpClient.defaultHeaders — what youtube_explode_dart uses.
     return {
-      'User-Agent': 'Mozilla/5.0 (SmartHub; SMART-TV; Linux/SmartTV) AppleWebKit/538.1',
-      'Referer': 'https://www.youtube.com/',
+      'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.18 Safari/537.36',
+      'cookie': 'CONSENT=YES+cb',
+      'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9',
+      'accept-language': 'en-US,en;q=0.5',
     };
   }
 
-  /// Check if URL is a WebM/Opus stream
   bool _isWebm(String url) => url.contains('mime=audio%2Fwebm') || url.contains('mime=audio/webm');
 
   Future<void> setQueue(List<Song> songs) async {
@@ -181,7 +203,6 @@ class AudioPlayerHandler extends BaseAudioHandler {
         'Referer': 'https://www.youtube.com/',
       },
     )).toList();
-
     await _player.setAudioSources(audioSources);
   }
 
