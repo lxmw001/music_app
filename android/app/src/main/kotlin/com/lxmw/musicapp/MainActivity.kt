@@ -141,6 +141,28 @@ class MainActivity : AudioServiceActivity() {
                 ): Boolean {
                     return false // always load in WebView
                 }
+
+                override fun onReceivedError(
+                    view: WebView?,
+                    request: android.webkit.WebResourceRequest?,
+                    error: android.webkit.WebResourceError?
+                ) {
+                    // Only fall back for the main frame failing to load the remote player page
+                    if (request?.isForMainFrame == true &&
+                        view?.url?.contains("/player") == true) {
+                        runOnUiThread {
+                            val html = loadAssetFromFlutter("assets/youtube_player.html")
+                            view.loadDataWithBaseURL(
+                                "https://music-app-server-950104611859.us-central1.run.app/",
+                                html,
+                                "text/html",
+                                "utf-8",
+                                null
+                            )
+                        }
+                    }
+                    super.onReceivedError(view, request, error)
+                }
             }
             webChromeClient = WebChromeClient()
             // JS → Android bridge
@@ -152,15 +174,11 @@ class MainActivity : AudioServiceActivity() {
         // Enable third-party cookies (required for YouTube embeds)
         android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
 
-        // Load the HTML asset from Flutter assets
-        val html = loadAssetFromFlutter("assets/youtube_player.html")
-        webView.loadDataWithBaseURL(
-            "https://www.youtube.com/",
-            html,
-            "text/html",
-            "utf-8",
-            null
-        )
+        // Load the player page from the remote server so the WebView has a real
+        // HTTPS origin. YouTube's IFrame embed system checks the Referer/Origin
+        // of the page hosting the embed; loading via loadDataWithBaseURL() does
+        // not produce a genuine remote origin and YouTube rejects it with error 152.
+        webView.loadUrl("https://music-app-server-950104611859.us-central1.run.app/player")
 
         // Add to activity's root view, VISIBLE at the top of the screen so we
         // can see what YouTube renders and the embed satisfies on-screen
