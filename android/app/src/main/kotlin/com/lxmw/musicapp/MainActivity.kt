@@ -121,14 +121,36 @@ class MainActivity : AudioServiceActivity() {
                 cacheMode = WebSettings.LOAD_DEFAULT
                 allowFileAccess = false
                 allowContentAccess = false
+                // Identify as a desktop browser so YouTube serves embeds not app redirects
+                userAgentString = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                // Allow third-party cookies for YouTube embeds
+                mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
             }
-            webViewClient = WebViewClient()
+            webViewClient = object : WebViewClient() {
+                // Keep ALL navigation inside the WebView — never open external browser.
+                // YouTube embeds sometimes try to navigate to youtube.com or consent
+                // pages; those must stay in-frame or playback breaks.
+                @Deprecated("Deprecated in Java")
+                override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
+                    return false // always load in WebView
+                }
+
+                override fun shouldOverrideUrlLoading(
+                    view: WebView?,
+                    request: android.webkit.WebResourceRequest?
+                ): Boolean {
+                    return false // always load in WebView
+                }
+            }
             webChromeClient = WebChromeClient()
             // JS → Android bridge
             addJavascriptInterface(JsBridge(), "AndroidBridge")
         }
 
         youtubeWebView = webView
+
+        // Enable third-party cookies (required for YouTube embeds)
+        android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
 
         // Load the HTML asset from Flutter assets
         val html = loadAssetFromFlutter("assets/youtube_player.html")
@@ -173,8 +195,7 @@ class MainActivity : AudioServiceActivity() {
             "load" -> {
                 val videoId = args["videoId"] as? String ?: ""
                 val startMs = (args["startMs"] as? Number)?.toLong() ?: 0L
-                val autoplay = args["autoplay"] as? Boolean ?: true
-                jsArgs.append("\"$videoId\", ${(startMs / 1000.0)}, $autoplay")
+                jsArgs.append("\"$videoId\", ${(startMs / 1000.0)}")
             }
             "crossfade" -> {
                 val videoId = args["videoId"] as? String ?: ""
