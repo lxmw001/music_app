@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:async';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
@@ -14,8 +15,13 @@ class AudioPlayerHandler extends BaseAudioHandler {
   final VoidCallback? onSkipToNext;
   final VoidCallback? onSkipToPrevious;
   final VoidCallback? onPlay;
+  /// Called when IFrame embedding is disabled (error 101/150/152).
+  /// Provides the videoId so the caller can fall back to server proxy.
+  final void Function(String videoId)? onEmbeddingError;
 
   bool _usingWebView = false;
+  String? _currentVideoId;
+  MediaItem? _currentItem;
   StreamSubscription? _webStateSub;
   StreamSubscription? _webPlayingSub;
   StreamSubscription? _webErrorSub;
@@ -28,6 +34,7 @@ class AudioPlayerHandler extends BaseAudioHandler {
     this.onSkipToNext,
     this.onSkipToPrevious,
     this.onPlay,
+    this.onEmbeddingError,
   })  : _player = player ?? AudioPlayer(androidApplyAudioAttributes: false),
         _webPlayer = webPlayer ?? YouTubeWebPlayer.instance {
     _init();
@@ -67,6 +74,17 @@ class AudioPlayerHandler extends BaseAudioHandler {
     });
     _webErrorSub = _webPlayer.errorStream.listen((error) {
       debugPrint('[AudioHandler] WebView error: $error');
+      if (!_usingWebView) return;
+      // Error format: "code:message" — codes 101/150/152 mean embedding disabled
+      final code = int.tryParse(error.split(':').first);
+      if (code == 101 || code == 150 || code == 152) {
+        final vid = _currentVideoId;
+        if (vid != null) {
+          debugPrint('[AudioHandler] Embedding disabled for $vid, triggering fallback');
+          _usingWebView = false;
+          onEmbeddingError?.call(vid);
+        }
+      }
     });
   }
 
@@ -195,6 +213,8 @@ class AudioPlayerHandler extends BaseAudioHandler {
     if (!isLocal && _isAndroid && videoId != null && videoId.isNotEmpty) {
       debugPrint('[AudioHandler] Using WebView player for $videoId');
       _usingWebView = true;
+      _currentVideoId = videoId;
+      _currentItem = item;
       try { await _player.stop(); } catch (_) {}
       mediaItem.add(item);
       await _webPlayer.load(videoId, autoplay: true);

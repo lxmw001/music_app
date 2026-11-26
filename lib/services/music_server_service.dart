@@ -10,6 +10,8 @@ import 'api_service.dart';
 class MusicServerService {
   final ApiService _api = ApiService();
 
+  String get baseUrl => ApiService.baseUrl;
+
   MusicServerService({http.Client? client});
 
   Future<MusicSearchResult> searchSongs(String query, {bool force = false}) async {

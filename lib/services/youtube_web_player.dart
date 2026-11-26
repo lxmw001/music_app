@@ -170,14 +170,21 @@ class YouTubeWebPlayer {
   Future<void> _handleMethodCall(MethodCall call) async {
     if (call.method != 'onEvent') return;
     try {
-      final data = jsonDecode(call.arguments as String) as Map<String, dynamic>;
-      final type = data['type'] as String?;
+      final raw = call.arguments as String;
+      debugPrint('[YouTubeWebPlayer] event: $raw');
+      final envelope = jsonDecode(raw) as Map<String, dynamic>;
+      final type = envelope['type'] as String?;
+      // HTML wraps payload in envelope['data'] — flatten it for convenience
+      final data = (envelope['data'] as Map<String, dynamic>?) ?? {};
       switch (type) {
         case 'ready':
-          _isReady = true;
-          _state = YtWebPlayerState.ready;
-          _stateController.add(YtWebPlayerState.ready);
-          _flushQueue();
+          // Fire _isReady only when both players are ready (allReady: true)
+          if (data['allReady'] == true || !_isReady) {
+            _isReady = true;
+            _state = YtWebPlayerState.ready;
+            _stateController.add(YtWebPlayerState.ready);
+            _flushQueue();
+          }
           break;
         case 'stateChange':
           final stateCode = data['state'] as int?;
@@ -187,14 +194,15 @@ class YouTubeWebPlayer {
           _playingController.add(_isPlaying);
           break;
         case 'timeUpdate':
-          final posMs = data['position'] as int?;
-          final durMs = data['duration'] as int?;
-          if (posMs != null) {
-            _position = Duration(milliseconds: posMs);
+          // HTML sends seconds (double), convert to Duration
+          final posSec = (data['position'] as num?)?.toDouble();
+          final durSec = (data['duration'] as num?)?.toDouble();
+          if (posSec != null) {
+            _position = Duration(milliseconds: (posSec * 1000).round());
             _positionController.add(_position);
           }
-          if (durMs != null && durMs > 0) {
-            _duration = Duration(milliseconds: durMs);
+          if (durSec != null && durSec > 0) {
+            _duration = Duration(milliseconds: (durSec * 1000).round());
             _durationController.add(_duration);
           }
           break;
@@ -203,7 +211,7 @@ class YouTubeWebPlayer {
           final message = data['message'] as String? ?? 'Unknown error (code: $code)';
           _state = YtWebPlayerState.error;
           _stateController.add(YtWebPlayerState.error);
-          _errorController.add(message);
+          _errorController.add('$code:$message'); // format: "code:message"
           break;
         case 'loaded':
           final videoId = data['videoId'] as String?;
