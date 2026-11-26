@@ -20,7 +20,7 @@ class ApiException implements Exception {
 }
 
 class ApiService {
-  static const String baseUrl = 'https://music-app-server-lupbg4y2ha-uc.a.run.app';
+  static const String baseUrl = 'https://music-app-server-950104611859.us-central1.run.app';
   final http.Client _client;
 
   ApiService({http.Client? client}) : _client = client ?? http.Client();
