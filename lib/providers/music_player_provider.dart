@@ -497,28 +497,13 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
   }
 
   /// Called when YouTube IFrame embedding is disabled for a video (101/150/152).
-  /// Falls back to the server stream proxy for that video.
+  /// Skips to next song — direct HTTP streams from Android also fail with
+  /// rqh=1 restrictions, so there is no reliable fallback for these videos.
   Future<void> _handleEmbeddingError(String videoId) async {
     final song = _currentSong;
     if (song == null || song.id != videoId) return;
-    rlog('[MusicPlayer] Embedding disabled for $videoId — server proxy fallback');
-    // Use the current song's data to build a MediaItem and switch source
-    final mediaItem = MediaItem(
-      id: song.id,
-      title: song.title,
-      artist: song.artist,
-      artUri: song.imageUrl.isNotEmpty ? Uri.tryParse(song.imageUrl) : null,
-      duration: song.duration,
-    );
-    final proxyUrl = '${MusicServerService().baseUrl}/songs/$videoId/audio-stream';
-    song.audioUrl = proxyUrl;
-    try {
-      await _audioHandler.setAudioSource(proxyUrl, mediaItem, videoId: null);
-      await _audioHandler.play();
-    } catch (e) {
-      rlog('[MusicPlayer] server proxy fallback failed for $videoId: $e');
-      await _handleStreamUrlFailure(song);
-    }
+    rlog('[MusicPlayer] Embedding disabled for $videoId — skipping to next song');
+    nextSong();
   }
 
   Future<void> _handleStreamUrlFailure(Song song, {bool fromQueue = false}) async {
