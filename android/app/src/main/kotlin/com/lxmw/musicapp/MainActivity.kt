@@ -143,12 +143,18 @@ class MainActivity : AudioServiceActivity() {
         // Add to activity's root view so it's available immediately
         val rootView = window.decorView as android.view.ViewGroup
         if (rootView.findViewById<WebView>(android.R.id.content) == null) {
-            // Add as a transparent overlay on top of the Flutter view
+            // Small visible WebView (mini-player) — YouTube requires the embed
+            // to be rendered on-screen for autoplay. Mini-player in the top-right
+            // corner, controlled by the app's player buttons.
             webView.setBackgroundColor(0x00000000)
-            rootView.addView(webView, WindowManager.LayoutParams(
-                WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.MATCH_PARENT
-            ))
+            val params = android.widget.FrameLayout.LayoutParams(
+                200,
+                112
+            ).apply {
+                leftMargin = rootView.width - 210
+                topMargin = 40
+            }
+            rootView.addView(webView, params)
         }
     }
 
