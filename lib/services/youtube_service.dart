@@ -408,22 +408,24 @@ class YouTubeService {
       print('[YouTubeService] using downloaded file for $videoId');
       return downloadedPath;
     }
+
+    // On Android, return a marker URL for the YouTube IFrame WebView player.
+    // The AudioPlayerHandler recognizes the `yt:` prefix and routes to WebView.
+    // This bypasses rqh=1/PO-token restrictions entirely.
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return 'yt:$videoId';
+    }
+
     if (song != null && song.hasValidStreamUrl) {
-      rlog('[YouTubeService] using song.streamUrl ip=${Uri.tryParse(song.streamUrl!)?.queryParameters['ip']}');
       return song.streamUrl!;
     }
     final cachedUrl = await _streamUrlCache.get(videoId);
     if (cachedUrl != null) {
-      rlog('[YouTubeService] using cached url ip=${Uri.tryParse(cachedUrl)?.queryParameters['ip']}');
       song?.streamUrl = cachedUrl;
       return cachedUrl;
     }
     String? url;
-    // On Android, skip server-cached URLs — they are IP-bound and may have been
-    // cached from a different network session, causing 403 on the current IP.
-    final serverUrl = defaultTargetPlatform == TargetPlatform.android
-        ? ''
-        : await _server.getStreamUrl(videoId);
+    final serverUrl = await _server.getStreamUrl(videoId);
     if (serverUrl.isNotEmpty) {
       url = serverUrl;
     } else {

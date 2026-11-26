@@ -2,53 +2,38 @@ import 'dart:async';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:youtube_explode_dart/youtube_explode_dart.dart' show AudioStreamInfo;
 import '../models/music_models.dart';
-import 'youtube_service.dart';
+import 'youtube_web_player.dart';
 
-/// Streams audio using youtube_explode_dart's own getStream() which correctly
-/// handles rqh=1/svpuc=1 signed YouTube URLs. The library's stream fetcher uses
-/// chunked range requests internally — the only method proven to work.
-/// just_audio serves bytes via http://127.0.0.1/id/<uuid> so MPV never calls YouTube.
-class _YtLibStreamSource extends StreamAudioSource {
-  final AudioStreamInfo streamInfo;
-  final Stream<List<int>> Function(int start) getStream;
-
-  _YtLibStreamSource(this.streamInfo, this.getStream, {dynamic tag})
-      : super(tag: tag);
-
-  @override
-  Future<StreamAudioResponse> request([int? start, int? end]) async {
-    final from = start ?? 0;
-    final totalBytes = streamInfo.size.totalBytes;
-    debugPrint('[YtLibStream] request start=$from total=$totalBytes mime=${streamInfo.codec.mimeType}');
-    return StreamAudioResponse(
-      sourceLength: totalBytes,
-      contentLength: totalBytes - from,
-      offset: from,
-      stream: getStream(from),
-      contentType: streamInfo.codec.mimeType,
-    );
-  }
-}
-
+/// Audio player handler that routes YouTube playback to a native WebView
+/// (YouTube IFrame API) on Android, and uses just_audio for local files
+/// and non-Android platforms.
 class AudioPlayerHandler extends BaseAudioHandler {
   final AudioPlayer _player;
-  YouTubeService? _ytService;
+  final YouTubeWebPlayer _webPlayer;
   final VoidCallback? onSkipToNext;
   final VoidCallback? onSkipToPrevious;
   final VoidCallback? onPlay;
 
-  AudioPlayerHandler({AudioPlayer? player, YouTubeService? ytService, this.onSkipToNext, this.onSkipToPrevious, this.onPlay})
-      : _player = player ?? AudioPlayer(androidApplyAudioAttributes: false),
-        _ytService = ytService {
+  bool _usingWebView = false;
+  StreamSubscription? _webStateSub;
+  StreamSubscription? _webPlayingSub;
+  StreamSubscription? _webErrorSub;
+
+  static bool get _isAndroid => defaultTargetPlatform == TargetPlatform.android;
+
+  AudioPlayerHandler({
+    AudioPlayer? player,
+    YouTubeWebPlayer? webPlayer,
+    this.onSkipToNext,
+    this.onSkipToPrevious,
+    this.onPlay,
+  })  : _player = player ?? AudioPlayer(androidApplyAudioAttributes: false),
+        _webPlayer = webPlayer ?? YouTubeWebPlayer.instance {
     _init();
   }
 
-  void updateYtService(YouTubeService service) => _ytService = service;
-
   void _init() {
-    // Throttle playbackState updates to ~4/sec to avoid Android notification rate limit
     DateTime lastEmit = DateTime.fromMillisecondsSinceEpoch(0);
     PlaybackState? pending;
     Timer? throttleTimer;
@@ -72,20 +57,62 @@ class AudioPlayerHandler extends BaseAudioHandler {
     }
 
     _player.playbackEventStream.map(_transformEvent).listen(emit);
+
+    // Listen to WebView player events
+    _webStateSub = _webPlayer.stateStream.listen((_) {
+      if (_usingWebView) _emitWebViewState();
+    });
+    _webPlayingSub = _webPlayer.playingStream.listen((_) {
+      if (_usingWebView) _emitWebViewState();
+    });
+    _webErrorSub = _webPlayer.errorStream.listen((error) {
+      debugPrint('[AudioHandler] WebView error: $error');
+    });
+  }
+
+  void _emitWebViewState() {
+    final state = _webPlayer.state;
+    final playing = _webPlayer.isPlaying;
+    final processingState = switch (state) {
+      YtWebPlayerState.idle => AudioProcessingState.idle,
+      YtWebPlayerState.loading => AudioProcessingState.loading,
+      YtWebPlayerState.ready => AudioProcessingState.ready,
+      YtWebPlayerState.playing => AudioProcessingState.ready,
+      YtWebPlayerState.paused => AudioProcessingState.ready,
+      YtWebPlayerState.buffering => AudioProcessingState.buffering,
+      YtWebPlayerState.ended => AudioProcessingState.completed,
+      YtWebPlayerState.error => AudioProcessingState.error,
+    };
+
+    playbackState.add(PlaybackState(
+      controls: _buildControls(playing),
+      systemActions: const {
+        MediaAction.seek,
+        MediaAction.seekForward,
+        MediaAction.seekBackward,
+      },
+      androidCompactActionIndices: const [0, 1, 2],
+      processingState: processingState,
+      playing: playing,
+      updatePosition: _webPlayer.position,
+      bufferedPosition: _webPlayer.position,
+      speed: 1.0,
+      queueIndex: 0,
+    ));
   }
 
   bool _nextEnabled = true;
   set nextEnabled(bool value) => _nextEnabled = value;
 
-  List<MediaControl> _buildControls() => [
+  List<MediaControl> _buildControls(bool playing) => [
     MediaControl.skipToPrevious,
-    if (_player.playing) MediaControl.pause else MediaControl.play,
+    if (playing) MediaControl.pause else MediaControl.play,
     if (_nextEnabled) MediaControl.skipToNext,
   ];
 
   PlaybackState _transformEvent(PlaybackEvent event) {
     return PlaybackState(
-      controls: _buildControls(),
+      controls: _buildControls(_player.playing),
       systemActions: const {
         MediaAction.seek,
         MediaAction.seekForward,
@@ -109,7 +136,12 @@ class AudioPlayerHandler extends BaseAudioHandler {
 
   @override
   Future<void> play() async {
-    if (_player.processingState == ProcessingState.idle) {
+    if (_usingWebView) {
+      await _webPlayer.play();
+      final current = mediaItem.value;
+      if (current != null) mediaItem.add(current);
+      _emitWebViewState();
+    } else if (_player.processingState == ProcessingState.idle) {
       onPlay?.call();
     } else {
       await _player.play();
@@ -121,12 +153,23 @@ class AudioPlayerHandler extends BaseAudioHandler {
 
   @override
   Future<void> pause() async {
-    await _player.pause();
-    playbackState.add(_transformEvent(_player.playbackEvent));
+    if (_usingWebView) {
+      await _webPlayer.pause();
+      _emitWebViewState();
+    } else {
+      await _player.pause();
+      playbackState.add(_transformEvent(_player.playbackEvent));
+    }
   }
 
   @override
-  Future<void> seek(Duration position) => _player.seek(position);
+  Future<void> seek(Duration position) async {
+    if (_usingWebView) {
+      await _webPlayer.seek(position);
+    } else {
+      await _player.seek(position);
+    }
+  }
 
   @override
   Future<void> skipToNext() async => onSkipToNext?.call();
@@ -136,6 +179,10 @@ class AudioPlayerHandler extends BaseAudioHandler {
 
   @override
   Future<void> stop() async {
+    if (_usingWebView) {
+      await _webPlayer.stop();
+      _usingWebView = false;
+    }
     await _player.stop();
     return super.stop();
   }
@@ -143,31 +190,24 @@ class AudioPlayerHandler extends BaseAudioHandler {
   Future<void> setAudioSource(String url, MediaItem item, {String? videoId}) async {
     final isLocal = url.startsWith('/') || url.startsWith('file://');
 
-    // On Android, use youtube_explode_dart's own stream fetcher (_YtLibStreamSource).
-    // This is the only method proven to work with rqh=1/svpuc=1 signed URLs.
-    // The library's getStream() handles chunked requests internally.
-    // just_audio serves bytes via http://127.0.0.1/id/<uuid> — MPV never calls YouTube.
-    if (!isLocal && defaultTargetPlatform == TargetPlatform.android
-        && _ytService != null && videoId != null && videoId.isNotEmpty) {
-      try {
-        final result = await _ytService!.getAudioStreamInfo(videoId);
-        if (result != null) {
-          debugPrint('[AudioHandler] _YtLibStreamSource for $videoId mime=${result.info.codec.mimeType}');
-          final source = _YtLibStreamSource(result.info, result.stream, tag: item);
-          await _player.setAudioSource(source);
-          mediaItem.add(item);
-          playbackState.add(_transformEvent(_player.playbackEvent));
-          return;
-        }
-      } catch (e) {
-        debugPrint('[AudioHandler] _YtLibStreamSource failed for $videoId: $e — falling back');
-      }
+    // On Android, route YouTube playback through the WebView IFrame player.
+    // This bypasses rqh=1/PO-token restrictions that block direct HTTP streams.
+    if (!isLocal && _isAndroid && videoId != null && videoId.isNotEmpty) {
+      debugPrint('[AudioHandler] Using WebView player for $videoId');
+      _usingWebView = true;
+      try { await _player.stop(); } catch (_) {}
+      mediaItem.add(item);
+      await _webPlayer.load(videoId, autoplay: true);
+      _emitWebViewState();
+      return;
     }
 
-    // Fallback: URI source with headers (works on iOS/desktop, fallback on Android)
+    // Local files and non-Android: use just_audio
+    _usingWebView = false;
     final uri = isLocal ? Uri.file(url) : Uri.parse(url);
-    final headers = isLocal ? null : (_isWebm(url) ? null : _headersForUrl(url));
-    await _player.setAudioSource(AudioSource.uri(uri,
+    final headers = isLocal ? null : _headersForUrl(url);
+    await _player.setAudioSource(AudioSource.uri(
+      uri,
       tag: item,
       headers: (headers == null || headers.isEmpty) ? null : headers,
     ));
@@ -176,7 +216,6 @@ class AudioPlayerHandler extends BaseAudioHandler {
   }
 
   Map<String, String> _headersForUrl(String url) {
-    // Match YoutubeHttpClient.defaultHeaders — what youtube_explode_dart uses.
     return {
       'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.18 Safari/537.36',
       'cookie': 'CONSENT=YES+cb',
@@ -197,18 +236,26 @@ class AudioPlayerHandler extends BaseAudioHandler {
         artUri: Uri.parse(song.imageUrl),
         duration: song.duration,
       ),
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Referer': 'https://www.youtube.com/',
-      },
+      headers: _headersForUrl(song.audioUrl),
     )).toList();
     await _player.setAudioSources(audioSources);
   }
 
-  Stream<Duration> get positionStream => _player.positionStream;
-  Duration get currentPosition => _player.position;
-  Duration get duration => _player.duration ?? Duration.zero;
-  Stream<Duration?> get durationStream => _player.durationStream;
-  Stream<bool> get playingStream => _player.playingStream;
+  // Position/duration getters — delegate to WebView when active
+  Stream<Duration> get positionStream =>
+      _usingWebView ? _webPlayer.positionStream : _player.positionStream;
+  Duration get currentPosition =>
+      _usingWebView ? _webPlayer.position : _player.position;
+  Duration get duration =>
+      _usingWebView ? _webPlayer.duration : (_player.duration ?? Duration.zero);
+  Stream<Duration?> get durationStream =>
+      _usingWebView ? _webPlayer.durationStream.map((d) => d) : _player.durationStream;
+  Stream<bool> get playingStream =>
+      _usingWebView ? _webPlayer.playingStream : _player.playingStream;
+
+  void dispose() {
+    _webStateSub?.cancel();
+    _webPlayingSub?.cancel();
+    _webErrorSub?.cancel();
+  }
 }

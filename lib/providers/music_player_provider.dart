@@ -207,7 +207,6 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     try {
       _audioHandler = await AudioService.init(
         builder: () => AudioPlayerHandler(
-          ytService: _youtubeService,
           onSkipToNext: () => nextSong(),
           onSkipToPrevious: () => previousSong(),
           onPlay: () => resume(),
