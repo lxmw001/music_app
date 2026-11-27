@@ -192,12 +192,15 @@ class MainActivity : AudioServiceActivity() {
         if (hasOverlayPermission()) {
             moveToOverlay()
         } else {
-            // No overlay permission — add a 1×1 visible pixel to the decor view.
-            // Covered/zero-size views cause YouTube to pause after ~40s, but a
-            // 1×1 on-screen pixel satisfies the visibility check.
+            // No overlay permission — add a visible corner widget to the decor view.
+            // 1×1 or tiny sizes fail YouTube's visibility check; use 200×112dp.
             val rootView = window.decorView as android.view.ViewGroup
-            val params = android.widget.FrameLayout.LayoutParams(1, 1).apply {
+            val density = resources.displayMetrics.density
+            val params = android.widget.FrameLayout.LayoutParams(
+                (200 * density).toInt(), (112 * density).toInt()
+            ).apply {
                 gravity = android.view.Gravity.TOP or android.view.Gravity.START
+                topMargin = (24 * density).toInt()
             }
             rootView.addView(webView, params)
             webView.bringToFront()
@@ -285,11 +288,15 @@ class MainActivity : AudioServiceActivity() {
         // Remove from activity view if attached
         (webView.parent as? android.view.ViewGroup)?.removeView(webView)
 
-        // 1×1 pixel, positioned at (0,0) — technically on-screen so Chromium's
-        // visibility check passes, but invisible to the user. NOT_TOUCHABLE so
-        // it never intercepts input.
+        // Full-size player (YouTube's visibility check fails on tiny windows —
+        // a 1×1px overlay paused playback at ~40s again), but positioned mostly
+        // OFF-SCREEN: only a ~64px corner sliver remains visible. NOT_TOUCHABLE
+        // so the sliver never intercepts input.
+        val density = resources.displayMetrics.density
+        val widthPx = (200 * density).toInt()
+        val heightPx = (112 * density).toInt()
         val params = WindowManager.LayoutParams(
-            1, 1,
+            widthPx, heightPx,
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             else
@@ -302,7 +309,8 @@ class MainActivity : AudioServiceActivity() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = android.view.Gravity.TOP or android.view.Gravity.START
-            x = 0
+            // Shift so only a 64px square shows in the top-left corner
+            x = -(widthPx - 64)
             y = 0
         }
 
@@ -312,14 +320,20 @@ class MainActivity : AudioServiceActivity() {
             overlayWindow = webView
             acquireWakeLock()
         } catch (e: Exception) {
-            // Fallback: 1×1 in the activity decor view
+            // Fallback: 200×112dp corner widget in the activity decor view
             overlayWindow = null
             val rootView = window.decorView as android.view.ViewGroup
             if (webView.parent == null) {
-                val fallbackParams = android.widget.FrameLayout.LayoutParams(1, 1).apply {
+                val density = resources.displayMetrics.density
+                val fallbackParams = android.widget.FrameLayout.LayoutParams(
+                    (200 * density).toInt(), (112 * density).toInt()
+                ).apply {
                     gravity = android.view.Gravity.TOP or android.view.Gravity.START
+                    topMargin = (24 * density).toInt()
                 }
                 rootView.addView(webView, fallbackParams)
+                webView.bringToFront()
+                webView.elevation = 100f
             }
         }
     }
@@ -371,8 +385,12 @@ class MainActivity : AudioServiceActivity() {
                     moveToOverlay()
                 } else {
                     val rootView = window.decorView as android.view.ViewGroup
-                    val params = android.widget.FrameLayout.LayoutParams(1, 1).apply {
+                    val density = resources.displayMetrics.density
+                    val params = android.widget.FrameLayout.LayoutParams(
+                        (200 * density).toInt(), (112 * density).toInt()
+                    ).apply {
                         gravity = android.view.Gravity.TOP or android.view.Gravity.START
+                        topMargin = (24 * density).toInt()
                     }
                     rootView.addView(webView, params)
                     webView.bringToFront()
