@@ -1074,6 +1074,31 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       notifyListeners();
       return;
     }
+
+    // 1. Server-side related songs (Cloud Run IP, InnerTube search) — the
+    //    device IP is flagged by Google bot detection (google_abuse redirects)
+    //    so client-side YouTube search frequently fails now.
+    try {
+      final song = _currentSong!;
+      final serverId = song.serverId.isNotEmpty ? song.serverId : song.id;
+      final related = await _serverService.generatePlaylist(serverId, limit: 10);
+      if (related.isNotEmpty) {
+        // Filter out the current song and already-queued ids
+        final queued = _normalQueue.map((s) => s.id).toSet();
+        final candidate = related.firstWhere(
+          (s) => s.id != song.id && !queued.contains(s.id),
+          orElse: () => related.first,
+        );
+        _normalQueue.add(candidate);
+        _normalIndex = _normalQueue.length - 1;
+        _updateAudioHandlerQueue();
+        playSong(candidate, fromQueue: true);
+        return;
+      }
+    } catch (e) {
+      rlog('[MusicPlayerProvider] server suggestion error: $e');
+    }
+
     try {
       if (_pendingSeedQueries.isNotEmpty) {
         final query = _pendingSeedQueries.removeAt(0);
@@ -1160,7 +1185,20 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
     _isFetchingSuggestions = true;
     notifyListeners();
     try {
-      _suggestedSongs = await _youtubeService.getSuggestedSongs(_currentSong!.id, maxResults: 5);
+      // Try server first (avoids device-IP bot detection from Google)
+      final song = _currentSong!;
+      final serverId = song.serverId.isNotEmpty ? song.serverId : song.id;
+      final serverSuggestions = await _serverService.generatePlaylist(serverId, limit: 8);
+      if (serverSuggestions.isNotEmpty) {
+        final queued = queue.map((s) => s.id).toSet();
+        _suggestedSongs = serverSuggestions
+            .where((s) => s.id != song.id && !queued.contains(s.id))
+            .take(5)
+            .toList();
+        return;
+      }
+      // Fallback to client-side
+      _suggestedSongs = await _youtubeService.getSuggestedSongs(song.id, maxResults: 5);
     } catch (e) {
       rlog('Error fetching suggestions: $e');
     } finally {
