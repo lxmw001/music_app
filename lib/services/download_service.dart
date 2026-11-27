@@ -1,13 +1,15 @@
 import "package:music_app/utils/logger.dart";
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import '../models/music_models.dart';
 
 class DownloadService {
   static const _metaKey = 'downloaded_songs';
+  static const _serverBase = 'https://music-app-server-950104611859.us-central1.run.app';
 
   Future<String?> getDownloadedPath(Song song) async {
     final file = await _localFile(song);
@@ -27,31 +29,45 @@ class DownloadService {
     return path;
   }
 
+  /// Downloads audio for [song] via the server proxy (yt-dlp android client).
+  /// Falls back to nothing on failure — the server resolves the stream URL
+  /// server-side so the Android IP restriction doesn't apply.
   Future<String?> downloadSong(Song song, {void Function(int, int)? onProgress}) async {
     try {
       final file = await _localFile(song);
       if (await file.exists()) return file.path;
 
-      final yt = YoutubeExplode();
+      final uri = Uri.parse('$_serverBase/songs/${song.id}/audio-stream');
+      final request = http.Request('GET', uri);
+
+      // Use an HTTP client with a long timeout — yt-dlp resolution + download
+      // can take 30–60 s for longer tracks.
+      final client = http.Client();
       try {
-        final manifest = await yt.videos.streamsClient.getManifest(
-          song.id,
-          ytClients: [YoutubeApiClient.ios, YoutubeApiClient.androidVr],
+        final streamedResponse = await client.send(request).timeout(
+          const Duration(minutes: 5),
         );
-        final streamInfo = manifest.audioOnly.withHighestBitrate();
-        final totalSize = streamInfo.size.totalBytes;
+
+        if (streamedResponse.statusCode != 200 &&
+            streamedResponse.statusCode != 206) {
+          rlog('[DownloadService] server returned ${streamedResponse.statusCode} for ${song.id}');
+          return null;
+        }
+
+        final contentLength = streamedResponse.contentLength;
         int received = 0;
 
-        final stream = yt.videos.streamsClient.get(streamInfo);
         final output = file.openWrite();
-        await for (final chunk in stream) {
+        await for (final chunk in streamedResponse.stream) {
           output.add(chunk);
           received += chunk.length;
-          onProgress?.call(received, totalSize);
+          if (contentLength != null && contentLength > 0) {
+            onProgress?.call(received, contentLength);
+          }
         }
         await output.close();
       } finally {
-        yt.close();
+        client.close();
       }
 
       await _saveMeta(song, file.path);
