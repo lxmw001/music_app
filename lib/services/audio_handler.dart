@@ -128,19 +128,17 @@ class AudioPlayerHandler extends BaseAudioHandler {
   }
 
   void _emitWebViewState() {
-    final state = _webPlayer.state;
-    final playing = _webPlayer.isPlaying;
-    final processingState = switch (state) {
-      YtWebPlayerState.idle => AudioProcessingState.idle,
-      YtWebPlayerState.loading => AudioProcessingState.loading,
-      YtWebPlayerState.ready => AudioProcessingState.ready,
-      YtWebPlayerState.playing => AudioProcessingState.ready,
-      YtWebPlayerState.paused => AudioProcessingState.ready,
-      YtWebPlayerState.buffering => AudioProcessingState.buffering,
-      YtWebPlayerState.ended => AudioProcessingState.completed,
-      YtWebPlayerState.error => AudioProcessingState.error,
-    };
+    _emitWebViewStatePlaying(_webPlayer.isPlaying);
+  }
 
+  /// Emit a WebView playback state with an explicit playing value. Used right
+  /// after play()/pause() so the UI reflects the intent immediately, before
+  /// the async JS stateChange event confirms it.
+  void _emitWebViewStatePlaying(bool playing) {
+    _playingMerger.add(playing);
+    final processingState = _webPlayer.state == YtWebPlayerState.error
+        ? AudioProcessingState.error
+        : AudioProcessingState.ready;
     playbackState.add(PlaybackState(
       controls: _buildControls(playing),
       systemActions: const {
@@ -197,7 +195,10 @@ class AudioPlayerHandler extends BaseAudioHandler {
       await _webPlayer.play();
       final current = mediaItem.value;
       if (current != null) mediaItem.add(current);
-      _emitWebViewState();
+      // Emit playing=true immediately — don't wait for the async stateChange
+      // event from JS, which arrives after a round-trip and would otherwise
+      // leave the UI showing the wrong icon until the next event.
+      _emitWebViewStatePlaying(true);
     } else if (_player.processingState == ProcessingState.idle) {
       onPlay?.call();
     } else {
@@ -212,7 +213,8 @@ class AudioPlayerHandler extends BaseAudioHandler {
   Future<void> pause() async {
     if (_usingWebView) {
       await _webPlayer.pause();
-      _emitWebViewState();
+      // Emit playing=false immediately — same reason as play() above.
+      _emitWebViewStatePlaying(false);
     } else {
       await _player.pause();
       playbackState.add(_transformEvent(_player.playbackEvent));
