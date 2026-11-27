@@ -2,14 +2,10 @@ package com.lxmw.musicapp
 
 import android.content.Context
 import android.content.Intent
-import android.media.AudioAttributes
-import android.media.AudioFocusRequest
-import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
-import android.webkit.WebView
 import androidx.core.content.FileProvider
 import com.ryanheise.audioservice.AudioServiceActivity
 import com.pichillilorenzo.flutter_inappwebview_android.InAppWebViewFlutterPlugin
@@ -20,23 +16,18 @@ import java.io.File
 class MainActivity : AudioServiceActivity() {
 
     private var youtubeChannel: MethodChannel? = null
-    private var audioFocusRequest: AudioFocusRequest? = null
 
     companion object {
-        // Called by WebViewPlayerService.JsBridge to deliver events to Dart
         @Volatile private var eventChannel: MethodChannel? = null
 
         fun forwardWebEvent(context: Context, json: String) {
-            val channel = eventChannel ?: return
-            // MethodChannel must be called on the main thread
+            val ch = eventChannel ?: return
             android.os.Handler(android.os.Looper.getMainLooper()).post {
-                channel.invokeMethod("onEvent", json)
+                ch.invokeMethod("onEvent", json)
             }
         }
 
-        fun setEventChannel(ch: MethodChannel?) {
-            eventChannel = ch
-        }
+        fun setEventChannel(ch: MethodChannel?) { eventChannel = ch }
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -93,17 +84,16 @@ class MainActivity : AudioServiceActivity() {
                 "cmd" -> {
                     val command = call.argument<String>("command") ?: ""
                     val args = call.arguments as Map<*, *>
-                    val js = buildJs(command, args)
                     val svc = WebViewPlayerService.instance
                     if (svc != null) {
-                        svc.sendCommand(js)
+                        svc.sendCommand(buildJs(command, args))
                         when (command) {
                             "load", "play" -> {
+                                // resumeTimers re-enables JS setInterval paused by Android
                                 svc.webView?.resumeTimers()
                                 svc.acquireWakeLock()
-                                requestAudioFocus()
                             }
-                            "pause", "stop" -> abandonAudioFocus()
+                            "stop" -> svc.releaseWakeLock()
                         }
                     }
                     result.success(null)
@@ -115,7 +105,6 @@ class MainActivity : AudioServiceActivity() {
                 }
                 "releaseWakeLock" -> {
                     WebViewPlayerService.instance?.releaseWakeLock()
-                    abandonAudioFocus()
                     result.success(null)
                 }
                 else -> result.notImplemented()
@@ -123,24 +112,20 @@ class MainActivity : AudioServiceActivity() {
         }
     }
 
-    // ── Service helpers ───────────────────────────────────────────────────
+    // ── Service ───────────────────────────────────────────────────────────
 
     private fun startWebViewService() {
         val intent = Intent(this, WebViewPlayerService::class.java).apply {
             action = WebViewPlayerService.ACTION_START
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(intent)
-        } else {
-            startService(intent)
-        }
-        // Give service a moment to start, then attach overlay window
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent)
+        else startService(intent)
         android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
             WebViewPlayerService.instance?.ensureOverlayWindow()
         }, 500)
     }
 
-    // ── JS command builder ────────────────────────────────────────────────
+    // ── JS builder ────────────────────────────────────────────────────────
 
     private fun buildJs(command: String, args: Map<*, *>): String {
         val jsArgs = when (command) {
@@ -154,14 +139,8 @@ class MainActivity : AudioServiceActivity() {
                 val startMs = (args["startMs"] as? Number)?.toLong() ?: 0L
                 "\"$videoId\", ${startMs / 1000.0}"
             }
-            "seek" -> {
-                val posMs = (args["positionMs"] as? Number)?.toLong() ?: 0L
-                "${posMs / 1000.0}"
-            }
-            "setVolume" -> {
-                val vol = (args["volume"] as? Number)?.toDouble() ?: 1.0
-                "${(vol * 100).toInt()}"
-            }
+            "seek" -> "${(args["positionMs"] as? Number)?.toLong()?.div(1000.0) ?: 0.0}"
+            "setVolume" -> "${((args["volume"] as? Number)?.toDouble()?.times(100))?.toInt() ?: 100}"
             "play", "pause", "stop" -> ""
             else -> args.filterKeys { it != "command" }.values.joinToString(", ") { v ->
                 when (v) {
@@ -188,40 +167,6 @@ class MainActivity : AudioServiceActivity() {
         }
     }
 
-    // ── Audio focus ───────────────────────────────────────────────────────
-
-    private fun requestAudioFocus() {
-        val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            if (audioFocusRequest != null) return
-            audioFocusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
-                .setAudioAttributes(AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_MEDIA)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                    .build())
-                .setAcceptsDelayedFocusGain(true)
-                .setOnAudioFocusChangeListener { change ->
-                    if (change == AudioManager.AUDIOFOCUS_GAIN)
-                        WebViewPlayerService.instance?.webView?.resumeTimers()
-                }
-                .build()
-            am.requestAudioFocus(audioFocusRequest!!)
-        } else {
-            @Suppress("DEPRECATION")
-            am.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN)
-        }
-    }
-
-    private fun abandonAudioFocus() {
-        val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            audioFocusRequest?.let { am.abandonAudioFocusRequest(it) }
-            audioFocusRequest = null
-        } else {
-            @Suppress("DEPRECATION") am.abandonAudioFocus(null)
-        }
-    }
-
     // ── Lifecycle ─────────────────────────────────────────────────────────
 
     override fun onResume() {
@@ -232,13 +177,11 @@ class MainActivity : AudioServiceActivity() {
 
     override fun onPause() {
         super.onPause()
-        // Do NOT pause the WebView — it lives in the foreground service
+        // WebView lives in WebViewPlayerService — do not pause it here
     }
 
     override fun onDestroy() {
         setEventChannel(null)
-        abandonAudioFocus()
         super.onDestroy()
-        // Service stays running so playback continues
     }
 }
