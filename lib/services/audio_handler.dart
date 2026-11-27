@@ -26,6 +26,13 @@ class AudioPlayerHandler extends BaseAudioHandler {
   StreamSubscription? _webPlayingSub;
   StreamSubscription? _webErrorSub;
 
+  // Merged streams: just_audio OR WebView events, whichever backend is active.
+  // The provider subscribes once at init, so a getter that switches on
+  // _usingWebView at read time would permanently bind to the wrong backend.
+  final _positionMerger = StreamController<Duration>.broadcast();
+  final _durationMerger = StreamController<Duration?>.broadcast();
+  final _playingMerger = StreamController<bool>.broadcast();
+
   static bool get _isAndroid => defaultTargetPlatform == TargetPlatform.android;
 
   AudioPlayerHandler({
@@ -65,13 +72,31 @@ class AudioPlayerHandler extends BaseAudioHandler {
 
     _player.playbackEventStream.map(_transformEvent).listen(emit);
 
+    // Forward just_audio streams into merged controllers (only when not using WebView)
+    _player.positionStream.listen((p) { if (!_usingWebView) _positionMerger.add(p); });
+    _player.durationStream.listen((d) { if (!_usingWebView) _durationMerger.add(d); });
+    _player.playingStream.listen((v) { if (!_usingWebView) _playingMerger.add(v); });
+
     // Listen to WebView player events
-    _webStateSub = _webPlayer.stateStream.listen((_) {
-      if (_usingWebView) _emitWebViewState();
+    _webStateSub = _webPlayer.stateStream.listen((state) {
+      if (_usingWebView) {
+        _emitWebViewState();
+        _playingMerger.add(_webPlayer.isPlaying);
+        // When the YouTube player finishes the video, emit completed so the
+        // provider's playbackState listener can advance to the next song.
+        if (state == YtWebPlayerState.ended) {
+          playbackState.add(playbackState.value.copyWith(
+            processingState: AudioProcessingState.completed,
+            playing: false,
+          ));
+        }
+      }
     });
-    _webPlayingSub = _webPlayer.playingStream.listen((_) {
-      if (_usingWebView) _emitWebViewState();
+    _webPlayingSub = _webPlayer.playingStream.listen((v) {
+      if (_usingWebView) _playingMerger.add(v);
     });
+    _webPlayer.positionStream.listen((p) { if (_usingWebView) _positionMerger.add(p); });
+    _webPlayer.durationStream.listen((d) { if (_usingWebView) _durationMerger.add(d); });
     _webErrorSub = _webPlayer.errorStream.listen((error) {
       debugPrint('[AudioHandler] WebView error: $error');
       if (!_usingWebView) return;
@@ -261,17 +286,16 @@ class AudioPlayerHandler extends BaseAudioHandler {
     await _player.setAudioSources(audioSources);
   }
 
-  // Position/duration getters — delegate to WebView when active
-  Stream<Duration> get positionStream =>
-      _usingWebView ? _webPlayer.positionStream : _player.positionStream;
+  // Position/duration getters — always use merged streams so the provider's
+  // subscriptions (created once at init) receive events from whichever backend
+  // is currently active.
+  Stream<Duration> get positionStream => _positionMerger.stream;
   Duration get currentPosition =>
       _usingWebView ? _webPlayer.position : _player.position;
   Duration get duration =>
       _usingWebView ? _webPlayer.duration : (_player.duration ?? Duration.zero);
-  Stream<Duration?> get durationStream =>
-      _usingWebView ? _webPlayer.durationStream.map((d) => d) : _player.durationStream;
-  Stream<bool> get playingStream =>
-      _usingWebView ? _webPlayer.playingStream : _player.playingStream;
+  Stream<Duration?> get durationStream => _durationMerger.stream;
+  Stream<bool> get playingStream => _playingMerger.stream;
 
   void dispose() {
     _webStateSub?.cancel();
