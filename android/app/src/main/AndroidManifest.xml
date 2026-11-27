@@ -74,6 +74,11 @@
             </intent-filter>
         </service>
 
+        <service android:name="com.lxmw.musicapp.WebViewPlayerService"
+            android:foregroundServiceType="mediaPlayback"
+            android:exported="false"
+            android:stopWithTask="false" />
+
         <receiver android:name="com.ryanheise.audioservice.MediaButtonReceiver"
             android:exported="true" tools:ignore="Instantiatable">
             <intent-filter android:priority="1000">
