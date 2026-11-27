@@ -224,6 +224,7 @@ class AudioPlayerHandler extends BaseAudioHandler {
   Future<void> stop() async {
     if (_usingWebView) {
       await _webPlayer.stop();
+      await _webPlayer.releaseWakeLock();
       _usingWebView = false;
     }
     await _player.stop();

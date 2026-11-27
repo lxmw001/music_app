@@ -26,6 +26,8 @@ class MainActivity : AudioServiceActivity() {
     private var youtubeWebView: WebView? = null
     private var overlayWindow: View? = null
     private var youtubeChannel: MethodChannel? = null
+    // Keeps CPU alive when screen is off so the WebView renderer keeps running
+    private var wakeLock: PowerManager.WakeLock? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -101,6 +103,10 @@ class MainActivity : AudioServiceActivity() {
                 }
                 "requestOverlayPermission" -> {
                     requestOverlayPermission()
+                    result.success(null)
+                }
+                "releaseWakeLock" -> {
+                    runOnUiThread { releaseWakeLock() }
                     result.success(null)
                 }
                 else -> result.notImplemented()
@@ -186,16 +192,12 @@ class MainActivity : AudioServiceActivity() {
         if (hasOverlayPermission()) {
             moveToOverlay()
         } else {
-            // No overlay permission — add directly to the decor view, small and
-            // in the top-start corner so it's visible (covered/zero-size views
-            // cause YouTube to pause after ~40s).
+            // No overlay permission — add a 1×1 visible pixel to the decor view.
+            // Covered/zero-size views cause YouTube to pause after ~40s, but a
+            // 1×1 on-screen pixel satisfies the visibility check.
             val rootView = window.decorView as android.view.ViewGroup
-            val density = resources.displayMetrics.density
-            val widthPx = (200 * density).toInt()
-            val heightPx = (112 * density).toInt()
-            val params = android.widget.FrameLayout.LayoutParams(widthPx, heightPx).apply {
+            val params = android.widget.FrameLayout.LayoutParams(1, 1).apply {
                 gravity = android.view.Gravity.TOP or android.view.Gravity.START
-                topMargin = (24 * density).toInt()
             }
             rootView.addView(webView, params)
             webView.bringToFront()
@@ -283,14 +285,11 @@ class MainActivity : AudioServiceActivity() {
         // Remove from activity view if attached
         (webView.parent as? android.view.ViewGroup)?.removeView(webView)
 
-        // Small window, top-left corner, not touchable — floats above the app
-        // (and above other apps) so YouTube's embed visibility check passes and
-        // playback continues in the background. NOT_TOUCHABLE so it never
-        // intercepts UI input.
-        val density = resources.displayMetrics.density
+        // 1×1 pixel, positioned at (0,0) — technically on-screen so Chromium's
+        // visibility check passes, but invisible to the user. NOT_TOUCHABLE so
+        // it never intercepts input.
         val params = WindowManager.LayoutParams(
-            (200 * density).toInt(),   // ~200dp wide
-            (112 * density).toInt(),   // ~112dp tall (16:9)
+            1, 1,
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             else
@@ -311,23 +310,41 @@ class MainActivity : AudioServiceActivity() {
         try {
             wm.addView(webView, params)
             overlayWindow = webView
+            acquireWakeLock()
         } catch (e: Exception) {
-            // Fallback: re-add to activity root view
+            // Fallback: 1×1 in the activity decor view
             overlayWindow = null
             val rootView = window.decorView as android.view.ViewGroup
             if (webView.parent == null) {
-                val fallbackParams = android.widget.FrameLayout.LayoutParams(
-                    (200 * density).toInt(),
-                    (112 * density).toInt()
-                ).apply {
+                val fallbackParams = android.widget.FrameLayout.LayoutParams(1, 1).apply {
                     gravity = android.view.Gravity.TOP or android.view.Gravity.START
-                    topMargin = (16 * density).toInt()
                 }
                 rootView.addView(webView, fallbackParams)
-                webView.bringToFront()
-                webView.elevation = 100f
             }
         }
+    }
+
+    // === Wake Lock ===
+
+    /** Acquire a PARTIAL_WAKE_LOCK so the CPU stays on when the screen locks.
+     *  Without this the WebView renderer is throttled and audio stops. */
+    private fun acquireWakeLock() {
+        if (wakeLock?.isHeld == true) return
+        val pm = getSystemService(POWER_SERVICE) as PowerManager
+        wakeLock = pm.newWakeLock(
+            PowerManager.PARTIAL_WAKE_LOCK,
+            "MusicApp:YouTubeWebView"
+        ).also {
+            it.setReferenceCounted(false)
+            it.acquire(6 * 60 * 60 * 1000L) // max 6 h, released on stop
+        }
+    }
+
+    fun releaseWakeLock() {
+        if (wakeLock?.isHeld == true) {
+            wakeLock?.release()
+        }
+        wakeLock = null
     }
 
     // === JS Bridge ===
@@ -354,12 +371,8 @@ class MainActivity : AudioServiceActivity() {
                     moveToOverlay()
                 } else {
                     val rootView = window.decorView as android.view.ViewGroup
-                    val density = resources.displayMetrics.density
-                    val params = android.widget.FrameLayout.LayoutParams(
-                        (200 * density).toInt(), (112 * density).toInt()
-                    ).apply {
+                    val params = android.widget.FrameLayout.LayoutParams(1, 1).apply {
                         gravity = android.view.Gravity.TOP or android.view.Gravity.START
-                        topMargin = (24 * density).toInt()
                     }
                     rootView.addView(webView, params)
                     webView.bringToFront()
@@ -377,8 +390,8 @@ class MainActivity : AudioServiceActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        // Keep WebView alive unless the activity is finishing
         if (isFinishing) {
+            releaseWakeLock()
             youtubeWebView?.let { webView ->
                 (webView.parent as? android.view.ViewGroup)?.removeView(webView)
                 if (overlayWindow != null) {

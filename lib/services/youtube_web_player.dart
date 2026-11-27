@@ -141,6 +141,11 @@ class YouTubeWebPlayer {
   Future<void> pause() async => _sendCommand('pause', {});
   Future<void> seek(Duration position) async => _sendCommand('seek', {'positionMs': position.inMilliseconds});
   Future<void> stop() async => _sendCommand('stop', {});
+  Future<void> releaseWakeLock() async {
+    try {
+      await _channel.invokeMethod('releaseWakeLock');
+    } catch (_) {}
+  }
   Future<void> setVolume(double vol) async {
     _volume = vol;
     _sendCommand('setVolume', {'volume': vol});
