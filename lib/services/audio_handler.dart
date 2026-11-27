@@ -205,11 +205,11 @@ class AudioPlayerHandler extends BaseAudioHandler {
   @override
   Future<void> play() async {
     if (_usingWebView) {
+      _optimisticPlaying = true;      // set before await so the guard is active
+      _emitWebViewStatePlaying(true); // update UI immediately
       await _webPlayer.play();
       final current = mediaItem.value;
       if (current != null) mediaItem.add(current);
-      _optimisticPlaying = true;
-      _emitWebViewStatePlaying(true);
     } else if (_player.processingState == ProcessingState.idle) {
       onPlay?.call();
     } else {
@@ -224,8 +224,8 @@ class AudioPlayerHandler extends BaseAudioHandler {
   Future<void> pause() async {
     if (_usingWebView) {
       _optimisticPlaying = false;
+      _emitWebViewStatePlaying(false); // update UI immediately
       await _webPlayer.pause();
-      _emitWebViewStatePlaying(false);
     } else {
       await _player.pause();
       playbackState.add(_transformEvent(_player.playbackEvent));

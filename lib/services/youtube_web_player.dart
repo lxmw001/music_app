@@ -210,8 +210,11 @@ class YouTubeWebPlayer {
         case 'stateChange':
           final stateCode = data['state'] as int?;
           _state = _mapState(stateCode);
-          _stateController.add(_state);
+          // Update _isPlaying BEFORE firing the state stream — the handler
+          // (audio_handler) reads isPlaying inside its listener, and it must
+          // already reflect the new state at that point.
           _isPlaying = _state == YtWebPlayerState.playing;
+          _stateController.add(_state);
           _playingController.add(_isPlaying);
           break;
         case 'timeUpdate':
