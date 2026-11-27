@@ -242,6 +242,9 @@ class AudioPlayerHandler extends BaseAudioHandler {
       _currentItem = item;
       try { await _player.stop(); } catch (_) {}
       mediaItem.add(item);
+      // Park the WebView in the overlay window — a covered WebView makes
+      // YouTube's embed visibility check fail, pausing playback after ~40s.
+      await _webPlayer.ensureOverlay();
       await _webPlayer.load(videoId, autoplay: true);
       _emitWebViewState();
       return;

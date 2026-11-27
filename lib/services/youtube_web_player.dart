@@ -104,6 +104,22 @@ class YouTubeWebPlayer {
     }
   }
 
+  /// Ensure the WebView lives in the overlay window (needed so YouTube's
+  /// embed visibility check passes — covered views pause after ~40s).
+  /// Requests the SYSTEM_ALERT_WINDOW permission the first time.
+  Future<void> ensureOverlay() async {
+    try {
+      if (await hasOverlayPermission()) {
+        await moveToOverlay();
+      } else {
+        // Opens system settings; the user grants "Display over other apps".
+        await requestOverlayPermission();
+      }
+    } catch (e) {
+      debugPrint('[YouTubeWebPlayer] ensureOverlay failed: $e');
+    }
+  }
+
   Future<void> load(String videoId, {Duration? start, bool autoplay = true}) async {
     _sendCommand('load', {
       'videoId': videoId,
