@@ -1,7 +1,11 @@
 package com.lxmw.musicapp
 
+import android.content.Context
 import android.content.Intent
 import android.graphics.PixelFormat
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
@@ -26,8 +30,8 @@ class MainActivity : AudioServiceActivity() {
     private var youtubeWebView: WebView? = null
     private var overlayWindow: View? = null
     private var youtubeChannel: MethodChannel? = null
-    // Keeps CPU alive when screen is off so the WebView renderer keeps running
     private var wakeLock: PowerManager.WakeLock? = null
+    private var audioFocusRequest: AudioFocusRequest? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -255,6 +259,18 @@ class MainActivity : AudioServiceActivity() {
 
         val js = "window.__cmd(\"$command\"${if (jsArgs.isNotEmpty()) ", $jsArgs" else ""})"
         youtubeWebView?.evaluateJavascript(js, null)
+
+        // Keep the WebView renderer alive and audio focus held during playback
+        when (command) {
+            "load", "play" -> {
+                youtubeWebView?.resumeTimers()
+                requestAudioFocus()
+                acquireWakeLock()
+            }
+            "pause", "stop" -> {
+                abandonAudioFocus()
+            }
+        }
     }
 
     // === Overlay Window ===
@@ -352,6 +368,8 @@ class MainActivity : AudioServiceActivity() {
             it.setReferenceCounted(false)
             it.acquire(6 * 60 * 60 * 1000L) // max 6 h, released on stop
         }
+        // Ensure JS timers are running (may have been paused by system)
+        youtubeWebView?.resumeTimers()
     }
 
     fun releaseWakeLock() {
@@ -359,6 +377,50 @@ class MainActivity : AudioServiceActivity() {
             wakeLock?.release()
         }
         wakeLock = null
+    }
+
+    // === Audio Focus ===
+
+    private fun requestAudioFocus() {
+        val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (audioFocusRequest != null) return
+            audioFocusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build()
+                )
+                .setAcceptsDelayedFocusGain(true)
+                .setOnAudioFocusChangeListener { focusChange ->
+                    when (focusChange) {
+                        AudioManager.AUDIOFOCUS_LOSS,
+                        AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+                            // Let the Dart side handle pause — don't stop here
+                        }
+                        AudioManager.AUDIOFOCUS_GAIN -> {
+                            youtubeWebView?.resumeTimers()
+                        }
+                    }
+                }
+                .build()
+            am.requestAudioFocus(audioFocusRequest!!)
+        } else {
+            @Suppress("DEPRECATION")
+            am.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN)
+        }
+    }
+
+    private fun abandonAudioFocus() {
+        val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            audioFocusRequest?.let { am.abandonAudioFocusRequest(it) }
+            audioFocusRequest = null
+        } else {
+            @Suppress("DEPRECATION")
+            am.abandonAudioFocus(null)
+        }
     }
 
     // === JS Bridge ===
@@ -377,6 +439,8 @@ class MainActivity : AudioServiceActivity() {
     override fun onResume() {
         super.onResume()
         youtubeWebView?.onResume()
+        youtubeWebView?.resumeTimers()
+        if (wakeLock?.isHeld == true) requestAudioFocus()
         // If the overlay was lost (e.g. permission revoked), re-add to activity
         if (overlayWindow == null && youtubeWebView != null) {
             val webView = youtubeWebView!!
@@ -409,6 +473,7 @@ class MainActivity : AudioServiceActivity() {
     override fun onDestroy() {
         super.onDestroy()
         if (isFinishing) {
+            abandonAudioFocus()
             releaseWakeLock()
             youtubeWebView?.let { webView ->
                 (webView.parent as? android.view.ViewGroup)?.removeView(webView)
