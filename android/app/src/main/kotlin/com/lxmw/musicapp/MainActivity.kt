@@ -325,8 +325,11 @@ class MainActivity : AudioServiceActivity() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = android.view.Gravity.TOP or android.view.Gravity.START
-            // Shift so only a 64px square shows in the top-left corner
-            x = -(widthPx - 64)
+            // Shift entirely off-screen to the left — FLAG_LAYOUT_NO_LIMITS
+            // allows negative coordinates. The window stays attached to the
+            // display surface so Chromium's visibility check passes, but it
+            // is completely invisible to the user.
+            x = -widthPx
             y = 0
         }
 
