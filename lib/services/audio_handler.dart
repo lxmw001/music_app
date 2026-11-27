@@ -114,10 +114,8 @@ class AudioPlayerHandler extends BaseAudioHandler {
             processingState: AudioProcessingState.completed,
             playing: false,
           ));
-          Future.delayed(const Duration(milliseconds: 400), () {
-            if (_usingWebView == false) return;
-            onSkipToNext?.call();
-          });
+          // Provider's playbackState listener handles nextSong() with
+          // _lastCompletedSongId dedup. No second skip needed here.
         }
       }
     });
@@ -146,10 +144,8 @@ class AudioPlayerHandler extends BaseAudioHandler {
     _emitWebViewStatePlaying(_webPlayer.isPlaying);
   }
 
-  /// Emit a WebView playback state with an explicit playing value. Used right
-  /// after play()/pause() so the UI reflects the intent immediately, before
-  /// the async JS stateChange event confirms it.
   void _emitWebViewStatePlaying(bool playing) {
+    debugPrint('[AudioHandler] emitPlaying=$playing optimistic=$_optimisticPlaying webPlayerIsPlaying=${_webPlayer.isPlaying}');
     _playingMerger.add(playing);
     final processingState = _webPlayer.state == YtWebPlayerState.error
         ? AudioProcessingState.error
@@ -169,6 +165,7 @@ class AudioPlayerHandler extends BaseAudioHandler {
       speed: 1.0,
       queueIndex: 0,
     ));
+    debugPrint('[AudioHandler] playbackState.value.playing=${playbackState.value.playing}');
   }
 
   bool _nextEnabled = true;
@@ -207,6 +204,7 @@ class AudioPlayerHandler extends BaseAudioHandler {
   @override
   Future<void> play() async {
     if (_usingWebView) {
+      debugPrint('[AudioHandler] play() called, _optimisticPlaying=$_optimisticPlaying');
       _optimisticPlaying = true;      // set before await so the guard is active
       _emitWebViewStatePlaying(true); // update UI immediately
       await _webPlayer.play();
@@ -225,6 +223,7 @@ class AudioPlayerHandler extends BaseAudioHandler {
   @override
   Future<void> pause() async {
     if (_usingWebView) {
+      debugPrint('[AudioHandler] pause() called, _optimisticPlaying=$_optimisticPlaying');
       _optimisticPlaying = false;
       _emitWebViewStatePlaying(false); // update UI immediately
       await _webPlayer.pause();
