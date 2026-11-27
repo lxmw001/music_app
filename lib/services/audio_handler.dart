@@ -25,6 +25,9 @@ class AudioPlayerHandler extends BaseAudioHandler {
   StreamSubscription? _webStateSub;
   StreamSubscription? _webPlayingSub;
   StreamSubscription? _webErrorSub;
+  // Set to true right after play() so buffering stateChange events don't
+  // flip the icon back to paused before the player confirms playing=1.
+  bool _optimisticPlaying = false;
 
   /// True when the WebView IFrame player is the active backend. Used by the
   /// provider to treat YouTube 'ended' as authoritative song completion.
@@ -84,23 +87,33 @@ class AudioPlayerHandler extends BaseAudioHandler {
     // Listen to WebView player events
     _webStateSub = _webPlayer.stateStream.listen((state) {
       if (_usingWebView) {
+        // If we optimistically set playing=true (after play() command), hold
+        // that state until the WebView confirms playing (state 1). Buffering
+        // (state 3) arrives first and would flip the icon back to paused.
+        if (_optimisticPlaying) {
+          if (state == YtWebPlayerState.playing) {
+            _optimisticPlaying = false; // confirmed — resume normal emission
+          } else if (state == YtWebPlayerState.buffering ||
+                     state == YtWebPlayerState.loading) {
+            // Still loading — keep optimistic playing=true, skip emission
+            _playingMerger.add(true);
+            return;
+          } else {
+            // Unexpected state (error, paused, etc.) — clear optimism
+            _optimisticPlaying = false;
+          }
+        }
+
         _emitWebViewState();
         _playingMerger.add(_webPlayer.isPlaying);
-        // When the YouTube player finishes the video, emit completed so the
-        // provider's playbackState listener can advance to the next song.
-        // Also call onSkipToNext directly — the provider's completed guard
-        // (wasPlaying + nearEnd heuristics) can fail when duration/position
-        // data is stale at the moment the event arrives.
+
         if (state == YtWebPlayerState.ended) {
           playbackState.add(playbackState.value.copyWith(
             processingState: AudioProcessingState.completed,
             playing: false,
           ));
-          // Small delay so the playbackState listener fires first; if it
-          // already called nextSong the skip below is a no-op because
-          // _isSwitchingSong will be true.
           Future.delayed(const Duration(milliseconds: 400), () {
-            if (_usingWebView == false) return; // already switched
+            if (_usingWebView == false) return;
             onSkipToNext?.call();
           });
         }
@@ -195,9 +208,7 @@ class AudioPlayerHandler extends BaseAudioHandler {
       await _webPlayer.play();
       final current = mediaItem.value;
       if (current != null) mediaItem.add(current);
-      // Emit playing=true immediately — don't wait for the async stateChange
-      // event from JS, which arrives after a round-trip and would otherwise
-      // leave the UI showing the wrong icon until the next event.
+      _optimisticPlaying = true;
       _emitWebViewStatePlaying(true);
     } else if (_player.processingState == ProcessingState.idle) {
       onPlay?.call();
@@ -212,8 +223,8 @@ class AudioPlayerHandler extends BaseAudioHandler {
   @override
   Future<void> pause() async {
     if (_usingWebView) {
+      _optimisticPlaying = false;
       await _webPlayer.pause();
-      // Emit playing=false immediately — same reason as play() above.
       _emitWebViewStatePlaying(false);
     } else {
       await _player.pause();
@@ -255,6 +266,7 @@ class AudioPlayerHandler extends BaseAudioHandler {
     if (!isLocal && _isAndroid && videoId != null && videoId.isNotEmpty) {
       debugPrint('[AudioHandler] Using WebView player for $videoId');
       _usingWebView = true;
+      _optimisticPlaying = false;
       _currentVideoId = videoId;
       _currentItem = item;
       try { await _player.stop(); } catch (_) {}
