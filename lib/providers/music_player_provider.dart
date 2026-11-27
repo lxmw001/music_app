@@ -274,14 +274,17 @@ class MusicPlayerProviderImpl extends MusicPlayerProvider {
       _audioHandler.playbackState.listen((state) {
         if (state.processingState == AudioProcessingState.completed && !_isSwitchingSong && !_isTransitioning) {
           final completedSongId = _currentSong?.id;
-          if (completedSongId == _lastCompletedSongId) return; 
+          if (completedSongId == _lastCompletedSongId) return;
           final duration = totalDuration;
           final played = _lastPosition.inSeconds;
           final wasPlaying = played >= 10;
-          final nearEnd = duration.inSeconds > 0
+          // For WebView playback, YouTube state 0 (ended) is authoritative —
+          // skip the nearEnd heuristic that can fail when duration is stale.
+          final isWebView = _audioHandler.isUsingWebView;
+          final nearEnd = isWebView || (duration.inSeconds > 0
               ? played >= (duration.inSeconds - 15) || played >= (duration.inSeconds * 0.8)
-              : played >= 20;
-          if (completedSongId != null && wasPlaying && nearEnd) {
+              : played >= 20);
+          if (completedSongId != null && (isWebView || wasPlaying) && nearEnd) {
             _lastCompletedSongId = completedSongId;
             _historyService.recordPlay(_currentSong!, _lastPosition.inSeconds);
             _markPendingPlaylistLiked(_currentSong!, _lastPosition.inSeconds);

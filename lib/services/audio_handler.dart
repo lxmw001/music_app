@@ -26,6 +26,10 @@ class AudioPlayerHandler extends BaseAudioHandler {
   StreamSubscription? _webPlayingSub;
   StreamSubscription? _webErrorSub;
 
+  /// True when the WebView IFrame player is the active backend. Used by the
+  /// provider to treat YouTube 'ended' as authoritative song completion.
+  bool get isUsingWebView => _usingWebView;
+
   // Merged streams: just_audio OR WebView events, whichever backend is active.
   // The provider subscribes once at init, so a getter that switches on
   // _usingWebView at read time would permanently bind to the wrong backend.
@@ -84,11 +88,21 @@ class AudioPlayerHandler extends BaseAudioHandler {
         _playingMerger.add(_webPlayer.isPlaying);
         // When the YouTube player finishes the video, emit completed so the
         // provider's playbackState listener can advance to the next song.
+        // Also call onSkipToNext directly — the provider's completed guard
+        // (wasPlaying + nearEnd heuristics) can fail when duration/position
+        // data is stale at the moment the event arrives.
         if (state == YtWebPlayerState.ended) {
           playbackState.add(playbackState.value.copyWith(
             processingState: AudioProcessingState.completed,
             playing: false,
           ));
+          // Small delay so the playbackState listener fires first; if it
+          // already called nextSong the skip below is a no-op because
+          // _isSwitchingSong will be true.
+          Future.delayed(const Duration(milliseconds: 400), () {
+            if (_usingWebView == false) return; // already switched
+            onSkipToNext?.call();
+          });
         }
       }
     });
