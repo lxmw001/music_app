@@ -77,7 +77,9 @@ class AudioPlayerHandler extends BaseAudioHandler {
       }
     }
 
-    _player.playbackEventStream.map(_transformEvent).listen(emit);
+    _player.playbackEventStream.map(_transformEvent).listen((state) {
+      if (!_usingWebView) emit(state);
+    });
 
     // Forward just_audio streams into merged controllers (only when not using WebView)
     _player.positionStream.listen((p) { if (!_usingWebView) _positionMerger.add(p); });
